@@ -326,7 +326,7 @@ The Thin Skill may not have installed. From the `capafy-user/` directory, run `p
 
 - **Website**: <https://capafy.ai>
 - **Publisher Skill source**: [`publisher_skill/`](publisher_skill/)
-- **User Skill source**: [`_user_skill/`](_user_skill/)
+- **User Skill source**: [`_user_skill/`](_capafy-user/)
 - **Publisher install URL**: `https://capafy.ai/install-publisher-skill.md`
 - **User install URL**: `https://capafy.ai/install-user-skill.md`
 
