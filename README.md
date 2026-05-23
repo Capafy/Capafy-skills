@@ -8,9 +8,11 @@
 💻 [Website](https://capafy.ai) · 🚀 [Quickstart](#quickstart) · 📤 [Publish & Earn](#publish--earn) · 📥 [Use a Skill](#use-a-skill) · ❓ [FAQ](#faq--troubleshooting)
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-pre--launch-orange)
+![Status](https://img.shields.io/badge/status-launch-brightgreen)
+![Agent client](https://img.shields.io/badge/agent%20client-Claude%20Code%20%7C%20Codex%20%7C%20OpenClaw-blue)
 
-![Capafy — turn your skills into money](images/hero.png)
+<img width="1672" height="941" alt="hero" src="https://github.com/user-attachments/assets/b17f6d96-5c30-4dcc-b652-2e145ecedd19" />
+
 
 </div>
 
@@ -324,7 +326,7 @@ The Thin Skill may not have installed. From the `capafy-user/` directory, run `p
 
 - **Website**: <https://capafy.ai>
 - **Publisher Skill source**: [`publisher_skill/`](publisher_skill/)
-- **User Skill source**: [`user_skill/`](user_skill/)
+- **User Skill source**: [`_user_skill/`](_user_skill/)
 - **Publisher install URL**: `https://capafy.ai/install-publisher-skill.md`
 - **User install URL**: `https://capafy.ai/install-user-skill.md`
 
