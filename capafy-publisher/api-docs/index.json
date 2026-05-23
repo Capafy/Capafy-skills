@@ -1,0 +1,14 @@
+{
+  "version": "0.5.18",
+  "modules": [
+    "00_overview.md"
+  ],
+  "module_index": [
+    {
+      "file": "00_overview.md",
+      "runtime_active": true,
+      "purpose": "Current shipped API contract: base conventions, endpoint index, Agent queries, lifecycle gaps, earnings/payout/statistics/refund/KYC queries.",
+      "when_to_read": "Read first after every self-update; also read when checking endpoint contract, Agent status, relist/delist/delete-draft support, earnings, payout, statistics, refund, certification, or KYC."
+    }
+  ]
+}

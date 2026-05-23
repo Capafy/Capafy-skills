@@ -1,0 +1,123 @@
+{
+  "env_id": "codex",
+  "display_name": "Codex",
+  "target_registration": {
+    "runtime_generation": "codex_standalone"
+  },
+  "discovery_skill_precedence": [
+    ".agents/skills",
+    ".codex/skills"
+  ],
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".agents/skills",
+      "display_prefix": ".agents/skills",
+      "target_path": ".agents/skills",
+      "source_key": ".agents/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    },
+    {
+      "base": "home",
+      "path": ".codex/skills",
+      "display_prefix": ".codex/skills",
+      "target_path": ".codex/skills",
+      "source_key": ".codex/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    }
+  ],
+  "asset_roots": [],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".codex/config.toml",
+      "display_path": ".codex/config.toml"
+    },
+    {
+      "base": "home",
+      "path": ".codex/.env",
+      "display_path": ".codex/.env"
+    },
+    {
+      "base": "home",
+      "path": ".codex/auth.json",
+      "display_path": ".codex/auth.json"
+    },
+    {
+      "base": "home",
+      "path": ".codex/auth-profiles.json",
+      "display_path": ".codex/auth-profiles.json"
+    },
+    {
+      "base": "home",
+      "path": ".codex/AGENTS.md",
+      "display_path": ".codex/AGENTS.md"
+    },
+    {
+      "base": "home",
+      "path": ".codex/AGENTS.override.md",
+      "display_path": ".codex/AGENTS.override.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.md",
+      "display_path": "workspace/AGENTS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.override.md",
+      "display_path": "workspace/AGENTS.override.md"
+    }
+  ],
+  "fixed_stage_files": [
+    {
+      "base": "home",
+      "path": ".codex/config.toml",
+      "target_path": ".codex/config.toml",
+      "source_key": ".codex/config.toml",
+      "source_value": "copied"
+    },
+    {
+      "base": "home",
+      "path": ".codex/.env",
+      "target_path": ".codex/.env",
+      "source_key": ".codex/.env",
+      "source_value": "copied"
+    }
+  ],
+  "redact_files": [
+    {
+      "target_path": ".codex/config.toml",
+      "strategy": "toml_stage_config"
+    },
+    {
+      "target_path": ".codex/.env",
+      "strategy": "env_stage_config"
+    },
+    {
+      "target_path": ".codex/AGENTS.md",
+      "strategy": "markdown_instruction"
+    },
+    {
+      "target_path": ".codex/AGENTS.override.md",
+      "strategy": "markdown_instruction"
+    },
+    {
+      "target_path": "workspace/AGENTS.md",
+      "strategy": "markdown_instruction"
+    },
+    {
+      "target_path": "workspace/AGENTS.override.md",
+      "strategy": "markdown_instruction"
+    }
+  ],
+  "runtime_env": {
+    "field": "codex_version",
+    "command": [
+      "codex",
+      "--version"
+    ]
+  }
+}

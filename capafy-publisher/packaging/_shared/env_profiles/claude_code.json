@@ -1,0 +1,116 @@
+{
+  "env_id": "claude_code",
+  "display_name": "Claude Code",
+  "discovery_skill_precedence": [
+    ".claude/skills"
+  ],
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".claude/skills",
+      "display_prefix": ".claude/skills",
+      "target_path": ".claude/skills",
+      "source_key": ".claude/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    }
+  ],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".claude/.claude.json",
+      "display_path": ".claude/.claude.json"
+    },
+    {
+      "base": "home",
+      "path": ".claude/.credentials.json",
+      "display_path": ".claude/.credentials.json"
+    },
+    {
+      "base": "home",
+      "path": ".claude/settings.json",
+      "display_path": ".claude/settings.json"
+    },
+    {
+      "base": "home",
+      "path": ".claude/settings.local.json",
+      "display_path": ".claude/settings.local.json"
+    },
+    {
+      "base": "home",
+      "path": ".claude/managed-settings.json",
+      "display_path": ".claude/managed-settings.json"
+    },
+    {
+      "base": "home",
+      "path": ".claude/CLAUDE.md",
+      "display_path": ".claude/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "CLAUDE.md",
+      "display_path": "workspace/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".claude/CLAUDE.md",
+      "display_path": "workspace/.claude/CLAUDE.md"
+    }
+  ],
+  "fixed_stage_files": [
+    {
+      "base": "home",
+      "path": ".claude/settings.json",
+      "target_path": ".claude/settings.json",
+      "source_key": ".claude/settings.json",
+      "source_value": "copied"
+    },
+    {
+      "base": "home",
+      "path": ".claude/settings.local.json",
+      "target_path": ".claude/settings.local.json",
+      "source_key": ".claude/settings.local.json",
+      "source_value": "settings_local"
+    },
+    {
+      "base": "home",
+      "path": ".claude/managed-settings.json",
+      "target_path": ".claude/managed-settings.json",
+      "source_key": ".claude/managed-settings.json",
+      "source_value": "managed_settings"
+    }
+  ],
+  "redact_files": [
+    {
+      "target_path": ".claude/settings.json",
+      "strategy": "json_stage_config"
+    },
+    {
+      "target_path": ".claude/settings.local.json",
+      "strategy": "json_stage_config"
+    },
+    {
+      "target_path": ".claude/managed-settings.json",
+      "strategy": "json_stage_config"
+    },
+    {
+      "target_path": ".claude/CLAUDE.md",
+      "strategy": "markdown_instruction"
+    },
+    {
+      "target_path": "workspace/CLAUDE.md",
+      "strategy": "markdown_instruction"
+    },
+    {
+      "target_path": "workspace/.claude/CLAUDE.md",
+      "strategy": "markdown_instruction"
+    }
+  ],
+  "runtime_env": {
+    "field": "claude_code_version",
+    "command": [
+      "claude",
+      "--version"
+    ]
+  }
+}

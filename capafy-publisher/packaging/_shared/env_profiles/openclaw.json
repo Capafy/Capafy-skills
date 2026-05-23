@@ -1,0 +1,66 @@
+{
+  "env_id": "openclaw",
+  "display_name": "OpenClaw",
+  "discovery_skill_precedence": [
+    "workspace/skills",
+    "workspace/.agents/skills",
+    ".agents/skills",
+    ".openclaw/skills",
+    "bundled/skills",
+    "skills.load.extraDirs"
+  ],
+  "skill_roots": [],
+  "fixed_scan_files": [
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.md",
+      "display_path": ".openclaw/workspace/AGENTS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "SOUL.md",
+      "display_path": ".openclaw/workspace/SOUL.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "TOOLS.md",
+      "display_path": ".openclaw/workspace/TOOLS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "USER.md",
+      "display_path": ".openclaw/workspace/USER.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "HEARTBEAT.md",
+      "display_path": ".openclaw/workspace/HEARTBEAT.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "MEMORY.md",
+      "display_path": ".openclaw/workspace/MEMORY.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "memory.md",
+      "display_path": ".openclaw/workspace/memory.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "README.md",
+      "display_path": ".openclaw/workspace/README.md"
+    },
+    {
+      "base": "home",
+      "path": ".openclaw/agents/main/agent/auth-profiles.json",
+      "display_path": ".openclaw/agents/main/agent/auth-profiles.json"
+    }
+  ],
+  "fixed_stage_files": [],
+  "redact_files": [],
+  "runtime_env": {
+    "field": "openclaw_version",
+    "command": ["openclaw", "--version"]
+  }
+}
