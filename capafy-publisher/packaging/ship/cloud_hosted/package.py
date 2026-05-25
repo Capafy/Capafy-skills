@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path, PurePosixPath
@@ -38,7 +39,7 @@ def build_cloud_hosted_artifact_package_payload(
 def build_cloud_hosted_validate_reviewed_scan_json(
     *,
     effective_scan_payload: dict,
-) -> str | None:
+) -> Optional[str]:
     return json.dumps(effective_scan_payload, ensure_ascii=False)
 
 

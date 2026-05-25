@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
@@ -10,13 +11,6 @@ from packaging._shared.reviewed_scan.dispose import EXCLUDE_VALUE, REPLACE_WITH_
 from packaging.configure.sensitive.value_strip import strip_value_from_staging
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 from packaging.configure.staging.strip.targets import collect_strip_item_targets
-
-
-def collect_strip_targets(strip_items: list[dict]) -> list[dict]:
-    return collect_strip_item_targets(
-        strip_items,
-        placeholder_candidates_for_item=build_redaction_placeholder_candidates,
-    )
 
 
 def _run_strip_by_platform_groups(staging_root: Path, strip_targets: list[dict]) -> dict:
@@ -135,13 +129,17 @@ def _run_strip_by_final_disposition(staging_root: Path, reviewed_scan: dict) -> 
 
 def run_strip_batch(
     staging_root: Path,
-    strip_targets: list[dict] | None = None,
+    strip_targets: Optional[list[dict]] = None,
     *,
-    reviewed_scan: dict | None = None,
+    reviewed_scan: Optional[dict] = None,
     agent_type: str = "run_online",
 ) -> dict:
     if agent_type == "download":
         if not isinstance(reviewed_scan, dict):
             raise ValueError("download strip requires reviewed_scan payload")
         return _run_strip_by_final_disposition(staging_root, reviewed_scan)
-    return _run_strip_by_platform_groups(staging_root, strip_targets or [])
+    targets = collect_strip_item_targets(
+        strip_targets or [],
+        placeholder_candidates_for_item=build_redaction_placeholder_candidates,
+    )
+    return _run_strip_by_platform_groups(staging_root, targets)

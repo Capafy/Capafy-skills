@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import urllib.error
 import urllib.request
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 from urllib.parse import urlparse, urlunparse
 
 from capafy_platform.defaults import (
@@ -21,7 +22,7 @@ def build_file_upload_presign_request(
     *,
     agent_version_id: str,
     content_type: str,
-    biz_type: str | None = None,
+    biz_type: Optional[str] = None,
 ) -> dict[str, str]:
     normalized_agent_version_id = str(agent_version_id or "").strip()
     if not normalized_agent_version_id:
@@ -112,7 +113,7 @@ def _derive_http_package_url(upload_url: str, object_key: str) -> str:
         return ""
 
     path = parsed.path or ""
-    if path == f"/{normalized_object_key}" or path.endswith(f"/{normalized_object_key}"):
+    if path.endswith(f"/{normalized_object_key}"):
         normalized_path = path
     else:
         normalized_path = f"/{normalized_object_key}"
@@ -125,9 +126,9 @@ def presign_file_upload(
     *,
     agent_version_id: str,
     content_type: str,
-    biz_type: str | None = None,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    biz_type: Optional[str] = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     request_body = build_file_upload_presign_request(
         file_name,
@@ -146,10 +147,10 @@ def presign_file_upload(
 
 
 def upload_file_to_presigned_url(
-    file_path: str | Path,
+    file_path: Union[str, Path],
     upload_url: str,
     *,
-    headers: dict[str, str] | None = None,
+    headers: Optional[dict[str, str]] = None,
     method: str = "PUT",
     timeout_seconds: float = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
@@ -162,14 +163,18 @@ def upload_file_to_presigned_url(
         raise ValueError(f"only PUT presigned uploads are currently supported: {normalized_method}")
 
     request_headers = {str(key): str(value) for key, value in (headers or {}).items()}
-    request = urllib.request.Request(
-        str(upload_url).strip(),
-        data=normalized_file_path.read_bytes(),
-        headers=request_headers,
-        method=normalized_method,
-    )
+    if not any(str(key).lower() == "content-length" for key in request_headers):
+        request_headers["Content-Length"] = str(normalized_file_path.stat().st_size)
     try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        with ExitStack() as stack:
+            body = stack.enter_context(normalized_file_path.open("rb"))
+            request = urllib.request.Request(
+                str(upload_url).strip(),
+                data=body,
+                headers=request_headers,
+                method=normalized_method,
+            )
+            response = stack.enter_context(urllib.request.urlopen(request, timeout=timeout_seconds))
             return {
                 "upload_status": response.status,
                 "upload_response_headers": dict(response.headers.items()),
@@ -185,11 +190,11 @@ def upload_file_to_presigned_url(
 
 
 def upload_package_bundle(
-    bundle_file: str | Path,
+    bundle_file: Union[str, Path],
     *,
     agent_version_id: str,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
     biz_type: str = DEFAULT_PACKAGE_BIZ_TYPE,
     content_type: str = DEFAULT_PACKAGE_CONTENT_TYPE,
 ) -> dict[str, Any]:

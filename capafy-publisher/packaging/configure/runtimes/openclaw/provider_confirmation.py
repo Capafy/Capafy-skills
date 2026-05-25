@@ -2,20 +2,17 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
-from packaging._shared.openclaw.official_providers import OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME
-from packaging._shared.reviewed_scan.query import reviewed_url_proxy_groups as _reviewed_url_proxy_groups
+from packaging._shared.reviewed_scan.query import reviewed_url_proxy_groups
+from packaging.configure.runtimes.openclaw.provider_usage import (
+    builtin_openclaw_provider_map,
+    model_id_from_openclaw_provider,
+    provider_from_openclaw_model_ref,
+)
 
 
-_OFFICIAL_AUTH_PROFILE_PROVIDER_NAMES = {
-    "anthropic": "publisher_anthropic_official",
-    "claude": "publisher_anthropic_official",
-    "gemini": "publisher_google_official",
-    "google": "publisher_google_official",
-    "openai": "publisher_openai_official",
-}
-_OFFICIAL_PLUGIN_PROVIDER_NAMES = {
+_OFFICIAL_PROVIDER_NAMES_BY_MARKER = {
     "anthropic": "publisher_anthropic_official",
     "claude": "publisher_anthropic_official",
     "gemini": "publisher_google_official",
@@ -23,63 +20,14 @@ _OFFICIAL_PLUGIN_PROVIDER_NAMES = {
     "openai": "publisher_openai_official",
 }
 _AUTH_PROFILE_GROUP_PREFIX = ".openclaw/agents/main/agent/auth-profiles.json#"
+_CONFIG_PROVIDER_GROUP_PREFIX = ".openclaw/openclaw.json#models.providers."
 
 
-def _allowed_openclaw_provider_names(reviewed_scan: dict[str, Any]) -> set[str]:
-    prefix = ".openclaw/openclaw.json#models.providers."
-    providers: set[str] = set()
-    for group in _reviewed_url_proxy_groups(reviewed_scan):
-        if not group.startswith(prefix):
-            auth_profile_provider = _official_provider_name_from_auth_profile_group(group)
-            if auth_profile_provider:
-                providers.add(auth_profile_provider)
-            continue
-        provider = group[len(prefix) :].split(".", 1)[0].strip()
-        if provider:
-            providers.add(provider)
-    return providers
-
-
-def _confirmed_model_by_openclaw_provider(reviewed_scan: dict[str, Any]) -> dict[str, str]:
-    prefix = ".openclaw/openclaw.json#models.providers."
-    models: dict[str, str] = {}
-    url_proxy = reviewed_scan.get("url_proxy", [])
-    if not isinstance(url_proxy, list):
-        return models
-    for entry in url_proxy:
-        if not isinstance(entry, dict):
-            continue
-        group = str(entry.get("url_proxy_group", "") or "").strip()
-        provider = ""
-        if group.startswith(prefix):
-            provider = group[len(prefix) :].split(".", 1)[0].strip()
-        else:
-            provider = _official_provider_name_from_auth_profile_group(group)
-        model = str(entry.get("model", "") or "").strip()
-        if provider and model:
-            models[provider] = model
-    return models
-
-
-def _confirmed_api_format_by_openclaw_provider(reviewed_scan: dict[str, Any]) -> dict[str, str]:
-    prefix = ".openclaw/openclaw.json#models.providers."
-    formats: dict[str, str] = {}
-    url_proxy = reviewed_scan.get("url_proxy", [])
-    if not isinstance(url_proxy, list):
-        return formats
-    for entry in url_proxy:
-        if not isinstance(entry, dict):
-            continue
-        group = str(entry.get("url_proxy_group", "") or "").strip()
-        provider = ""
-        if group.startswith(prefix):
-            provider = group[len(prefix) :].split(".", 1)[0].strip()
-        else:
-            provider = _official_provider_name_from_auth_profile_group(group)
-        api_format = str(entry.get("api_format", "") or "").strip()
-        if provider and api_format:
-            formats[provider] = api_format
-    return formats
+def _provider_name_from_group(group: str) -> str:
+    normalized = str(group or "").strip()
+    if normalized.startswith(_CONFIG_PROVIDER_GROUP_PREFIX):
+        return normalized[len(_CONFIG_PROVIDER_GROUP_PREFIX) :].split(".", 1)[0].strip()
+    return _official_provider_name_from_auth_profile_group(normalized)
 
 
 def _official_provider_name_from_auth_profile_group(group: str) -> str:
@@ -94,66 +42,60 @@ def _official_provider_name_from_auth_profile_group(group: str) -> str:
         if token
     ]
     for token in reversed(path_tokens):
-        provider_name = _OFFICIAL_AUTH_PROFILE_PROVIDER_NAMES.get(token)
+        provider_name = _OFFICIAL_PROVIDER_NAMES_BY_MARKER.get(token)
         if provider_name:
             return provider_name
     return ""
 
 
-def _provider_from_model_ref(value: object) -> str:
-    if not isinstance(value, str):
-        return ""
-    return value.strip().split("/", 1)[0]
-
-
-def _confirmed_builtin_provider_map(allowed: set[str]) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for provider_name in allowed:
-        spec = OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME.get(provider_name)
-        if spec is None:
+def _confirmed_openclaw_provider_fields(
+    reviewed_scan: dict[str, Any],
+) -> dict[str, dict[str, str]]:
+    fields: dict[str, dict[str, str]] = {"model": {}, "api_format": {}}
+    url_proxy = reviewed_scan.get("url_proxy", [])
+    if not isinstance(url_proxy, list):
+        return fields
+    for entry in url_proxy:
+        if not isinstance(entry, dict):
             continue
-        for prefix in spec.model_prefixes:
-            builtin_provider = prefix.rstrip("/")
-            if builtin_provider:
-                result[builtin_provider] = provider_name
-        for marker in spec.markers:
-            if marker:
-                result[marker] = provider_name
-    return result
+        provider = _provider_name_from_group(str(entry.get("url_proxy_group", "") or ""))
+        if not provider:
+            continue
+        model = str(entry.get("model", "") or "").strip()
+        if model:
+            fields["model"][provider] = model
+        api_format = str(entry.get("api_format", "") or "").strip()
+        if api_format:
+            fields["api_format"][provider] = api_format
+    return fields
 
 
-def _model_id_from_entry(entry: object) -> str:
-    if isinstance(entry, dict):
-        for key in ("id", "name", "model"):
-            value = entry.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    if isinstance(entry, str):
-        return entry.strip()
-    return ""
+def _allowed_openclaw_provider_names(reviewed_scan: dict[str, Any]) -> set[str]:
+    return {
+        provider
+        for provider in (
+            _provider_name_from_group(group)
+            for group in reviewed_url_proxy_groups(reviewed_scan)
+        )
+        if provider
+    }
 
 
-def _first_model_ref(provider_name: str, provider_payload: dict[str, Any]) -> str:
-    models = provider_payload.get("models")
-    if isinstance(models, list):
-        for entry in models:
-            model_id = _model_id_from_entry(entry)
-            if model_id:
-                return f"{provider_name}/{model_id}"
-    return provider_name
-
-
-def _rewrite_model_ref(value: object, *, allowed: set[str], fallback_ref: str) -> tuple[object, int]:
-    provider = _provider_from_model_ref(value)
-    if not provider or provider in allowed:
-        return value, 0
-    return fallback_ref, 1
-
-
-def _filter_model_ref_list(values: object, *, allowed: set[str]) -> tuple[object, int]:
+def _filter_model_ref_list(
+    values: object,
+    *,
+    allowed: set[str],
+    managed_providers: set[str],
+) -> tuple[object, int]:
     if not isinstance(values, list):
         return values, 0
-    filtered = [value for value in values if not isinstance(value, str) or _provider_from_model_ref(value) in allowed]
+    filtered = [
+        value
+        for value in values
+        if not isinstance(value, str)
+        or provider_from_openclaw_model_ref(value) not in managed_providers
+        or provider_from_openclaw_model_ref(value) in allowed
+    ]
     return filtered, 1 if filtered != values else 0
 
 
@@ -162,8 +104,9 @@ def _rewrite_openclaw_model_defaults(
     *,
     allowed: set[str],
     fallback_ref: str,
-    replacement_refs: dict[str, str] | None = None,
-    builtin_provider_map: dict[str, str] | None = None,
+    managed_providers: set[str],
+    replacement_refs: Optional[dict[str, str]] = None,
+    builtin_provider_map: Optional[dict[str, str]] = None,
 ) -> int:
     replacement_refs = replacement_refs or {}
     builtin_provider_map = builtin_provider_map or {}
@@ -172,21 +115,28 @@ def _rewrite_openclaw_model_defaults(
     if not isinstance(agents, dict):
         return 0
 
-    def rewrite_allowed_model_ref(value: object) -> tuple[object, int]:
+    def rewrite_managed_model_ref(value: object) -> tuple[object, int]:
         if not isinstance(value, str):
             return value, 0
-        provider = _provider_from_model_ref(value)
-        replacement_provider = builtin_provider_map.get(provider, provider)
+        provider = provider_from_openclaw_model_ref(value)
+        if provider in managed_providers:
+            if provider not in allowed:
+                return fallback_ref, 1
+            replacement_provider = provider
+        elif provider in builtin_provider_map:
+            replacement_provider = builtin_provider_map[provider]
+        else:
+            return value, 0
         replacement_ref = replacement_refs.get(replacement_provider, "")
         if not replacement_ref or value == replacement_ref:
             return value, 0
         return replacement_ref, 1
 
-    def rewrite_allowed_model_ref_list(values: object) -> tuple[object, int]:
+    def rewrite_managed_model_ref_list(values: object) -> tuple[object, int]:
         if not isinstance(values, list):
             return values, 0
         updated = [
-            rewrite_allowed_model_ref(value)[0] if isinstance(value, str) else value
+            rewrite_managed_model_ref(value)[0] if isinstance(value, str) else value
             for value in values
         ]
         return updated, 1 if updated != values else 0
@@ -198,31 +148,41 @@ def _rewrite_openclaw_model_defaults(
             if not isinstance(node, dict):
                 continue
             if "primary" in node:
-                node["primary"], count = _rewrite_model_ref(node.get("primary"), allowed=allowed, fallback_ref=fallback_ref)
-                rewrites += count
-                node["primary"], count = rewrite_allowed_model_ref(node.get("primary"))
+                node["primary"], count = rewrite_managed_model_ref(node.get("primary"))
                 rewrites += count
             if "fallbacks" in node:
-                node["fallbacks"], count = _filter_model_ref_list(node.get("fallbacks"), allowed=allowed)
+                node["fallbacks"], count = _filter_model_ref_list(
+                    node.get("fallbacks"),
+                    allowed=allowed,
+                    managed_providers=managed_providers,
+                )
                 rewrites += count
-                node["fallbacks"], count = rewrite_allowed_model_ref_list(node.get("fallbacks"))
+                node["fallbacks"], count = rewrite_managed_model_ref_list(node.get("fallbacks"))
                 rewrites += count
         models = defaults.get("models")
         if isinstance(models, dict):
+            renamed: dict[str, Any] = {}
             for model_ref in list(models):
-                provider = _provider_from_model_ref(model_ref)
-                if provider in builtin_provider_map or provider not in allowed:
+                provider = provider_from_openclaw_model_ref(model_ref)
+                if provider in builtin_provider_map or (
+                    provider in managed_providers and provider not in allowed
+                ):
                     models.pop(model_ref, None)
                     rewrites += 1
+                    continue
+                if provider in managed_providers and provider in allowed:
+                    replacement_ref = replacement_refs.get(provider, "")
+                    if replacement_ref and replacement_ref != model_ref:
+                        renamed[replacement_ref] = models.pop(model_ref)
+                        rewrites += 1
+            models.update(renamed)
 
     agent_list = agents.get("list")
     if isinstance(agent_list, list):
         for agent in agent_list:
             if not isinstance(agent, dict) or "model" not in agent:
                 continue
-            agent["model"], count = _rewrite_model_ref(agent.get("model"), allowed=allowed, fallback_ref=fallback_ref)
-            rewrites += count
-            agent["model"], count = rewrite_allowed_model_ref(agent.get("model"))
+            agent["model"], count = rewrite_managed_model_ref(agent.get("model"))
             rewrites += count
     return rewrites
 
@@ -261,7 +221,7 @@ def _rewrite_confirmed_provider_models(
 def _prune_confirmed_official_plugin_entries(payload: dict[str, Any], *, allowed: set[str]) -> int:
     allowed_plugin_names = {
         plugin_name
-        for plugin_name, provider_name in _OFFICIAL_PLUGIN_PROVIDER_NAMES.items()
+        for plugin_name, provider_name in _OFFICIAL_PROVIDER_NAMES_BY_MARKER.items()
         if provider_name in allowed
     }
     if not allowed_plugin_names:
@@ -292,6 +252,15 @@ def _rewrite_confirmed_provider_api_formats(
         if provider.get("api") != api_format:
             provider["api"] = api_format
             rewrites += 1
+        models = provider.get("models")
+        if not isinstance(models, list):
+            continue
+        for model in models:
+            if not isinstance(model, dict) or "api" not in model:
+                continue
+            if model.get("api") != api_format:
+                model["api"] = api_format
+                rewrites += 1
     return rewrites
 
 
@@ -329,6 +298,7 @@ def rewrite_openclaw_confirmed_providers(
     fallback_provider = ordered_allowed[0]
 
     original_payload = json.loads(json.dumps(payload, ensure_ascii=False))
+    managed_providers = {str(provider_name) for provider_name in providers}
     removed = 0
     for provider_name in list(providers):
         if str(provider_name) in allowed:
@@ -336,16 +306,21 @@ def rewrite_openclaw_confirmed_providers(
         providers.pop(provider_name, None)
         removed += 1
 
-    confirmed_api_formats = _confirmed_api_format_by_openclaw_provider(reviewed_scan)
+    confirmed_fields = _confirmed_openclaw_provider_fields(reviewed_scan)
+    confirmed_models = confirmed_fields["model"]
+    confirmed_api_formats = confirmed_fields["api_format"]
     api_format_rewrites = _rewrite_confirmed_provider_api_formats(providers, confirmed_api_formats)
-    confirmed_models = _confirmed_model_by_openclaw_provider(reviewed_scan)
     replacement_refs, model_rewrites = _rewrite_confirmed_provider_models(providers, confirmed_models)
-    fallback_ref = replacement_refs.get(fallback_provider) or _first_model_ref(fallback_provider, providers[fallback_provider])
-    builtin_provider_map = _confirmed_builtin_provider_map(set(ordered_allowed))
+    fallback_model_id = model_id_from_openclaw_provider(providers[fallback_provider])
+    fallback_ref = replacement_refs.get(fallback_provider) or (
+        f"{fallback_provider}/{fallback_model_id}" if fallback_model_id else fallback_provider
+    )
+    builtin_provider_map = builtin_openclaw_provider_map(set(ordered_allowed))
     rewrites = _rewrite_openclaw_model_defaults(
         payload,
         allowed=set(ordered_allowed),
         fallback_ref=fallback_ref,
+        managed_providers=managed_providers,
         replacement_refs=replacement_refs,
         builtin_provider_map=builtin_provider_map,
     )

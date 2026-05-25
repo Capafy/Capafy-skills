@@ -7,6 +7,7 @@ from packaging._shared.contracts.publish_work_state import (
     STAGE_BUNDLE_PREPARED,
     STAGE_CONFIG_SUBMITTED,
 )
+from packaging._shared.mode_dispatch import lookup_mode
 from packaging.ship.contexts import (
     ArtifactPackageContext,
     ArtifactValidateContext,
@@ -134,13 +135,7 @@ _REGISTRY: Dict[str, ShipMode] = {
 
 
 def get_ship_mode(agent_type: str) -> ShipMode:
-    normalized = str(agent_type).strip()
-    if not normalized:
-        raise ValueError("Unknown agent_type: empty")
-    try:
-        return _REGISTRY[normalized]
-    except KeyError as exc:
-        raise ValueError(f"Unknown agent_type: {agent_type}") from exc
+    return lookup_mode(_REGISTRY, agent_type)
 
 
 __all__ = [

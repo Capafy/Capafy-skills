@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import DEFAULT_STAGING_PATH, DEVELOPER_WORK_DIR_PATH
 from packaging._shared.common.fs import cleanup_staging_root
@@ -32,10 +32,11 @@ def build_staging_and_reviewed_scan(
     runtime_dir: str,
     agent_type: str,
     selection_groups: dict,
-    deep_scan_findings: DeepScanFindingsInput = DeepScanFindingsInput(),
+    deep_scan_findings: Optional[DeepScanFindingsInput] = None,
     developer_work_dir_path: Path = DEVELOPER_WORK_DIR_PATH,
     default_staging_path: str = DEFAULT_STAGING_PATH,
-) -> tuple[ReviewedScanResult | None, dict | None]:
+) -> tuple[Optional[ReviewedScanResult], Optional[dict]]:
+    deep_scan_findings = deep_scan_findings or DeepScanFindingsInput()
     normalized_runtime_dir = str(runtime_dir or "").strip()
     if not normalized_runtime_dir:
         return None, build_publish_error(

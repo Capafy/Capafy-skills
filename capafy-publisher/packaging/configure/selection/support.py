@@ -1,12 +1,12 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
 from packaging._shared.contracts.selectable import normalize_text
-from packaging.configure.selection.unit_metadata import build_unit_metadata
 
 
-def classify_selectable_directory(target, unit_path: Path, display_path: str) -> tuple[str | None, str, bool]:
+def classify_selectable_directory(target, unit_path: Path, display_path: str) -> tuple[Optional[str], str, bool]:
     from packaging._shared.contracts.path_shapes import classify_basic_selectable_directory
     from packaging._shared.runtimes.contracts import call_optional_target_hook
 
@@ -16,18 +16,6 @@ def classify_selectable_directory(target, unit_path: Path, display_path: str) ->
         unit_path,
         display_path,
         default=classify_basic_selectable_directory(unit_path, display_path),
-    )
-
-
-def classify_selectable_file(target, display_path: str) -> tuple[str | None, str]:
-    from packaging._shared.contracts.path_shapes import classify_basic_selectable_file
-    from packaging._shared.runtimes.contracts import call_optional_target_hook
-
-    return call_optional_target_hook(
-        target,
-        "classify_selectable_file",
-        display_path,
-        default=classify_basic_selectable_file(display_path),
     )
 
 
@@ -48,9 +36,9 @@ def finalize_selectable_entry(target, entry: dict, *, unit_path: Path) -> dict:
 
 def resolve_workspace_root(
     *,
-    workspace: str | None,
-    target_name: str | None = None,
-) -> Path | None:
+    workspace: Optional[str],
+    target_name: Optional[str] = None,
+) -> Optional[Path]:
     from packaging.runtimes import DEFAULT_TARGET, get_target, resolve_target_request
     normalized_workspace = normalize_text(workspace)
     if not normalized_workspace:

@@ -12,6 +12,11 @@ from packaging.configure.sensitive.literals import (
     looks_like_platform_managed_placeholder_value,
 )
 from packaging.configure.staging.strip.fallback import replace_values_in_staging
+from packaging.configure.runtimes.claude_code.auth import (
+    CLAUDE_AUTH_ENV_KEY,
+    CLAUDE_AUTH_TOKEN_ENV_KEY,
+    CLAUDE_BASE_URL_ENV_KEY,
+)
 from packaging.configure.runtimes.claude_code.url_proxy_candidates import (
     API_KEY_FIELD_ORDER,
     BASE_URL_FIELD_ORDER,
@@ -31,13 +36,13 @@ from packaging.configure.url_proxy.scanner_utils import (
     resolve_process_env_refs,
 )
 
-_API_KEY_FIELDS = frozenset({"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"})
-_BASE_URL_FIELDS = frozenset({"ANTHROPIC_BASE_URL"})
-_FIELD_SET = UrlProxyFieldSet(api_key_fields=_API_KEY_FIELDS, base_url_fields=_BASE_URL_FIELDS)
+_API_KEY_FIELDS = frozenset({CLAUDE_AUTH_ENV_KEY, CLAUDE_AUTH_TOKEN_ENV_KEY})
+_FIELD_SET = UrlProxyFieldSet(
+    api_key_fields=_API_KEY_FIELDS,
+    base_url_fields=frozenset({CLAUDE_BASE_URL_ENV_KEY}),
+)
 _SERVICE = "Anthropic"
 _ID = "claude_code"
-_PLATFORM_KEY_FIELD = "ANTHROPIC_AUTH_TOKEN"
-_CANONICAL_BASE_URL_FIELD = "ANTHROPIC_BASE_URL"
 _API_FORMAT = "anthropic-messages"
 
 
@@ -74,7 +79,13 @@ class ClaudeCodeRuntime(RuntimeContract):
             ctx.target_id == _ID
             and not any(c.role in {"api_key", "synthesized_api_key"} and str(c.value or "").strip() for c in candidates)
         ):
-            candidates.append(self._platform_key_mode_candidate())
+            candidates.append(Candidate(
+                role="synthesized_api_key",
+                field=CLAUDE_AUTH_TOKEN_ENV_KEY,
+                value="",
+                source_kind=SourceKind.SYNTHESIZED,
+                source_relpath="",
+            ))
         return annotate_candidates_with_settings_model(candidates, ctx.staging_root)
 
     @staticmethod
@@ -86,7 +97,7 @@ class ClaudeCodeRuntime(RuntimeContract):
             return []
 
         candidates: list[Candidate] = []
-        for field in ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"):
+        for field in (CLAUDE_AUTH_TOKEN_ENV_KEY, CLAUDE_AUTH_ENV_KEY):
             value = ClaudeCodeRuntime._usable_process_env_value(ctx, field)
             if value and field not in existing_fields:
                 candidates.append(Candidate(
@@ -99,12 +110,12 @@ class ClaudeCodeRuntime(RuntimeContract):
                     extra={"canonical_process_env_fallback": True},
                 ))
 
-        base_url = ClaudeCodeRuntime._usable_process_env_value(ctx, _CANONICAL_BASE_URL_FIELD)
+        base_url = ClaudeCodeRuntime._usable_process_env_value(ctx, CLAUDE_BASE_URL_ENV_KEY)
         normalized_url = normalize_http_url_candidate(base_url) if base_url else ""
-        if normalized_url and _CANONICAL_BASE_URL_FIELD not in existing_fields:
+        if normalized_url and CLAUDE_BASE_URL_ENV_KEY not in existing_fields:
             candidates.append(Candidate(
                 role="base_url",
-                field=_CANONICAL_BASE_URL_FIELD,
+                field=CLAUDE_BASE_URL_ENV_KEY,
                 value=normalized_url,
                 source_kind=SourceKind.PROCESS_ENV,
                 source_relpath="",
@@ -143,7 +154,7 @@ class ClaudeCodeRuntime(RuntimeContract):
         )
         if url_candidate is None:
             url_field = self._settings_plan_field(
-                field=_CANONICAL_BASE_URL_FIELD,
+                field=CLAUDE_BASE_URL_ENV_KEY,
                 value=official_url,
                 source_kind=SourceKind.SYNTHESIZED,
                 locator=official_url,
@@ -151,7 +162,7 @@ class ClaudeCodeRuntime(RuntimeContract):
             )
         else:
             url_field = self._settings_plan_field(
-                field=_CANONICAL_BASE_URL_FIELD,
+                field=CLAUDE_BASE_URL_ENV_KEY,
                 value=url_candidate.value,
                 source_kind=url_candidate.source_kind,
                 locator=url_candidate.value,
@@ -225,7 +236,7 @@ class ClaudeCodeRuntime(RuntimeContract):
             key_placeholder=pair.key.placeholder,
             url_placeholder=pair.url.placeholder,
             api_key_fields=_API_KEY_FIELDS,
-            canonical_base_url_field=_CANONICAL_BASE_URL_FIELD,
+            canonical_base_url_field=CLAUDE_BASE_URL_ENV_KEY,
         )
 
     @staticmethod
@@ -266,33 +277,17 @@ class ClaudeCodeRuntime(RuntimeContract):
         ):
             return []
         if not any(c.field in _API_KEY_FIELDS for c in existing if c.source_kind == SourceKind.FILE):
-            return [Candidate(role="synthesized_api_key", field=_PLATFORM_KEY_FIELD, value="", source_kind=SourceKind.SYNTHESIZED, source_relpath="")]
+            return [Candidate(role="synthesized_api_key", field=CLAUDE_AUTH_TOKEN_ENV_KEY, value="", source_kind=SourceKind.SYNTHESIZED, source_relpath="")]
         return []
-
-    @staticmethod
-    def _platform_key_mode_candidate() -> Candidate:
-        return Candidate(
-            role="synthesized_api_key",
-            field=_PLATFORM_KEY_FIELD,
-            value="",
-            source_kind=SourceKind.SYNTHESIZED,
-            source_relpath="",
-        )
-
-
 
     def rewrite_confirmed(self, staging_root: Path, reviewed_scan: dict[str, Any]) -> dict[str, Any]:
         url_proxy = reviewed_scan.get("url_proxy", [])
         if not isinstance(url_proxy, list):
             return {}
-        model = self._confirmed_model(url_proxy)
+        confirmed, model = self._confirmed_url_proxy_summary(url_proxy)
         model_rewritten = False
         if model:
-            model_rewritten = self._write_settings_model(staging_root, model)
-        confirmed = sum(
-            1 for e in url_proxy
-            if isinstance(e, dict) and ".claude/" in str(e.get("url_proxy_group", "") or e.get("group", ""))
-        )
+            model_rewritten = write_settings_model(staging_root, model)
         summary: dict[str, Any] = {}
         if confirmed:
             summary["claude_code_confirmed_entries"] = confirmed
@@ -301,20 +296,17 @@ class ClaudeCodeRuntime(RuntimeContract):
         return summary
 
     @staticmethod
-    def _confirmed_model(url_proxy: list[Any]) -> str:
+    def _confirmed_url_proxy_summary(url_proxy: list[Any]) -> tuple[int, str]:
+        confirmed = 0
+        confirmed_model = ""
         for entry in url_proxy:
             if not isinstance(entry, dict):
                 continue
             if ".claude/" not in str(entry.get("url_proxy_group", "") or entry.get("group", "")):
                 continue
-            model = str(entry.get("model", "") or "").strip()
-            if model:
-                return model
-        return ""
-
-    @staticmethod
-    def _write_settings_model(staging_root: Path, model: str) -> bool:
-        return write_settings_model(staging_root, model)
-
+            confirmed += 1
+            if not confirmed_model:
+                confirmed_model = str(entry.get("model", "") or "").strip()
+        return confirmed, confirmed_model
 
 __all__ = ["ClaudeCodeRuntime"]

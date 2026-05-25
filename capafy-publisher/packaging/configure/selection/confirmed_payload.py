@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 
@@ -18,7 +19,7 @@ SELECTED_CATEGORIES = (
 
 def load_payload(
     *,
-    skills_plan_json: str | None,
+    skills_plan_json: Optional[str],
 ) -> dict:
     if not skills_plan_json:
         return {}
@@ -56,7 +57,7 @@ def normalize_payload_categories(payload: object) -> dict[str, list]:
 
 def load_confirmed_workspace_documents_payload(
     *,
-    skills_plan_json: str | None,
+    skills_plan_json: Optional[str],
 ) -> dict:
     payload = load_payload(skills_plan_json=skills_plan_json)
     raw_groups = payload.get("selection_groups", {}) if isinstance(payload, dict) else {}

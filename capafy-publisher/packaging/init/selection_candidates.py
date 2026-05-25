@@ -53,19 +53,6 @@ def _candidate_unit_is_supported(entry: DiscoveryUnit, *, target=None) -> bool:
     return True
 
 
-def _owning_selectable_paths(path: str, *, target=None) -> tuple[str, ...]:
-    return tuple(
-        str(item).strip()
-        for item in call_optional_target_hook(
-            target,
-            "owning_selectable_paths",
-            path,
-            default=basic_owning_selectable_paths(path),
-        )
-        if str(item).strip()
-    )
-
-
 def _is_under_skill_root(path: str) -> bool:
     parts = [part for part in PurePosixPath(path.rstrip("/")).parts if part and part != "."]
     return "skills" in parts
@@ -82,7 +69,17 @@ def _workspace_document_candidates(documents: list[SourceDocument], *, target=No
             continue
         if _is_under_skill_root(path):
             continue
-        if _owning_selectable_paths(path, target=target):
+        owning_paths = tuple(
+            str(item).strip()
+            for item in call_optional_target_hook(
+                target,
+                "owning_selectable_paths",
+                path,
+                default=basic_owning_selectable_paths(path),
+            )
+            if str(item).strip()
+        )
+        if owning_paths:
             continue
         if path in seen:
             continue

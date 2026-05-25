@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.contracts.publish_work_state import (
     STAGE_BUNDLE_PREPARED,
@@ -96,7 +96,7 @@ def write_cloud_hosted_config_submitted_manifest(
     agent_version_id: str,
     env_id: str,
     agent_type: str,
-    review_url: str | None,
+    review_url: Optional[str],
     reviewed_scan_path: str,
 ) -> Path:
     extra = dict(manifest.extra) if isinstance(manifest.extra, dict) else {}
@@ -126,7 +126,7 @@ def write_buyout_bundle_prepared_manifest(
     reviewed_scan_digest: str,
     disposition_summary: dict[str, int],
     disposition_status: str,
-    redaction_summary: dict[str, Any] | None = None,
+    redaction_summary: Optional[dict[str, Any]] = None,
 ) -> Path:
     extra = configure_extra_with_review_artifacts(
         manifest.extra,

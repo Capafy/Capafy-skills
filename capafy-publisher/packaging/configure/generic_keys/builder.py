@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import replace
 
@@ -46,7 +47,7 @@ def _positive_int(value: object) -> int:
     return result if result > 0 else 0
 
 
-def build_generic_from_entry(entry: dict) -> dict | None:
+def build_generic_from_entry(entry: dict) -> Optional[dict]:
     source = str(entry.get("source", "") or "").strip()
     if not source:
         return None

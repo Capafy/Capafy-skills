@@ -1,15 +1,15 @@
 from __future__ import annotations
+from typing import Optional
 
 import os
 from pathlib import Path
 
 from packaging._shared.common.fs import relpath as fs_relpath
 from .support import (
-    classify_selectable_directory as _classify_selectable_directory,
-    classify_selectable_file as _classify_selectable_file,
-    finalize_selectable_entry as _finalize_selectable_entry,
+    classify_selectable_directory,
+    finalize_selectable_entry,
 )
-from .unit_metadata import build_unit_metadata as _build_unit_metadata
+from .unit_metadata import build_unit_metadata
 
 
 def _iter_skill_dirs(
@@ -25,7 +25,7 @@ def _iter_skill_dirs(
         for dirname in sorted(dirnames):
             skill_dir = current_path / dirname
             relpath = fs_relpath(skill_dir, staging_root)
-            selectable_path, unit_type, keep_descending = _classify_selectable_directory(
+            selectable_path, unit_type, keep_descending = classify_selectable_directory(
                 target,
                 skill_dir,
                 relpath,
@@ -40,14 +40,6 @@ def _iter_skill_dirs(
             if keep_descending:
                 kept_dirs.append(dirname)
         dirnames[:] = kept_dirs
-
-        for filename in sorted(filenames):
-            skill_file = current_path / filename
-            relpath = fs_relpath(skill_file, staging_root)
-            selectable_path, unit_type = _classify_selectable_file(target, relpath)
-            if selectable_path == relpath and relpath not in seen:
-                seen.add(relpath)
-                discovered.append((skill_file, current_path, unit_type))
     return discovered
 
 
@@ -58,10 +50,10 @@ def _skill_entry(
     *,
     unit_type: str = "skill",
     target=None,
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, Optional[dict]]:
     relative_path = fs_relpath(skill_dir, staging_root)
     source_root = fs_relpath(skill_root, staging_root)
-    meta = _build_unit_metadata(
+    meta = build_unit_metadata(
         skill_dir,
         unit_type,
         target=target,
@@ -79,7 +71,7 @@ def _skill_entry(
         "size_bytes": meta["size_bytes"],
         "synopsis": meta["synopsis"],
     }
-    entry = _finalize_selectable_entry(target, entry, unit_path=skill_dir)
+    entry = finalize_selectable_entry(target, entry, unit_path=skill_dir)
 
     suspicious_entry = None
     if meta["suspicious_reasons"]:

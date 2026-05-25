@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from contextlib import suppress
 import os
 import shutil
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 from packaging._shared.common.fs import display_stage_path, record_skip, relpath as fs_relpath
 
@@ -47,10 +48,8 @@ def _normalize_line_endings_if_needed(src: Path, dst: Path) -> bool:
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(normalized.encode("utf-8"))
-    try:
+    with suppress(OSError):
         shutil.copystat(src, dst)
-    except OSError:
-        pass
     return True
 
 
@@ -74,7 +73,7 @@ def copy_tree(
     skipped_seen: set[str],
     *,
     should_skip: SkipPredicate,
-    after_copy: AfterCopyHook | None = None,
+    after_copy: Optional[AfterCopyHook] = None,
 ) -> int:
     copied_files = 0
 

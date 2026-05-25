@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
-from typing import List, TypedDict
+from typing import List, Optional, TypedDict
 
 from .selectable import is_absolute_like_path, normalize_text
 from .path_shapes import is_cron_unit_type, is_plugin_unit_type
@@ -199,7 +199,7 @@ def _cron_group_item(
     item: dict,
     *,
     preserve_selection: bool = False,
-) -> CronGroupItem | None:
+) -> Optional[CronGroupItem]:
     cron_id = normalize_text(item.get("id"))
     name = normalize_text(item.get("name"))
     schedule = _cron_schedule_payload(item.get("schedule"))
@@ -269,8 +269,8 @@ def _group_selected_units(
 
 def build_selected_selection_groups(
     *,
-    selected_units: list | None = None,
-    context_sources_input: dict | None = None,
+    selected_units: Optional[list] = None,
+    context_sources_input: Optional[dict] = None,
 ) -> SelectionGroups:
     if selected_units is None:
         normalized_selected_units: list = []

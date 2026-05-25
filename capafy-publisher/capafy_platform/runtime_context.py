@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 import os
@@ -32,18 +33,24 @@ WINDOWS_TZ_TO_IANA = {
     "New Zealand Standard Time": "Pacific/Auckland",
 }
 
-_APP_VERSION_CACHE: str | None = None
+_APP_VERSION_CACHE: Optional[str] = None
+_SKILL_DIR = Path(__file__).resolve().parents[1]
 
 
 def skill_dir() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return _SKILL_DIR
 
 
-def load_app_version(*, skill_dir: Path | None = None) -> str:
+def load_app_version(
+    *,
+    skill_dir_override: Optional[Path] = None,
+    skill_dir: Optional[Path] = None,
+) -> str:
     global _APP_VERSION_CACHE
-    if skill_dir is None and _APP_VERSION_CACHE is not None:
+    root_override = skill_dir_override or skill_dir
+    if root_override is None and _APP_VERSION_CACHE is not None:
         return _APP_VERSION_CACHE
-    root = skill_dir or globals()["skill_dir"]()
+    root = root_override or _SKILL_DIR
     index_path = root / "api-docs" / "index.json"
     try:
         payload = json.loads(index_path.read_text(encoding="utf-8"))
@@ -51,7 +58,7 @@ def load_app_version(*, skill_dir: Path | None = None) -> str:
         version = ""
     else:
         version = str(payload.get("version", "")).strip() if isinstance(payload, dict) else ""
-    if skill_dir is None:
+    if root_override is None:
         _APP_VERSION_CACHE = version
     return version
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from pathlib import Path
@@ -48,7 +49,7 @@ def ensure_provider_section(
 
     lines = text.splitlines(keepends=True)
     section_name = f"model_providers.{provider}"
-    section_start: int | None = None
+    section_start: Optional[int] = None
     section_end = len(lines)
     top_level_provider_seen = False
     provider_section_count = 0
@@ -110,6 +111,36 @@ def ensure_provider_section(
     updated = "".join(lines)
     if updated != text:
         config_path.write_text(updated, encoding="utf-8")
+
+
+def ensure_model_provider(config_path: Path, *, provider: str) -> None:
+    normalized_provider = str(provider or "").strip()
+    if not normalized_provider:
+        return
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    except OSError:
+        text = ""
+
+    lines = text.splitlines(keepends=True)
+    current_section = ""
+    for raw_line in lines:
+        line = raw_line.rstrip("\r\n")
+        section_match = _TOML_SECTION.match(line)
+        if section_match:
+            current_section = section_match.group(1).strip()
+            continue
+        kv_match = _TOML_KEY_VALUE.match(line)
+        if kv_match and not current_section and kv_match.group(2) == "model_provider":
+            return
+
+    insert_at = _first_section_index(lines)
+    if insert_at > 0 and lines[insert_at - 1].strip():
+        lines.insert(insert_at, "\n")
+        insert_at += 1
+    lines.insert(insert_at, f"model_provider = {_toml_string(normalized_provider)}\n")
+    config_path.write_text("".join(lines), encoding="utf-8")
 
 
 def remove_top_level_toml_key(config_path: Path, key: str) -> None:
@@ -180,6 +211,7 @@ def _first_section_index(lines: list[str]) -> int:
 
 __all__ = [
     "disable_requires_openai_auth",
+    "ensure_model_provider",
     "ensure_provider_section",
     "provider_name_from_codex_section",
     "provider_name_from_pair_group",

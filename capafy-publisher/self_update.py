@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
+from typing import Optional
 
 import argparse
 import contextlib
@@ -55,10 +56,8 @@ def _unlink_if_exists(path: Path) -> None:
 
 
 def _safe_chmod(path: Path, mode: int) -> None:
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(path, mode)
-    except OSError:
-        pass
 
 
 def _is_protected(rel_path: Path) -> bool:
@@ -139,18 +138,13 @@ def _exclusive_lock(skill_dir: Path):
             try:
                 if os.name == "nt":
                     import msvcrt
-                    try:
-
+                    with contextlib.suppress(OSError):
                         fp.seek(0)
                         msvcrt.locking(fp.fileno(), msvcrt.LK_UNLCK, 1)
-                    except OSError:
-                        pass
                 else:
                     import fcntl
-                    try:
+                    with contextlib.suppress(OSError):
                         fcntl.flock(fp, fcntl.LOCK_UN)
-                    except OSError:
-                        pass
             finally:
                 fp.close()
         else:
@@ -174,7 +168,7 @@ def _persisted_platform_base_url() -> str:
     return str(payload.get("base_url", "")).strip()
 
 
-def _normalize_platform_base_url(base_url: str | None) -> str:
+def _normalize_platform_base_url(base_url: Optional[str]) -> str:
     candidate = str(
         base_url
         or os.environ.get(PLATFORM_BASE_URL_ENV)
@@ -188,7 +182,7 @@ def _normalize_platform_base_url(base_url: str | None) -> str:
     return candidate.rstrip("/")
 
 
-def _load_installed_version_state(skill_dir: Path) -> dict | None:
+def _load_installed_version_state(skill_dir: Path) -> Optional[dict]:
     state_path = _state_path(skill_dir)
     if not state_path.is_file():
         return None
@@ -201,7 +195,7 @@ def _load_installed_version_state(skill_dir: Path) -> dict | None:
     return payload
 
 
-def get_local_version(skill_dir: Path | None = None) -> str:
+def get_local_version(skill_dir: Optional[Path] = None) -> str:
 
     root = skill_dir or _detect_skill_dir()
     state = _load_installed_version_state(root)
@@ -300,9 +294,9 @@ def _read_url_bytes(url: str, *, timeout: int, include_platform_context: bool = 
 
 
 def resolve_version_manifest_url(
-    manifest_url: str | None = None,
+    manifest_url: Optional[str] = None,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> str:
 
     endpoint = str(manifest_url or VERSION_MANIFEST_PATH).strip()
@@ -315,7 +309,7 @@ def resolve_version_manifest_url(
     return f"{_normalize_platform_base_url(base_url)}{endpoint}"
 
 
-def _normalize_sha256(value: object) -> str | None:
+def _normalize_sha256(value: object) -> Optional[str]:
     if value is None:
         return None
     digest = str(value).strip().lower()
@@ -329,9 +323,9 @@ def _normalize_sha256(value: object) -> str | None:
 
 
 def fetch_version_manifest(
-    manifest_url: str | None = None,
+    manifest_url: Optional[str] = None,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict:
 
     resolved_manifest_url = resolve_version_manifest_url(manifest_url, base_url=base_url)
@@ -393,7 +387,7 @@ def download_release(download_url: str) -> Path:
     return archive_path
 
 
-def _verify_archive_digest(archive_path: Path, expected_sha256: str | None) -> None:
+def _verify_archive_digest(archive_path: Path, expected_sha256: Optional[str]) -> None:
     if not expected_sha256:
         return
     digest = hashlib.sha256()
@@ -639,10 +633,8 @@ def _sweep_files_not_in(
         if path.name.endswith(PENDING_SUFFIX):
             if not sweep_pending_markers:
                 continue
-            try:
+            with contextlib.suppress(OSError):
                 path.unlink()
-            except OSError:
-                pass
             continue
         if rel.as_posix() in expected_rels:
             continue
@@ -779,14 +771,10 @@ def _install_per_file(root: Path, archive_path: Path, manifest: dict) -> dict:
         raise
     finally:
 
-        try:
+        with contextlib.suppress(RuntimeError):
             _remove_existing_path(staging, label="staging directory")
-        except RuntimeError:
-            pass
-        try:
+        with contextlib.suppress(RuntimeError):
             _remove_existing_path(snapshot, label="snapshot directory")
-        except RuntimeError:
-            pass
 
     return {
         "installed_version": installed_version,
@@ -799,7 +787,7 @@ def _install_per_file(root: Path, archive_path: Path, manifest: dict) -> dict:
 
 
 
-def finalize_pending(skill_dir: Path | None = None) -> dict:
+def finalize_pending(skill_dir: Optional[Path] = None) -> dict:
 
     root = (skill_dir or _detect_skill_dir()).resolve()
     pending = _read_pending(root)
@@ -873,13 +861,9 @@ def _migrate_legacy_state(root: Path) -> None:
     source = next((p for p in (legacy_bak, legacy_recovered) if p.is_dir()), None)
     if source is None:
         return
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree(root, ignore_errors=True)
         shutil.move(str(source), str(root))
-    except OSError:
-
-
-        pass
 
 
 
@@ -970,10 +954,10 @@ def _install_runtime_requirements(skill_dir: Path) -> dict:
 
 
 def self_update(
-    manifest_url: str | None = None,
-    skill_dir: Path | None = None,
+    manifest_url: Optional[str] = None,
+    skill_dir: Optional[Path] = None,
     check_only: bool = False,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict:
     root = (skill_dir or _detect_skill_dir()).resolve()
 
@@ -1038,7 +1022,7 @@ def self_update(
 
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Publisher Skill self-updater")
     parser.add_argument(
         "--check",

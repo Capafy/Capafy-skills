@@ -1,47 +1,19 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
+from packaging._shared.common.exclusion_rules import CREDENTIAL_EXCLUDED_SUFFIXES, PRIVATE_KEY_FILE_BASENAMES
 from packaging._shared.contracts.selectable import INSTRUCTION_DOC_BASENAMES, INSTRUCTION_DOC_SUFFIXES
 
 
 
 
-SUSPICIOUS_SKILL_BASENAMES = {
-    "id_dsa",
-    "id_ecdsa",
-    "id_ed25519",
-    "id_rsa",
-}
-
-
-SUSPICIOUS_SKILL_SUFFIXES = (
-    ".key",
-    ".p12",
-    ".pfx",
-    ".ppk",
-    ".keychain",
-    ".keychain-db",
-    ".keystore",
-    ".jks",
-    ".kdb",
-    ".kdbx",
-    ".kwallet",
-    ".agilekeychain",
-    ".ovpn",
-)
-
-
-BUNDLE_COMMAND_SUFFIXES = (".md", ".markdown", ".mdx", ".txt")
-
-
+SUSPICIOUS_SKILL_SUFFIXES = tuple(sorted(CREDENTIAL_EXCLUDED_SUFFIXES))
 SKILL_UNIT_TYPE = "skill"
 PLUGIN_UNIT_TYPE = "plugin"
 OPENCLAW_PLUGIN_UNIT_TYPE = "openclaw_plugin"
-BUNDLE_COMMAND_UNIT_TYPE = "bundle_command"
-BUNDLE_HOOK_PACK_UNIT_TYPE = "bundle_hook_pack"
 CRON_UNIT_TYPE = "cron"
-UNKNOWN_UNIT_TYPE = "unknown"
 
 
 
@@ -49,13 +21,8 @@ PLUGIN_UNIT_TYPES = frozenset(
     {
         PLUGIN_UNIT_TYPE,
         OPENCLAW_PLUGIN_UNIT_TYPE,
-        BUNDLE_COMMAND_UNIT_TYPE,
-        BUNDLE_HOOK_PACK_UNIT_TYPE,
     }
 )
-
-
-CRON_UNIT_TYPES = frozenset({CRON_UNIT_TYPE})
 
 
 def is_plugin_unit_type(unit_type: str) -> bool:
@@ -63,7 +30,7 @@ def is_plugin_unit_type(unit_type: str) -> bool:
 
 
 def is_cron_unit_type(unit_type: str) -> bool:
-    return str(unit_type).strip() in CRON_UNIT_TYPES
+    return str(unit_type).strip() == CRON_UNIT_TYPE
 
 
 def normalized_parts(display_path: str) -> list[str]:
@@ -71,7 +38,7 @@ def normalized_parts(display_path: str) -> list[str]:
     return [part for part in pure.parts if part and part != "."]
 
 
-def _skills_segment_index(parts: list[str]) -> int | None:
+def _skills_segment_index(parts: list[str]) -> Optional[int]:
     for index, part in enumerate(parts):
         if part == "skills" and index + 1 < len(parts):
             return index
@@ -112,11 +79,11 @@ def _skill_depth_after_root(display_path: str) -> int:
     return len(parts) - skills_index - 1
 
 
-def suspicious_skill_file_reason(relpath: str) -> str | None:
+def suspicious_skill_file_reason(relpath: str) -> Optional[str]:
     pure = PurePosixPath(relpath)
     lowered = relpath.lower()
     basename = pure.name.lower()
-    if basename in SUSPICIOUS_SKILL_BASENAMES:
+    if basename in PRIVATE_KEY_FILE_BASENAMES:
         return f"contains sensitive credential file: {relpath}"
     for suffix in SUSPICIOUS_SKILL_SUFFIXES:
         if lowered.endswith(suffix):
@@ -124,52 +91,14 @@ def suspicious_skill_file_reason(relpath: str) -> str | None:
     return None
 
 
-def extract_skill_dir_display_path(display_path: str) -> str | None:
+def extract_skill_dir_display_path(display_path: str) -> Optional[str]:
     candidates = _candidate_skill_paths(display_path)
     if not candidates:
         return None
     return candidates[0]
 
 
-def extract_bundle_command_display_path(display_path: str) -> str | None:
-    parts = normalized_parts(display_path)
-    if "extensions" not in parts:
-        return None
-    if len(parts) >= 2 and parts[-2] == "commands":
-        suffix = PurePosixPath(parts[-1]).suffix.lower()
-        if suffix in BUNDLE_COMMAND_SUFFIXES:
-            return PurePosixPath(*parts).as_posix()
-    if len(parts) >= 3 and parts[-3:] and parts[-3] == ".cursor" and parts[-2] == "commands":
-        suffix = PurePosixPath(parts[-1]).suffix.lower()
-        if suffix in BUNDLE_COMMAND_SUFFIXES:
-            return PurePosixPath(*parts).as_posix()
-    return None
-
-
-def extract_bundle_hook_display_path(display_path: str) -> str | None:
-    parts = normalized_parts(display_path)
-    if "extensions" not in parts:
-        return None
-    for index, part in enumerate(parts):
-        if part == "hooks" and index + 1 < len(parts):
-            return PurePosixPath(*parts[: index + 2]).as_posix()
-    return None
-
-
-def extract_selectable_unit_display_path(display_path: str, *, allow_bundle_units: bool = False) -> str | None:
-
-    skill_path = extract_skill_dir_display_path(display_path)
-    if skill_path:
-        return skill_path
-    if not allow_bundle_units:
-        return None
-    hook_path = extract_bundle_hook_display_path(display_path)
-    if hook_path:
-        return hook_path
-    return extract_bundle_command_display_path(display_path)
-
-
-def classify_basic_selectable_directory(unit_path: Path, display_path: str) -> tuple[str | None, str, bool]:
+def classify_basic_selectable_directory(unit_path: Path, display_path: str) -> tuple[Optional[str], str, bool]:
     normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
     if not normalized or normalized == ".":
         return None, "unknown", True
@@ -199,24 +128,12 @@ def classify_basic_selectable_directory(unit_path: Path, display_path: str) -> t
     return None, "unknown", True
 
 
-def classify_basic_selectable_file(display_path: str) -> tuple[str | None, str]:
-    normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
-    if not normalized or normalized == ".":
-        return None, "unknown"
-    return None, "unknown"
-
-
 def basic_owning_selectable_paths(display_path: str) -> tuple[str, ...]:
     normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
     if not normalized or normalized == ".":
         return ()
     candidates = _candidate_skill_paths(normalized)
     return tuple(candidates)
-
-
-def basic_owning_plugin_paths(display_path: str) -> tuple[str, ...]:
-    del display_path
-    return ()
 
 
 def basic_allowed_skill_root_prefixes(display_prefix: str) -> set[str]:
@@ -235,18 +152,7 @@ def basic_allowed_skill_root_prefixes(display_prefix: str) -> set[str]:
     return allowed
 
 
-def unit_type_from_path(relative_path: str, *, allow_bundle_units: bool = False) -> str:
-    if extract_skill_dir_display_path(relative_path):
-        return SKILL_UNIT_TYPE
-    if allow_bundle_units:
-        if extract_bundle_command_display_path(relative_path):
-            return BUNDLE_COMMAND_UNIT_TYPE
-        if extract_bundle_hook_display_path(relative_path):
-            return BUNDLE_HOOK_PACK_UNIT_TYPE
-    return UNKNOWN_UNIT_TYPE
-
-
-def rootless_skill_path(relative_path: str) -> str | None:
+def rootless_skill_path(relative_path: str) -> Optional[str]:
     marker = "/skills/"
     if marker not in relative_path:
         return None

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import PurePosixPath
 
@@ -12,9 +13,9 @@ _OPENCLAW_WORKSPACE_SOURCE_KEY = ".openclaw/workspace"
 
 def selected_workflow_unit_paths(
     *,
-    selected_skill_paths: set[str] | None,
-    selected_plugin_paths: set[str] | None,
-    selected_cron_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
+    selected_plugin_paths: Optional[set[str]],
+    selected_cron_paths: Optional[set[str]],
 ) -> set[str]:
     return {
         str(path).strip().rstrip("/")
@@ -41,7 +42,7 @@ def _workflow_runtime_auth_paths(*, bundle_context: dict, stage_plan) -> set[str
 def _is_workflow_related_credential_skip(
     skipped_path: str,
     *,
-    selected_unit_paths: set[str] | None,
+    selected_unit_paths: Optional[set[str]],
     runtime_auth_paths: set[str],
     target,
 ) -> bool:
@@ -71,14 +72,14 @@ def _is_workflow_related_credential_skip(
 def build_workflow_related_no_auth_paths(
     skipped: list[str],
     *,
-    selected_skill_paths: set[str] | None,
-    selected_plugin_paths: set[str] | None,
-    selected_cron_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
+    selected_plugin_paths: Optional[set[str]],
+    selected_cron_paths: Optional[set[str]],
     bundle_context: dict,
     stage_plan,
     target,
 ) -> list[str]:
-    selected_unit_paths: set[str] | None = None
+    selected_unit_paths: Optional[set[str]] = None
     if any(group is not None for group in (selected_skill_paths, selected_plugin_paths, selected_cron_paths)):
         selected_unit_paths = selected_workflow_unit_paths(
             selected_skill_paths=selected_skill_paths,

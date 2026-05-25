@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import errno
+from contextlib import suppress
 import os
 import re
 import shutil
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Iterable
+from typing import Iterable, Optional, Union
 
 from .constants import TEXT_ENCODINGS, TEXT_SAMPLE_BYTES, VIRTUALENV_BIN_DIRS, VIRTUALENV_MARKER_FILES
 from .exclusion_rules import SYSTEM_DIRS, SYSTEM_SUFFIXES
@@ -49,7 +50,7 @@ def cleanup_bundle_file(bundle_file: str) -> dict[str, object]:
     return summary
 
 
-def cleanup_staging_root(staging_root: str | Path | None) -> dict[str, object]:
+def cleanup_staging_root(staging_root: Optional[Union[str, Path]]) -> dict[str, object]:
     summary: dict[str, object] = {}
     normalized_staging_root = str(staging_root or "").strip()
     if not normalized_staging_root:
@@ -72,13 +73,11 @@ def cleanup_staging_root(staging_root: str | Path | None) -> dict[str, object]:
 
 
 def safe_chmod(path: Path, mode: int) -> None:
-    try:
+    with suppress(OSError):
         os.chmod(path, mode)
-    except OSError:
-        pass
 
 
-def normalize_path(path: str | Path) -> Path:
+def normalize_path(path: Union[str, Path]) -> Path:
     return Path(path).expanduser().resolve()
 
 
@@ -127,7 +126,7 @@ def _is_probably_binary(raw: bytes) -> bool:
     return printable / len(sample) < 0.75
 
 
-def read_text(path: Path) -> tuple[str | None, str | None]:
+def read_text(path: Path) -> tuple[Optional[str], Optional[str]]:
     try:
         raw = path.read_bytes()
     except OSError:

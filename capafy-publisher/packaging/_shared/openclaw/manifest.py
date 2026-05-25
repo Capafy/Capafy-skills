@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 
 
@@ -7,7 +8,7 @@ _MISSING = object()
 _SELECTION_RUNTIME_VALIDATION_LABEL = "agent.selected_units.runtime_validation"
 
 
-def confirmed_openclaw_skills_from_manifest(payload: dict | None) -> list[dict] | None:
+def confirmed_openclaw_skills_from_manifest(payload: Optional[dict]) -> Optional[list[dict]]:
     if payload is None:
         return None
 

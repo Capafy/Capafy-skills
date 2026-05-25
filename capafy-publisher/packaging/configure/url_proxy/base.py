@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Mapping
+from typing import Any, ClassVar, Mapping, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from packaging.configure.candidate import Candidate
@@ -15,8 +15,8 @@ class ScanContext:
     staging_root: Path
     process_env: Mapping[str, str]
     stage_plan: Any = None
-    user_home: Path | None = None
-    target_id: str | None = None
+    user_home: Optional[Path] = None
+    target_id: Optional[str] = None
 
     @property
     def scan_only_root(self) -> Path:
@@ -30,7 +30,7 @@ class RuntimeContract(ABC):
 
     display_name: ClassVar[str]
 
-    applicable_targets: ClassVar[frozenset[str] | None] = None
+    applicable_targets: ClassVar[Optional[frozenset[str]]] = None
 
 
     def prepare(self, ctx: ScanContext) -> None:

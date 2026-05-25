@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 
@@ -9,7 +10,7 @@ OPENCLAW_MODERN_MIN_VERSION = (2026, 3, 22)
 OPENCLAW_VERSION_PATTERN = re.compile(r"(\d{4}\.\d+\.\d+)")
 
 
-def extract_version(raw_value: str | None) -> str | None:
+def extract_version(raw_value: Optional[str]) -> Optional[str]:
     if not raw_value:
         return None
     match = OPENCLAW_VERSION_PATTERN.search(raw_value)
@@ -19,7 +20,7 @@ def extract_version(raw_value: str | None) -> str | None:
     return stripped or None
 
 
-def version_tuple(version: str | None) -> tuple[int, ...] | None:
+def version_tuple(version: Optional[str]) -> Optional[tuple[int, ...]]:
     normalized = extract_version(version)
     if not normalized:
         return None

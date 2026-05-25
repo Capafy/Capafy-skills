@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -7,10 +8,10 @@ from pathlib import Path
 def write_selected_units_manifest(
     staging_root: Path,
     *,
-    selected_skill_paths: set[str] | None,
-    selected_plugin_paths: set[str] | None,
-    selected_cron_paths: set[str] | None,
-    runtime_validation: dict | None = None,
+    selected_skill_paths: Optional[set[str]],
+    selected_plugin_paths: Optional[set[str]],
+    selected_cron_paths: Optional[set[str]],
+    runtime_validation: Optional[dict] = None,
 ) -> Path:
     payload = {
         "selected_skill_paths": sorted(set(selected_skill_paths or set())),

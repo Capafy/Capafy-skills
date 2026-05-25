@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from capafy_platform.http import post_platform_json
 
@@ -33,7 +33,7 @@ def build_login_verify_request(
 
 
 
-def login_init(email: str, *, base_url: str | None = None) -> dict[str, Any]:
+def login_init(email: str, *, base_url: Optional[str] = None) -> dict[str, Any]:
     request_body = build_login_init_request(email)
     data = post_platform_json("/auth/login", request_body, base_url=base_url)
     response = {
@@ -52,7 +52,7 @@ def login_init(email: str, *, base_url: str | None = None) -> dict[str, Any]:
 def login_verify(
     challenge_id: str,
     code: str,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     request_body = build_login_verify_request(challenge_id, code)
     data = post_platform_json("/auth/login/verify", request_body, base_url=base_url)

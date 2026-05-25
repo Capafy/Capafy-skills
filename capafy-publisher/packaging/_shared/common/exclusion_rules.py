@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import PurePosixPath
 
@@ -113,7 +114,7 @@ SOURCE_CODE_SUFFIXES = {
 }
 
 
-def looks_like_high_risk_file(relpath: str) -> str | None:
+def looks_like_high_risk_file(relpath: str) -> Optional[str]:
     pure = PurePosixPath(relpath)
     basename = pure.name
     lowered_basename = basename.lower()
@@ -131,7 +132,7 @@ def looks_like_high_risk_file(relpath: str) -> str | None:
     return None
 
 
-def exclude_reason_code_for_path(relpath: str, *, reason: str = "") -> str | None:
+def exclude_reason_code_for_path(relpath: str, *, reason: str = "") -> Optional[str]:
     normalized = str(relpath or "").strip().rstrip("/")
     if not normalized:
         return None

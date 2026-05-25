@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import logging
 import re
@@ -27,23 +28,23 @@ def normalize_command_version(name: str, version: str) -> str:
 
 
 def runtime_candidates(
-    candidates: Mapping[str, Sequence[str]] | None,
+    candidates: Optional[Mapping[str, Sequence[str]]],
 ) -> Mapping[str, Sequence[str]]:
     return SYSTEM_PACKAGE_CANDIDATES if candidates is None else candidates
 
 
 def runtime_which(
-    which: Callable[[str], str | None] | None,
-) -> Callable[[str], str | None]:
+    which: Optional[Callable[[str], Optional[str]]],
+) -> Callable[[str], Optional[str]]:
     return shutil.which if which is None else which
 
 
-def runtime_logger(default_logger: logging.Logger, log: logging.Logger | None) -> logging.Logger:
+def runtime_logger(default_logger: logging.Logger, log: Optional[logging.Logger]) -> logging.Logger:
     return default_logger if log is None else log
 
 
 def runtime_run_command(
-    run_command: Callable[[list[str], int], dict] | None,
+    run_command: Optional[Callable[[list[str], int], dict]],
 ) -> Callable[[list[str], int], dict]:
     return _default_run_text_command if run_command is None else run_command
 
@@ -52,9 +53,9 @@ def collect_command_version(
     name: str,
     args: list[str],
     *,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
-) -> dict | None:
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
+) -> Optional[dict]:
     resolved_which = runtime_which(which)
     resolved_run_command = runtime_run_command(run_command)
     executable = args[0]
@@ -77,12 +78,12 @@ def collect_per_candidate(
     executable: str,
     candidate_key: str,
     make_args: Callable[[str], list[str]],
-    parse_version: Callable[[str, dict], str | None],
+    parse_version: Callable[[str, dict], Optional[str]],
     timeout: int = 5,
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     resolved_candidates = runtime_candidates(candidates)
     resolved_which = runtime_which(which)
@@ -98,7 +99,7 @@ def collect_per_candidate(
     return packages
 
 
-def version_from_stdout(name: str, result: dict) -> str | None:
+def version_from_stdout(name: str, result: dict) -> Optional[str]:
     del name
     if result.get("ok") and result.get("stdout"):
         return result["stdout"]

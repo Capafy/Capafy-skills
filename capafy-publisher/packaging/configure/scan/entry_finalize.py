@@ -3,10 +3,6 @@ from __future__ import annotations
 from packaging.configure.sensitive.placeholders import build_placeholder
 
 
-def entry_source_seed(entry: dict) -> str:
-    return str(entry.get("_source_seed") or str(entry.get("source", "")).strip())
-
-
 def entry_field_aliases(entry: dict) -> list[str]:
     aliases = entry.get("_field_aliases", [])
     if not isinstance(aliases, list):
@@ -18,10 +14,6 @@ def entry_field_aliases(entry: dict) -> list[str]:
         if normalized and normalized not in result:
             result.append(normalized)
     return result
-
-
-def entry_source(entry: dict) -> str:
-    return str(entry.get("source", "")).strip()
 
 
 def finalize_entry(entry: dict) -> dict:
@@ -40,7 +32,7 @@ def finalize_entry(entry: dict) -> dict:
 
 
 def _placeholder_source(entry: dict) -> str:
-    source = entry_source_seed(entry)
+    source = str(entry.get("_source_seed") or str(entry.get("source", "")).strip())
     detail = str(entry.get("source_detail", "") or "").strip()
     occurrence = str(entry.get("occurrence_index", "") or "").strip()
     return "\n".join((source, detail, occurrence))
@@ -76,7 +68,6 @@ def resolve_candidate_url(
 
 
 __all__ = [
-    "entry_source",
     "finalize_entry",
     "resolve_candidate_url",
 ]

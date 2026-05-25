@@ -1,4 +1,7 @@
 from __future__ import annotations
+from typing import Optional
+
+from pathlib import Path
 
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging._shared.env_profiles import load_profile, string_tuple_profile_value
@@ -13,7 +16,7 @@ class EnvProfileTarget:
         self.profile = profile
         self.env_id = str(profile.get("env_id", self._DEFAULT_ENV_ID))
 
-    def profile_env_id(self) -> str | None:
+    def profile_env_id(self) -> Optional[str]:
         return self.env_id or None
 
     def prepare_runtime_dir(self, runtime_dir: str) -> str:
@@ -28,7 +31,7 @@ class EnvProfileTarget:
         stage_plan: StagePlan,
         *,
         agent_type: str = "",
-        workspace_documents_manifest_payload: dict | None = None,
+        workspace_documents_manifest_payload: Optional[dict] = None,
     ) -> dict:
         return stage_impl.finalize_packaging(
             self,
@@ -54,7 +57,7 @@ class EnvProfileTarget:
         self,
         runtime_root: Path,
         *,
-        expected_version: str | None = None,
+        expected_version: Optional[str] = None,
     ) -> dict:
         from packaging.ship.artifacts.runtimes.env_validate import validate_env_runtime
 

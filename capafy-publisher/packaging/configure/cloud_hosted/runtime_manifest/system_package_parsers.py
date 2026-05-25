@@ -1,9 +1,10 @@
 from __future__ import annotations
+from typing import Optional
 
 from packaging.configure.cloud_hosted.runtime_manifest.system_package_helpers import split_table_columns
 
 
-def parse_brew_version(name: str, result: dict) -> str | None:
+def parse_brew_version(name: str, result: dict) -> Optional[str]:
     del name
     line = result.get("stdout")
     if not result.get("ok") or not line:
@@ -12,7 +13,7 @@ def parse_brew_version(name: str, result: dict) -> str | None:
     return parts[1] if len(parts) >= 2 else None
 
 
-def parse_winget_version(package_id: str, result: dict) -> str | None:
+def parse_winget_version(package_id: str, result: dict) -> Optional[str]:
     stdout = result.get("stdout")
     if not result.get("ok") or not stdout:
         return None
@@ -31,7 +32,7 @@ def parse_winget_version(package_id: str, result: dict) -> str | None:
     return None
 
 
-def parse_choco_version(package_name: str, result: dict) -> str | None:
+def parse_choco_version(package_name: str, result: dict) -> Optional[str]:
     stdout = result.get("stdout")
     if not result.get("ok") or not stdout:
         return None
@@ -47,7 +48,7 @@ def parse_choco_version(package_name: str, result: dict) -> str | None:
     return None
 
 
-def parse_pacman_version(name: str, result: dict) -> str | None:
+def parse_pacman_version(name: str, result: dict) -> Optional[str]:
     del name
     line = result.get("stdout")
     if not result.get("ok") or not line:

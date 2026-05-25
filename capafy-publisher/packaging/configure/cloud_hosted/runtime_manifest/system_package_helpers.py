@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 import shlex
@@ -7,7 +8,7 @@ import shlex
 TABLE_SPLIT_PATTERN = re.compile(r"\s{2,}")
 
 
-def first_output_line(payload: dict) -> str | None:
+def first_output_line(payload: dict) -> Optional[str]:
     for key in ("stdout", "stderr"):
         value = payload.get(key)
         if value:
@@ -34,13 +35,13 @@ def split_table_columns(line: str) -> list[str]:
     return [column.strip() for column in TABLE_SPLIT_PATTERN.split(line.strip()) if column.strip()]
 
 
-def extract_named_versions(payload: object, versions: dict[str, str] | None = None) -> dict[str, str]:
+def extract_named_versions(payload: object, versions: Optional[dict[str, str]] = None) -> dict[str, str]:
 
     if versions is None:
         versions = {}
     if isinstance(payload, dict):
-        name: str | None = None
-        version: str | None = None
+        name: Optional[str] = None
+        version: Optional[str] = None
         for key, value in payload.items():
             lowered = str(key).lower()
             if lowered in {"name", "app"} and isinstance(value, str):

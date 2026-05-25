@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-from typing import Callable
+from typing import Callable, Optional
 
-from packaging._shared.common.url_values import build_config_url_proxy_group, find_domains, normalize_explicit_url
+from packaging._shared.common.url_values import build_config_url_proxy_group
 from packaging._shared.openclaw.official_providers import (
     OpenClawOfficialProviderSpec,
     find_openclaw_official_provider_in_text,
 )
+from packaging.configure.runtimes.openclaw.provider_url import extract_provider_url
 from packaging.configure.scan.support import append_candidate
 from packaging.configure.sensitive.keywords import contains_explicit_secret_keyword
 from packaging.configure.sensitive.literals import extract_secret_value
@@ -17,37 +18,11 @@ OPENCLAW_CONFIG_REL_SOURCE = ".openclaw/openclaw.json"
 OPENCLAW_AUTH_PROFILE_REL_SOURCE = ".openclaw/agents/main/agent/auth-profiles.json"
 
 
-def _openclaw_url_proxy_group(path_parts: list[str], *, source_path: str = OPENCLAW_CONFIG_REL_SOURCE) -> str:
-    return build_config_url_proxy_group(source_path, path_parts)
-
-
-def _extract_provider_url(provider_config: dict) -> str | None:
-    preferred_keys = (
-        "baseUrl",
-        "baseURL",
-        "apiBase",
-        "api_base",
-        "endpoint",
-        "url",
-    )
-    for key in preferred_keys:
-        value = provider_config.get(key)
-        if isinstance(value, str):
-            explicit_url = normalize_explicit_url(value)
-            if explicit_url:
-                return explicit_url
-
-    domains = find_domains(json.dumps(provider_config, ensure_ascii=False))
-    if domains:
-        return domains[0]
-    return None
-
-
 def _infer_auth_profile_provider_spec(
     path_parts: list[str],
     node: dict,
-) -> OpenClawOfficialProviderSpec | None:
-    def match_text(value: str) -> OpenClawOfficialProviderSpec | None:
+) -> Optional[OpenClawOfficialProviderSpec]:
+    def match_text(value: str) -> Optional[OpenClawOfficialProviderSpec]:
         return find_openclaw_official_provider_in_text(value)
 
     for key in ("provider", "type", "service", "name"):
@@ -63,24 +38,13 @@ def _infer_auth_profile_provider_spec(
     return None
 
 
-def _auth_profile_provider_group(provider_name: str) -> str:
-    return _openclaw_url_proxy_group(
-        ["models", "providers", provider_name],
-        source_path=OPENCLAW_CONFIG_REL_SOURCE,
-    )
-
-
-def _auth_profile_provider_field(provider_name: str, field: str) -> str:
-    return f"models.providers.{provider_name}.{field}"
-
-
 def _is_auth_profile_api_key_field(key_name: str) -> bool:
     return key_name.strip().lower() == "key" or contains_explicit_secret_keyword(key_name)
 
 
 def collect_openclaw_auth_profile_scan_hints(
     text: str,
-    annotate_candidate: Callable[[dict, str], dict | None],
+    annotate_candidate: Callable[[dict, str], Optional[dict]],
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str], list[dict]]:
     env_hints: dict[str, str] = {}
     service_hints: dict[str, str] = {}
@@ -91,9 +55,9 @@ def collect_openclaw_auth_profile_scan_hints(
     except json.JSONDecodeError:
         return env_hints, service_hints, value_hints, []
 
-    def walk(node: object, path_parts: list[str], inherited_domain: str | None = None) -> None:
+    def walk(node: object, path_parts: list[str], inherited_domain: Optional[str] = None) -> None:
         if isinstance(node, dict):
-            explicit_domain = _extract_provider_url(node)
+            explicit_domain = extract_provider_url(node)
             provider_spec = _infer_auth_profile_provider_spec(path_parts, node)
             official_domain = provider_spec.base_url if provider_spec else ""
             domain = explicit_domain or official_domain or inherited_domain
@@ -102,10 +66,13 @@ def collect_openclaw_auth_profile_scan_hints(
                     walk(value, path_parts + [str(key)], domain)
                 return
             provider_name = provider_spec.provider_name
-            url_proxy_group = _auth_profile_provider_group(provider_name)
+            url_proxy_group = build_config_url_proxy_group(
+                OPENCLAW_CONFIG_REL_SOURCE,
+                ["models", "providers", provider_name],
+            )
             service_name = provider_spec.service
-            api_key_field = _auth_profile_provider_field(provider_name, "apiKey")
-            base_url_field = _auth_profile_provider_field(provider_name, "baseUrl")
+            api_key_field = f"models.providers.{provider_name}.apiKey"
+            base_url_field = f"models.providers.{provider_name}.baseUrl"
 
             url_candidate_added = False
             api_key_candidate_added = False

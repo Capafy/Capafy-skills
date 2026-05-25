@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import (
     DEVELOPER_WORK_DIR_PATH,
@@ -32,7 +32,7 @@ from packaging.init.explicit_skill import (
 )
 
 
-def load_dispose_overrides_json(path: str | None) -> dict[str, str]:
+def load_dispose_overrides_json(path: Optional[str]) -> dict[str, str]:
     if not path:
         return {}
     json_path = Path(path).expanduser()
@@ -69,7 +69,7 @@ def _write_buyout_manifest(
     result: Any,
     reviewed_scan_payload: dict[str, Any],
     disposition_status: str,
-    redaction_summary: dict[str, Any] | None = None,
+    redaction_summary: Optional[dict[str, Any]] = None,
 ) -> None:
     manifest: PublishWorkState = ctx.manifest
     latest_state = ctx.latest_state

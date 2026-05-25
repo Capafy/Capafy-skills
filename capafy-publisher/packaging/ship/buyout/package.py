@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -41,7 +42,7 @@ def build_buyout_artifact_package_payload(
 def build_buyout_validate_reviewed_scan_json(
     *,
     effective_scan_payload: dict,
-) -> str | None:
+) -> Optional[str]:
     return json.dumps(sanitize_reviewed_scan_payload(effective_scan_payload), ensure_ascii=False)
 
 

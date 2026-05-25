@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Iterable, List, Mapping, TypedDict
+from typing import Any, Iterable, List, Mapping, Optional, TypedDict
 
 
 REVIEW_METADATA_KEY = "_review"
@@ -103,11 +103,11 @@ def is_reviewed_scan_payload(payload: object) -> bool:
 
 def resolved_review_binding(
     *,
-    review_binding: dict | None = None,
-    raw_scan: dict | None = None,
+    review_binding: Optional[dict] = None,
+    raw_scan: Optional[dict] = None,
     staging_root: object = None,
-    env_id: str | None = None,
-    agent_type: str | None = None,
+    env_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
     digest_builder: object = None,
 ) -> dict:
     resolved: dict = {}
@@ -133,11 +133,11 @@ def resolved_review_binding(
 def reviewed_scan_matches_context(
     payload: object,
     *,
-    review_binding: dict | None = None,
-    raw_scan: dict | None = None,
+    review_binding: Optional[dict] = None,
+    raw_scan: Optional[dict] = None,
     staging_root: object = None,
-    env_id: str | None = None,
-    agent_type: str | None = None,
+    env_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
     digest_builder: object = None,
 ) -> bool:
     if not is_reviewed_scan_payload(payload):
@@ -162,7 +162,7 @@ def reviewed_scan_matches_context(
 def reviewed_scan_context_diagnostics(
     payload: object,
     *,
-    review_binding: dict | None = None,
+    review_binding: Optional[dict] = None,
 ) -> dict[str, Any]:
     expected = resolved_review_binding(
         review_binding=review_binding,
@@ -236,14 +236,20 @@ def _string_value(value: object) -> str:
 
 
 def _required_non_empty_text(entry: Mapping[str, Any], key: str, *, label: str) -> str:
-    value = str(entry.get(key, "") or "").strip()
+    raw_value = entry.get(key)
+    if not isinstance(raw_value, str):
+        raise ValueError(f"{label}.{key} must be a string")
+    value = raw_value.strip()
     if not value:
         raise ValueError(f"{label}.{key} must not be empty")
     return value
 
 
 def _required_reviewed_scan_use(entry: Mapping[str, Any], *, label: str) -> str:
-    use = str(entry.get("use", "") or "").strip()
+    raw_use = entry.get("use")
+    if not isinstance(raw_use, str):
+        raise ValueError(f"{label}.use must be a string")
+    use = raw_use.strip()
     if not use:
         raise ValueError(f"{label}.use must not be empty for reviewed_scan")
     return use

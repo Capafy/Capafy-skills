@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Union
 
 from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
 from packaging._shared.common.json_io import load_json_object
@@ -160,7 +160,7 @@ def claude_auth_login_detected(staging_root: Path, stage_plan=None) -> bool:
     return bool(credentials_payload and claude_credentials_uses_login_state(credentials_payload))
 
 
-def claude_oauth_token_env_detected(process_env: Mapping[str, str] | Any) -> bool:
+def claude_oauth_token_env_detected(process_env: Union[Mapping[str, str], Any]) -> bool:
     get_value = getattr(process_env, "get", lambda _key, _default=None: _default)
     value = str(get_value(CLAUDE_CODE_OAUTH_TOKEN_ENV_KEY, "") or "").strip()
     return bool(value and not looks_like_platform_managed_placeholder_value(value))

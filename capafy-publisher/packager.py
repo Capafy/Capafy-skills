@@ -2,6 +2,7 @@
 
 
 from __future__ import annotations
+from typing import Optional
 
 import argparse
 import sys
@@ -59,7 +60,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
 
     args = _build_parser().parse_args(raw_argv)

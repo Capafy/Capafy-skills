@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import DEVELOPER_WORK_DIR_PATH
 from packaging._shared.common.cli import build_publish_error
@@ -182,7 +182,7 @@ def _write_config_submitted_manifest(
     agent_version_id: str,
     env_id: str,
     agent_type: str,
-    review_url: str | None,
+    review_url: Optional[str],
     reviewed_scan_path: str,
 ) -> None:
     write_cloud_hosted_config_submitted_manifest(

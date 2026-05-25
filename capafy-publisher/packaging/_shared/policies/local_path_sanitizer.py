@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from pathlib import Path
@@ -67,7 +68,7 @@ def rewrite_local_path_text(
     value: str,
     *,
     packaged_path_refs: dict[str, str],
-    source_path: Path | None = None,
+    source_path: Optional[Path] = None,
 ) -> tuple[str, int]:
     updated, known_ref_replacements = replace_known_path_refs(value, packaged_path_refs)
     updated, openclaw_private_replacements = redact_openclaw_home_path_refs(updated)

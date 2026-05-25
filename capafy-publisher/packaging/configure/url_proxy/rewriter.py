@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging.configure.contracts import (
     PlanField,
@@ -174,7 +174,7 @@ def _synthesize_toml_field(file_path: Path, plan_field: PlanField) -> None:
         return
 
     lines = text.splitlines(keepends=True)
-    section_start: int | None = None
+    section_start: Optional[int] = None
     section_end = len(lines)
 
     for idx, raw_line in enumerate(lines):

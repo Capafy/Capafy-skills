@@ -57,14 +57,9 @@ class ScanCollectionAccumulator:
         self.referenced_env_names.update(local_referenced_env_names)
 
 
-_INTERNAL_SCAN_EXCLUDED_RELPATHS = frozenset({
-    STAGE_MANIFEST_NAME,
-})
-
-
 def _is_internal_scan_file(relpath: str) -> bool:
     normalized = str(relpath or "").strip().replace("\\", "/").lstrip("./")
-    return normalized in _INTERNAL_SCAN_EXCLUDED_RELPATHS
+    return normalized == STAGE_MANIFEST_NAME
 
 
 def _drop_internal_scan_entries(result: dict) -> None:

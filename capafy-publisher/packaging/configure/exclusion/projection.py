@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
@@ -10,7 +11,7 @@ def build_exclude_entry(
     *,
     reason: str = "",
     added_by: str = "scan",
-) -> dict[str, str] | None:
+) -> Optional[dict[str, str]]:
     normalized = str(relpath or "").strip().rstrip("/")
     if not normalized:
         return None
@@ -34,7 +35,7 @@ def project_scan_excludes(
     excludes: list[dict] = []
     seen_sources: set[str] = set()
 
-    def append_exclude(entry: dict | None) -> None:
+    def append_exclude(entry: Optional[dict]) -> None:
         if not isinstance(entry, dict):
             return
         source = str(entry.get("source", "")).strip()

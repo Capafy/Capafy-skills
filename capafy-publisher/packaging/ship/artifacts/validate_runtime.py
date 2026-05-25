@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import DEFAULT_BUNDLE_PATH, DEFAULT_STAGING_PATH
 from packaging._shared.common.fs import normalize_path
@@ -59,11 +59,11 @@ def _materialize_validate_input(
 def _run_validate_runtime_pipeline(
     input_path: Path,
     *,
-    target_name: str | None = None,
-    expected_version: str | None = None,
-    reviewed_scan_json: str | None = None,
-    reviewed_scan_file: str | None = None,
-    staging_root: Path | None = None,
+    target_name: Optional[str] = None,
+    expected_version: Optional[str] = None,
+    reviewed_scan_json: Optional[str] = None,
+    reviewed_scan_file: Optional[str] = None,
+    staging_root: Optional[Path] = None,
 ) -> tuple[int, dict]:
     ensure_validate_runtime_input_ready(input_path, staging_root=staging_root)
     target, resolved_target_name = get_runtime_validation_target(target_name)
@@ -107,11 +107,11 @@ def _run_validate_runtime_pipeline(
 def run_validate_runtime_pipeline(
     input_path: Path,
     *,
-    target_name: str | None = None,
-    expected_version: str | None = None,
-    reviewed_scan_json: str | None = None,
-    reviewed_scan_file: str | None = None,
-    staging_root: Path | None = None,
+    target_name: Optional[str] = None,
+    expected_version: Optional[str] = None,
+    reviewed_scan_json: Optional[str] = None,
+    reviewed_scan_file: Optional[str] = None,
+    staging_root: Optional[Path] = None,
 ) -> tuple[int, dict]:
     return _run_validate_runtime_pipeline(
         input_path,
@@ -141,7 +141,7 @@ def latest_mtime_under(path: Path) -> float:
     return latest_mtime
 
 
-def _default_staging_root_for_validate_input(input_path: Path) -> Path | None:
+def _default_staging_root_for_validate_input(input_path: Path) -> Optional[Path]:
     default_bundle_path = normalize_path(DEFAULT_BUNDLE_PATH)
     if input_path != default_bundle_path:
         return None
@@ -171,7 +171,7 @@ def _validate_runtime_mtime_tolerance_seconds() -> float:
 def ensure_validate_runtime_input_ready(
     input_path: Path,
     *,
-    staging_root: Path | None = None,
+    staging_root: Optional[Path] = None,
 ) -> None:
     if not input_path.exists():
         raise ValueError(f"{SERIAL_VALIDATE_RUNTIME_HINT} Input path does not exist: {input_path}")

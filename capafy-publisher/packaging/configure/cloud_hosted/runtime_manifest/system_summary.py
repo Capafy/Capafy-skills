@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import platform
 import shlex
@@ -10,7 +11,7 @@ from packaging.configure.cloud_hosted.runtime_manifest.system_package_helpers im
 )
 
 
-def read_os_release(os_release_path: Path | None = None) -> dict[str, str]:
+def read_os_release(os_release_path: Optional[Path] = None) -> dict[str, str]:
     path = os_release_path or Path("/etc/os-release")
     values: dict[str, str] = {}
     if not path.is_file():
@@ -35,7 +36,7 @@ def system_summary(
     *,
     read_release: Callable[[], dict[str, str]] = read_os_release,
     platform_module=platform,
-) -> dict[str, str | None]:
+) -> dict[str, Optional[str]]:
     os_release = read_release()
     system_name = platform_module.system()
     display_os = (

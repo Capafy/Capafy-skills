@@ -62,7 +62,7 @@ class PublishWorkState:
         extra = self.extra if isinstance(self.extra, dict) else {}
         return str(extra.get(key, default)).strip()
 
-    def with_stage(self, stage: str, *, extra: Optional[Dict[str, Any]] | None = None) -> PublishWorkState:
+    def with_stage(self, stage: str, *, extra: Optional[Optional[Dict[str, Any]]] = None) -> PublishWorkState:
         updates: dict[str, Any] = {"current_stage": _require_valid_stage(stage)}
         if extra is not None:
             updates["extra"] = extra
@@ -73,7 +73,7 @@ def publish_work_state_manifest_path(work_dir: Path) -> Path:
     return work_dir / PUBLISH_WORK_STATE_MANIFEST_NAME
 
 
-def require_publish_work_state_manifest(work_dir: Path) -> dict[str, Any] | None:
+def require_publish_work_state_manifest(work_dir: Path) -> Optional[dict[str, Any]]:
     path = publish_work_state_manifest_path(work_dir)
     try:
         path_stat = path.lstat()
@@ -146,7 +146,7 @@ def write_publish_work_state_manifest(
     stage_value = _require_valid_stage(stage)
     if stage_value == STAGE_INIT_COMPLETED:
 
-        normalized_agent_type = str(agent_type or "").strip()
+        normalized_agent_type = agent_type.strip() if isinstance(agent_type, str) else ""
     else:
         normalized_agent_type = _require_non_empty_value("agent_type", agent_type)
 
@@ -220,14 +220,18 @@ def _utc_now() -> str:
 
 
 def _require_non_empty_value(label: str, value: Any) -> str:
-    normalized = str(value).strip()
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    normalized = value.strip()
     if not normalized:
         raise ValueError(f"{label} must not be empty")
     return normalized
 
 
 def _require_valid_stage(stage: Any) -> str:
-    normalized = str(stage).strip()
+    if not isinstance(stage, str):
+        raise ValueError("stage must be a string")
+    normalized = stage.strip()
     if normalized not in VALID_PUBLISH_WORK_STATE_STAGES:
         raise ValueError(f"stage must be one of {VALID_PUBLISH_WORK_STATE_STAGES}")
     return normalized

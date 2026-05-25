@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.cli import emit_json
 from packaging._shared.common.constants import DEVELOPER_WORK_DIR_PATH
@@ -34,9 +34,9 @@ _CONFIGURE_ALLOWED_STAGES = {
 def run_publish_configure(
     *,
     agent_id: str,
-    overrides: dict[str, str] | None = None,
+    overrides: Optional[dict[str, str]] = None,
     deep_scan: bool = False,
-    deep_scan_findings_file: str | None = None,
+    deep_scan_findings_file: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     try:
         manifest = require_publish_work_state(DEVELOPER_WORK_DIR_PATH)
@@ -168,9 +168,9 @@ def run_publish_configure(
 def publish_configure(
     *,
     agent_id: str,
-    dispositions_file: str | None = None,
+    dispositions_file: Optional[str] = None,
     deep_scan: bool = False,
-    deep_scan_findings_file: str | None = None,
+    deep_scan_findings_file: Optional[str] = None,
 ) -> int:
     run_kwargs = {
         "agent_id": agent_id,

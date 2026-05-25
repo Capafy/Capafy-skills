@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 
@@ -87,7 +88,7 @@ def _looks_like_env_reference_key(key: str) -> bool:
     return bool(tokens & ENV_REFERENCE_VALUE_TOKENS)
 
 
-def _collect_runtime_env_object_mentions(text: str, known_env_names: set[str] | None = None) -> set[str]:
+def _collect_runtime_env_object_mentions(text: str, known_env_names: Optional[set[str]] = None) -> set[str]:
     known = set(known_env_names) if known_env_names else None
     names: set[str] = set()
     for match in RUNTIME_ENV_DESTRUCTURE_PATTERN.finditer(text):
@@ -111,7 +112,7 @@ def _extract_nearby_structured_url_hint(text: str, target_line_no: int) -> str:
     if not lines:
         return "unknown"
 
-    best_distance: int | None = None
+    best_distance: Optional[int] = None
     best_url = "unknown"
     start = max(1, target_line_no - 20)
     end = min(len(lines), target_line_no + 20)
@@ -138,7 +139,7 @@ def _extract_nearby_structured_url_hint(text: str, target_line_no: int) -> str:
     return best_url
 
 
-def collect_referenced_env_names(text: str, known_env_names: set[str] | None = None) -> tuple[set[str], dict[str, str]]:
+def collect_referenced_env_names(text: str, known_env_names: Optional[set[str]] = None) -> tuple[set[str], dict[str, str]]:
     names: set[str] = set()
     url_hints: dict[str, str] = {}
     cursor = 0

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from packaging.configure.contracts import PROCESS_ENV_SOURCE
 from packaging.configure.env_var.names import iter_related_process_env_names
@@ -38,8 +39,12 @@ def _build_process_env_candidate(
     raw_value: str,
     process_env: dict[str, str],
     known_env_url_hints: dict[str, str],
-) -> tuple[dict | None, dict[str, str], dict[str, str]]:
+    *,
+    allow_plain_value: bool = False,
+) -> tuple[Optional[dict], dict[str, str], dict[str, str]]:
     extracted_value = extract_assignment_value(env_name, raw_value)
+    if not extracted_value and allow_plain_value:
+        extracted_value = str(raw_value or "").strip()
     if not extracted_value:
         return None, {}, {}
 
@@ -101,6 +106,7 @@ def collect_process_env_candidates(
             process_env[env_name],
             process_env,
             {**known_env_url_hints, **env_url_hints},
+            allow_plain_value=env_name in referenced_names or env_name in hinted_names,
         )
         if candidate is None:
             continue

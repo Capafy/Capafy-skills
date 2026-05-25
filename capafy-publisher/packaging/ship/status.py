@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 from packaging._shared.common.cli import emit_json_result
 from packaging._shared.common.constants import (
@@ -19,8 +19,8 @@ from packaging._shared.contracts.publish_work_state import (
 def _build_publish_local_files_summary(
     *,
     work_dir: Path = DEVELOPER_WORK_DIR_PATH,
-    staging_path: str | Path = DEFAULT_STAGING_PATH,
-    bundle_path: str | Path = DEFAULT_BUNDLE_PATH,
+    staging_path: Union[str, Path] = DEFAULT_STAGING_PATH,
+    bundle_path: Union[str, Path] = DEFAULT_BUNDLE_PATH,
 ) -> dict[str, Any]:
     temp_state = summarize_publish_work_state(work_dir)
     return {
@@ -36,8 +36,8 @@ def _build_publish_local_files_summary(
 def run_publish_status(
     *,
     developer_work_dir_path: Path = DEVELOPER_WORK_DIR_PATH,
-    staging_path: str | Path = DEFAULT_STAGING_PATH,
-    bundle_path: str | Path = DEFAULT_BUNDLE_PATH,
+    staging_path: Union[str, Path] = DEFAULT_STAGING_PATH,
+    bundle_path: Union[str, Path] = DEFAULT_BUNDLE_PATH,
 ) -> tuple[dict[str, Any], int]:
     try:
         payload = require_publish_work_state_manifest(developer_work_dir_path)

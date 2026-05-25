@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.contracts.selection_groups import (
     SELECTION_GROUP_KEYS,
@@ -10,7 +11,8 @@ from packaging._shared.contracts.selection_groups import (
     normalize_documented_selection_groups,
 )
 from packaging._shared.contracts.selectable import is_absolute_like_path
-from packaging.configure.selection.support import build_unit_metadata, finalize_selectable_entry
+from packaging.configure.selection.support import finalize_selectable_entry
+from packaging.configure.selection.unit_metadata import build_unit_metadata
 from packaging.runtimes import get_target
 
 
@@ -58,7 +60,10 @@ def resolve_explicit_skill(skill_dir: str, *, env_id: str) -> dict[str, Any]:
         raise ValueError(f"skill_dir must contain SKILL.md: {source_root}")
 
     logical_path = _logical_path_for_skill_dir(source_root, env_id)
-    meta = build_unit_metadata(source_root, "skill")
+    target = None
+    with suppress(ValueError):
+        target = get_target(env_id)
+    meta = build_unit_metadata(source_root, "skill", target=target)
     entry: dict[str, Any] = {
         "path": logical_path,
         "name": meta["name"],
@@ -77,12 +82,8 @@ def resolve_explicit_skill(skill_dir: str, *, env_id: str) -> dict[str, Any]:
         "source_kind": EXPLICIT_SKILL_SOURCE_KIND,
         "skip_skill_runtime_outputs": True,
     }
-    try:
-        entry = finalize_selectable_entry(get_target(env_id), entry, unit_path=source_root)
-    except ValueError:
-
-
-        pass
+    if target is not None:
+        entry = finalize_selectable_entry(target, entry, unit_path=source_root)
     entry.setdefault("reasons", ["Explicit skill_dir provided by creator"])
     return entry
 
@@ -104,7 +105,7 @@ def _selected_explicit_skill_item(explicit_skill: dict[str, Any]) -> dict[str, A
 
 def merge_explicit_skill_into_top_level_selections(
     selections: dict[str, Any],
-    explicit_skill: dict[str, Any] | None,
+    explicit_skill: Optional[dict[str, Any]],
 ) -> dict[str, Any]:
     if not explicit_skill:
         return selections
@@ -150,7 +151,7 @@ def discovery_payload_from_explicit_skill(explicit_skill: dict[str, Any]) -> dic
 
 def merge_explicit_skill_into_selection_groups(
     selection_groups: dict[str, Any],
-    explicit_skill: dict[str, Any] | None,
+    explicit_skill: Optional[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     groups = normalize_documented_selection_groups(selection_groups)
     if not explicit_skill:
@@ -185,7 +186,7 @@ def merge_explicit_skill_into_selection_groups(
     return merged_groups
 
 
-def _external_skill_binding_for_manifest(item: dict[str, Any]) -> dict[str, Any] | None:
+def _external_skill_binding_for_manifest(item: dict[str, Any]) -> Optional[dict[str, Any]]:
     path = str(item.get("path", "")).strip()
     source_path = str(item.get("source_path", "")).strip()
     if not source_path:
@@ -273,7 +274,7 @@ def merge_external_skill_bindings_into_selection_groups(
     return merged_groups
 
 
-def explicit_skill_for_manifest(explicit_skill: dict[str, Any] | None) -> dict[str, Any] | None:
+def explicit_skill_for_manifest(explicit_skill: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
     if not explicit_skill:
         return None
     payload = {
@@ -289,7 +290,7 @@ def explicit_skill_for_manifest(explicit_skill: dict[str, Any] | None) -> dict[s
     return payload if payload["path"] and payload["source_path"] else None
 
 
-def explicit_skill_from_manifest_extra(extra: object) -> dict[str, Any] | None:
+def explicit_skill_from_manifest_extra(extra: object) -> Optional[dict[str, Any]]:
     if not isinstance(extra, dict):
         return None
     payload = extra.get("explicit_skill")

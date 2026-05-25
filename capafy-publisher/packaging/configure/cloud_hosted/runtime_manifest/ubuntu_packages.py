@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 
 UNMAPPED_PACKAGE_REASON = "No Ubuntu package mapping is defined yet; follow up in the skill or LLM workflow."
@@ -113,7 +114,7 @@ def _normalized_package_name(name: object) -> str:
     return str(name or "").strip().lower()
 
 
-def _map_package_name_to_ubuntu(source_manager: str, source_name: str) -> str | None:
+def _map_package_name_to_ubuntu(source_manager: str, source_name: str) -> Optional[str]:
     if not source_name:
         return None
     if source_manager == "apt":
@@ -132,7 +133,7 @@ def _map_package_name_to_ubuntu(source_manager: str, source_name: str) -> str | 
     return None
 
 
-def derive_ubuntu_system_packages(system_packages: dict | None) -> dict:
+def derive_ubuntu_system_packages(system_packages: Optional[dict]) -> dict:
     if not isinstance(system_packages, dict):
         system_packages = {}
 

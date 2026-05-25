@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import ipaddress
 import re
@@ -62,7 +63,7 @@ def normalize_http_url_candidate(value: str) -> str:
     return candidate
 
 
-def _normalize_domain(candidate: str) -> str | None:
+def _normalize_domain(candidate: str) -> Optional[str]:
     value = candidate.strip().rstrip(".,;:)]}")
     if not value:
         return None
@@ -88,7 +89,7 @@ def find_domains(text: str) -> list[str]:
     return seen
 
 
-def normalize_explicit_url(candidate: str) -> str | None:
+def normalize_explicit_url(candidate: str) -> Optional[str]:
     value = candidate.strip().rstrip(".,;)]}")
     if not value:
         return None

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Union
 
 import re
 from pathlib import Path, PurePosixPath
@@ -9,7 +10,7 @@ def slugify_source_name(value: str) -> str:
     return slug or "source"
 
 
-def dedupe_packaged_base(base: PurePosixPath | Path, used: set[str]) -> PurePosixPath:
+def dedupe_packaged_base(base: Union[PurePosixPath, Path], used: set[str]) -> PurePosixPath:
     candidate = PurePosixPath(base.as_posix())
     index = 2
     while candidate.as_posix() in used:

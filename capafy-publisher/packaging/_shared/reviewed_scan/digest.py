@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Union
 
 from packaging._shared.common.fs import iter_workspace_files, relpath as fs_relpath
 from packaging._shared.contracts.reviewed_scan import sanitize_reviewed_scan_payload
@@ -20,7 +20,7 @@ def compute_scan_digest(scan: dict[str, Any]) -> str:
 
 
 def _iter_digest_file_records(
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     *,
     include_scan_only: bool,
 ) -> Iterator[tuple[str, bytes]]:
@@ -40,7 +40,7 @@ def _iter_digest_file_records(
         yield relpath, raw
 
 
-def _compute_file_digest(staging_root: str | Path, *, include_scan_only: bool) -> str:
+def _compute_file_digest(staging_root: Union[str, Path], *, include_scan_only: bool) -> str:
     digest = hashlib.sha256()
     for relpath, raw in _iter_digest_file_records(staging_root, include_scan_only=include_scan_only):
         digest.update(relpath.encode("utf-8"))
@@ -50,11 +50,11 @@ def _compute_file_digest(staging_root: str | Path, *, include_scan_only: bool) -
     return digest.hexdigest()
 
 
-def compute_staging_digest(staging_root: str | Path) -> str:
+def compute_staging_digest(staging_root: Union[str, Path]) -> str:
     return _compute_file_digest(staging_root, include_scan_only=False)
 
 
-def compute_scan_only_digest(staging_root: str | Path) -> str:
+def compute_scan_only_digest(staging_root: Union[str, Path]) -> str:
     return _compute_file_digest(staging_root, include_scan_only=True)
 
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from collections.abc import Callable
@@ -6,13 +7,14 @@ from pathlib import Path
 
 from packaging._shared.common.url_values import build_config_url_proxy_group
 from packaging.configure.scan.env_scan_rules import (
-    candidate_source,
     config_literal_candidate_kind,
     is_endpoint_config_key,
 )
-from packaging.configure.scan.support import append_candidate as _append_candidate
+from packaging.configure.scan.support import append_candidate
 from packaging.configure.runtimes.codex.auth import should_skip_codex_auth_structured_scan
 from packaging.configure.runtimes.codex.provider import collect_codex_official_base_url_targets
+from packaging.configure.runtimes.codex.config_state import load_codex_config_state_from_text
+from packaging.configure.runtimes.codex.provider_config import provider_name_from_codex_section
 from packaging.configure.sensitive.keywords import normalize_key_name
 from packaging.configure.sensitive.literals import looks_like_url_or_dsn
 
@@ -26,6 +28,11 @@ def should_scan_codex_structured_values(relpath: str) -> bool:
     if should_skip_codex_auth_structured_scan(relpath):
         return False
     return Path(str(relpath or "")).name != "config.toml"
+
+
+def _selected_provider_from_text(text: str) -> str:
+    state = load_codex_config_state_from_text(text).provider
+    return state.selected_provider if state is not None else ""
 
 
 def _attach_url_proxy_env_name(candidates: list[dict], group: str, env_name: str) -> None:
@@ -46,13 +53,14 @@ def collect_codex_toml_config_hints(
     text: str,
     display_path: str,
     source_display_path: str,
-    annotate_candidate: Callable[[dict, str], dict | None],
+    annotate_candidate: Callable[[dict, str], Optional[dict]],
 ) -> tuple[dict[str, str], dict[str, str], list[dict]]:
     env_url_hints: dict[str, str] = {}
     value_url_hints: dict[str, str] = {}
     candidates: list[dict] = []
     section_env_keys: dict[str, str] = {}
     section_base_urls: dict[str, str] = {}
+    selected_provider = _selected_provider_from_text(text)
 
     kv_pattern = re.compile(r'^\s*(\w[\w.-]*)\s*=\s*"([^"]+)"\s*$')
     current_section = ""
@@ -71,20 +79,25 @@ def collect_codex_toml_config_hints(
         value = kv_match.group(2)
         service = current_section.split(".")[-1] if current_section else "unknown"
         is_codex_provider_section = is_codex_model_provider_section(current_section)
+        is_selected_provider_section = (
+            is_codex_provider_section
+            and bool(selected_provider)
+            and provider_name_from_codex_section(current_section) == selected_provider
+        )
 
         if is_endpoint_config_key(key):
             if value.startswith("http://") or value.startswith("https://"):
                 env_url_hints[f"{current_section}.{key}"] = value
                 value_url_hints[value] = value
-                if is_codex_provider_section:
+                if is_selected_provider_section:
                     section_base_urls[current_section] = value
                 env_key = section_env_keys.get(current_section, "").strip()
                 url_proxy_group = (
                     build_config_url_proxy_group(source_display_path, current_section)
-                    if is_codex_provider_section
+                    if is_selected_provider_section
                     else ""
                 )
-                if env_key and is_codex_provider_section:
+                if env_key and is_selected_provider_section:
                     env_url_hints[env_key] = value
                 source_detail = f"line {line_no} [{current_section}]"
                 candidate_payload = {
@@ -102,14 +115,14 @@ def collect_codex_toml_config_hints(
                 if url_proxy_group:
                     candidate_payload["url_proxy_group"] = url_proxy_group
                     candidate_payload["url_proxy_env_names"] = [env_key] if env_key else []
-                _append_candidate(
+                append_candidate(
                     candidates,
                     annotate_candidate(candidate_payload, display_path)
                 )
             continue
 
         if normalize_key_name(key) == "envkey":
-            if is_codex_provider_section:
+            if is_selected_provider_section:
                 section_env_keys[current_section] = value
                 base_url = section_base_urls.get(current_section, "").strip()
                 if base_url:
@@ -139,10 +152,10 @@ def collect_codex_toml_config_hints(
             "source_detail": f"line {line_no} [{current_section}]",
             "env_name": None,
         }
-        if is_codex_provider_section and entry_type == "api_key":
+        if is_selected_provider_section and entry_type == "api_key":
             candidate_payload["url_proxy_group"] = build_config_url_proxy_group(source_display_path, current_section)
         candidate = annotate_candidate(candidate_payload, display_path)
-        _append_candidate(candidates, candidate)
+        append_candidate(candidates, candidate)
 
     for item in collect_codex_official_base_url_targets(text):
         env_key = str(item.get("env_key", "")).strip()
@@ -151,7 +164,7 @@ def collect_codex_toml_config_hints(
         if env_key and url:
             env_url_hints.setdefault(env_key, url)
             value_url_hints.setdefault(url, url)
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {

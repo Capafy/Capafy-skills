@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 from packaging._shared.contracts.reviewed_scan import (
     REVIEW_METADATA_KEY,
@@ -32,7 +32,7 @@ def _copy_dict_list(items: object) -> list[dict[str, Any]]:
 def build_review_binding(
     *,
     raw_scan: dict[str, Any],
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     env_id: str,
     agent_type: str,
 ) -> dict[str, str]:
@@ -52,13 +52,13 @@ class _DigestBuilder:
 
 
 def reviewed_scan_matches_context(
-    payload: dict[str, Any] | object,
+    payload: Union[dict[str, Any], object],
     *,
-    review_binding: dict[str, str] | None = None,
-    raw_scan: dict[str, Any] | None = None,
-    staging_root: str | Path | None = None,
-    env_id: str | None = None,
-    agent_type: str | None = None,
+    review_binding: Optional[dict[str, str]] = None,
+    raw_scan: Optional[dict[str, Any]] = None,
+    staging_root: Optional[Union[str, Path]] = None,
+    env_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
 ) -> bool:
     return _contract_reviewed_scan_matches_context(
         payload,
@@ -72,14 +72,14 @@ def reviewed_scan_matches_context(
 
 
 def refresh_reviewed_scan_metadata(
-    payload: dict[str, Any] | object,
+    payload: Union[dict[str, Any], object],
     *,
-    review_binding: dict[str, str] | None = None,
-    raw_scan: dict[str, Any] | None = None,
-    staging_root: str | Path | None = None,
-    env_id: str | None = None,
-    agent_type: str | None = None,
-) -> dict[str, Any] | object:
+    review_binding: Optional[dict[str, str]] = None,
+    raw_scan: Optional[dict[str, Any]] = None,
+    staging_root: Optional[Union[str, Path]] = None,
+    env_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
+) -> Union[dict[str, Any], object]:
     if not isinstance(payload, dict) or not is_reviewed_scan_payload(payload):
         return payload
 
@@ -139,7 +139,7 @@ def _list_payload(payload: dict[str, Any], key: str) -> list[Any]:
     return _copy_dict_list(value) if isinstance(value, list) else []
 
 
-def _generic_payload(payload: dict[str, Any], *, staging_root: str | Path, agent_type: str) -> list[Any]:
+def _generic_payload(payload: dict[str, Any], *, staging_root: Union[str, Path], agent_type: str) -> list[Any]:
     resolved_agent_type = str(agent_type or "").strip()
     if not resolved_agent_type:
         raise ValueError("reviewed scan source filtering requires agent_type")
@@ -161,7 +161,7 @@ def build_reviewed_scan_from_scan(
     raw_scan: dict[str, Any],
     *,
     review_binding: dict[str, str],
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
 ) -> dict[str, Any]:
     excludes = _list_payload(raw_scan, "excludes")
     agent_type = str(review_binding.get("agent_type", "")).strip()

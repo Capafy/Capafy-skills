@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass
 
@@ -17,7 +18,7 @@ def is_unknown_locator(value: object) -> bool:
 
 def apply_url_proxy_group_hints(candidates: list[dict]) -> None:
     url_by_group: dict[str, str] = {}
-    env_group_hints: dict[str, tuple[str, str] | None] = {}
+    env_group_hints: dict[str, Optional[tuple[str, str]]] = {}
 
     def record_env_group_hint(env_name: str, group: str, url: str) -> None:
         normalized_env_name = str(env_name or "").strip()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from packaging._shared.common.home import safe_expanduser_path
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
+from typing import Optional
 
+from contextlib import suppress
 from dataclasses import dataclass
 import hashlib
 import os
@@ -81,10 +83,8 @@ def _windows_user_home_candidates(raw_value: str) -> list[Path]:
 
 def _allowed_roots(raw_value: str) -> list[Path]:
     roots = [Path.home()]
-    try:
+    with suppress(OSError):
         roots.append(Path.home().expanduser().resolve())
-    except OSError:
-        pass
     userprofile = os.environ.get("USERPROFILE", "").strip()
     if userprofile:
         roots.extend(_path_candidates(userprofile))
@@ -112,7 +112,7 @@ def _looks_like_local_path(raw_value: str) -> bool:
 
 
 def _append_local_file_warning(
-    warnings: list[dict] | None,
+    warnings: Optional[list[dict]],
     *,
     field: CodexLocalFileField,
     code: str,
@@ -153,7 +153,7 @@ def _parse_local_file_value(line: str, match: re.Match[str], field: CodexLocalFi
     return match.group("value")
 
 
-def resolve_codex_local_config_file_source(raw_value: str) -> Path | None:
+def resolve_codex_local_config_file_source(raw_value: str) -> Optional[Path]:
     for candidate in _path_candidates(raw_value):
         if not candidate.is_file():
             continue
@@ -168,7 +168,7 @@ def stage_codex_model_instructions_file(
     staging_root: Path,
     *,
     stage_plan=None,
-    warnings: list[dict] | None = None,
+    warnings: Optional[list[dict]] = None,
 ) -> int:
     text = config_path.read_text(encoding="utf-8")
     staged_count = 0

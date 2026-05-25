@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import os
 from pathlib import Path
@@ -15,7 +16,7 @@ from packaging._shared.common.toml_loader import safe_toml_loads, tomllib
 from packaging._shared.contracts.selectable import is_instruction_doc, should_skip_skill_reference_document
 from packaging._shared.env_profiles.path_resolver import resolve_path_spec
 from packaging.configure.selection.local_ref_confirmation import display_path_for_local_reference
-from packaging.configure.selection.support import classify_selectable_directory, classify_selectable_file
+from packaging.configure.selection.support import classify_selectable_directory
 from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 
 from .selection_candidates import SourceDocument
@@ -33,7 +34,7 @@ def _build_document_entry(display_path: str, source_file: Path, text: str) -> So
 def _iter_tree_source_documents(
     tree_source: StageTreeSource,
     *,
-    runtime_root: Path | None = None,
+    runtime_root: Optional[Path] = None,
     target=None,
 ) -> list[SourceDocument]:
     source_root = tree_source.source_root.expanduser().resolve(strict=False)
@@ -83,8 +84,6 @@ def _iter_tree_source_documents(
             source_file = current_path / filename
             relpath = display_stage_path(current_relpath, filename)
             display_path = display_stage_path(tree_source.display_prefix, relpath)
-            selectable_path, _unit_type = classify_selectable_file(target, display_path)
-
             if source_root == runtime_root and source_file.suffix.lower() not in (".md", ".txt"):
                 continue
             if looks_like_absolute_symlink(source_file):
@@ -96,8 +95,6 @@ def _iter_tree_source_documents(
                 skill_runtime_prefixes=tree_source.skill_runtime_prefixes,
                 excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
             ):
-                continue
-            if selectable_path == display_path:
                 continue
             if should_skip_skill_reference_document(display_path) or display_path in seen:
                 continue
@@ -113,7 +110,7 @@ def _iter_tree_source_documents(
 
 def _iter_profile_fixed_instruction_documents(
     *,
-    runtime_dir: str | None = None,
+    runtime_dir: Optional[str] = None,
     target=None,
 ) -> list[SourceDocument]:
     profile = getattr(target, "profile", None)
@@ -138,7 +135,7 @@ def _iter_profile_fixed_instruction_documents(
     return documents
 
 
-def _source_file_for_display_path(stage_plan: StagePlan, display_path: str) -> Path | None:
+def _source_file_for_display_path(stage_plan: StagePlan, display_path: str) -> Optional[Path]:
     normalized_display_path = display_path.strip().strip("/")
     if not normalized_display_path:
         return None
@@ -151,7 +148,7 @@ def _source_file_for_display_path(stage_plan: StagePlan, display_path: str) -> P
     return None
 
 
-def _resolve_codex_model_instructions_source(raw_value: str) -> Path | None:
+def _resolve_codex_model_instructions_source(raw_value: str) -> Optional[Path]:
     from packaging.configure.runtimes.codex.local_files import resolve_codex_local_config_file_source
 
     return resolve_codex_local_config_file_source(raw_value)
@@ -160,7 +157,7 @@ def _resolve_codex_model_instructions_source(raw_value: str) -> Path | None:
 def _append_config_referenced_instruction_document(
     documents: list[SourceDocument],
     *,
-    source_path: Path | None,
+    source_path: Optional[Path],
     stage_plan: StagePlan,
 ) -> None:
     if source_path is None or not source_path.is_file():
@@ -224,7 +221,7 @@ def _append_unique_document(
 def discover_documents(
     stage_plan: StagePlan,
     *,
-    runtime_dir: str | None = None,
+    runtime_dir: Optional[str] = None,
     target=None,
 ) -> list[SourceDocument]:
     documents: list[SourceDocument] = []

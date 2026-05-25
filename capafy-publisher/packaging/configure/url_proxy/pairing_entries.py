@@ -1,9 +1,10 @@
 from __future__ import annotations
+from typing import Optional
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
 
 
-def normalized_url_entry_for_pairing(url_entry: dict) -> dict | None:
+def normalized_url_entry_for_pairing(url_entry: dict) -> Optional[dict]:
     normalized_url = normalize_http_url_candidate(str(url_entry.get("value", "")).strip())
     if not normalized_url:
         return None
@@ -17,8 +18,4 @@ def normalized_url_entry_for_pairing(url_entry: dict) -> dict | None:
     return normalized_entry
 
 
-def url_proxy_group_of(entry: dict) -> str:
-    return str(entry.get("url_proxy_group", "") or "").strip()
-
-
-__all__ = ["normalized_url_entry_for_pairing", "url_proxy_group_of"]
+__all__ = ["normalized_url_entry_for_pairing"]

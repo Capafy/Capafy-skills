@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 
 def emit_json_result(payload: dict, exit_code: int) -> int:
@@ -21,9 +21,9 @@ def build_publish_error(
     *,
     error: str,
     failed_step: str,
-    blocking_category: str | None = None,
-    developer_next_steps: list[str] | None = None,
-    next_step: str | None = None,
+    blocking_category: Optional[str] = None,
+    developer_next_steps: Optional[list[str]] = None,
+    next_step: Optional[str] = None,
     **extra: Any,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
@@ -47,8 +47,8 @@ def stopped_publish_payload(
     next_step: str,
     artifacts: dict[str, object],
     raw_steps: list[dict[str, object]],
-    developer_next_steps: list[str] | None = None,
-    missing_requirements: list[str] | None = None,
+    developer_next_steps: Optional[list[str]] = None,
+    missing_requirements: Optional[list[str]] = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "ok": False,

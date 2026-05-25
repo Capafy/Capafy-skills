@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from packaging._shared.common.json_io import load_json_object
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
@@ -42,7 +42,7 @@ def _codex_auth_openai_api_key(payload: dict[str, Any]) -> str:
     return ""
 
 
-def _codex_api_key_env_value(process_env: Mapping[str, str] | None) -> str:
+def _codex_api_key_env_value(process_env: Optional[Mapping[str, str]]) -> str:
     if process_env is None:
         return ""
     value = process_env.get(CODEX_AUTH_OVERRIDE_ENV_KEY, "")
@@ -51,7 +51,7 @@ def _codex_api_key_env_value(process_env: Mapping[str, str] | None) -> str:
     return ""
 
 
-def codex_access_token_env_detected(process_env: Mapping[str, str] | None) -> bool:
+def codex_access_token_env_detected(process_env: Optional[Mapping[str, str]]) -> bool:
     if process_env is None:
         return False
     value = process_env.get(CODEX_AUTH_ACCESS_TOKEN_ENV_KEY, "")
@@ -116,7 +116,7 @@ def codex_auth_api_key_value(
     staging_root: Path,
     stage_plan=None,
     *,
-    process_env: Mapping[str, str] | None = None,
+    process_env: Optional[Mapping[str, str]] = None,
 ) -> str:
     env_key = _codex_api_key_env_value(process_env)
     if env_key:

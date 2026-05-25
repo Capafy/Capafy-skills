@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from packaging.configure.runtimes.env_profile_target import EnvProfileTarget
 from packaging.configure.runtimes.claude_code import scan_hints as claude_scan_hints
@@ -9,6 +10,11 @@ from packaging.configure.scan.env_scan_rules import logical_env_source_path
 
 class ClaudeCodeTarget(EnvProfileTarget):
     _DEFAULT_ENV_ID = "claude_code"
+
+    def selectable_unit_name(self, unit_path: Path, unit_type: str) -> Optional[str]:
+        if unit_type != "skill":
+            return None
+        return unit_path.name
 
     def collect_special_scan_candidates(
         self,

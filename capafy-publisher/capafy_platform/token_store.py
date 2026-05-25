@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import SKILL_CONFIG_PATH
 from packaging._shared.common.fs import safe_chmod
@@ -15,9 +15,9 @@ def token_store_path() -> Path:
 def persist_access_token(
     access_token: str,
     *,
-    user_id: str | None = None,
-    email: str | None = None,
-    name: str | None = None,
+    user_id: Optional[str] = None,
+    email: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> dict[str, Any]:
     normalized_access_token = str(access_token or "").strip()
     if not normalized_access_token:
@@ -41,7 +41,7 @@ def persist_access_token(
     }
 
 
-def _load_persisted_token_payload() -> tuple[dict[str, Any], Path] | None:
+def _load_persisted_token_payload() -> Optional[tuple[dict[str, Any], Path]]:
     store_path = token_store_path()
     if not store_path.is_file():
         return None
@@ -54,7 +54,7 @@ def _load_persisted_token_payload() -> tuple[dict[str, Any], Path] | None:
     return payload, store_path
 
 
-def load_persisted_access_token() -> tuple[str, Path] | None:
+def load_persisted_access_token() -> Optional[tuple[str, Path]]:
     loaded = _load_persisted_token_payload()
     if loaded is None:
         return None

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from collections.abc import Iterator, Mapping
 from functools import lru_cache
@@ -103,7 +104,7 @@ def get_default_target() -> PackagingTarget:
     return get_target(DEFAULT_TARGET)
 
 
-def get_runtime_validation_target(name: str | None) -> tuple[PackagingTarget, str]:
+def get_runtime_validation_target(name: Optional[str]) -> tuple[PackagingTarget, str]:
     dispatch_name, reported_name = resolve_runtime_validation_target(name)
     try:
         return TARGETS[dispatch_name], reported_name

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.cli import build_publish_error, emit_json
 from packaging._shared.common.constants import DEVELOPER_WORK_DIR_PATH
@@ -30,14 +30,14 @@ def _run_publish_init(
     *,
     env_id: str,
     runtime_dir: str,
-    skill_dir: str | None = None,
-    agent_id: str | None = None,
-    selections_json: str | None = None,
+    skill_dir: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    selections_json: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     env = prepare_environment(env_id, runtime_dir=runtime_dir)
 
     resolved_env_id = env["env_id"]
-    explicit_skill: dict[str, Any] | None = None
+    explicit_skill: Optional[dict[str, Any]] = None
     if skill_dir:
         try:
             explicit_skill = resolve_explicit_skill(
@@ -133,9 +133,9 @@ def publish_init(
     *,
     env_id: str,
     runtime_dir: str,
-    skill_dir: str | None = None,
-    agent_id: str | None = None,
-    selections_json: str | None = None,
+    skill_dir: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    selections_json: Optional[str] = None,
     reset_local_state: bool = False,
 ) -> int:
     login_error = platform_login_error()
@@ -143,7 +143,7 @@ def publish_init(
         emit_json(login_error)
         return 1
 
-    cleanup_summary: dict[str, Any] | None = None
+    cleanup_summary: Optional[dict[str, Any]] = None
     if selections_json is not None:
         existing_state = summarize_publish_work_state(DEVELOPER_WORK_DIR_PATH)
         if existing_state["blocking"] and not reset_local_state:

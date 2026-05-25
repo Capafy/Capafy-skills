@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from packaging._shared.common.fs import (
     cleanup_bundle_file,
@@ -24,12 +25,12 @@ def publish_upload_and_report(
     agent_version_id: str,
     bundle_file: str,
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
-    staging_root: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
+    staging_root: Optional[str] = None,
     cleanup: bool = True,
-    package_url: str | None = None,
-    latest_version: dict[str, object] | None = None,
+    package_url: Optional[str] = None,
+    latest_version: Optional[dict[str, object]] = None,
 ) -> dict[str, object]:
     base_artifacts = {
         "agent_id": str(agent_id or "").strip(),

@@ -1,16 +1,61 @@
 from __future__ import annotations
 
-from packaging.configure.contracts import SourceKind, UrlProxyPair
+from packaging.configure.contracts import GenericValue, ReviewedScanBuildInput, SourceKind, UrlProxyPair
 
 
-def _pair_identity(pair: UrlProxyPair) -> tuple[str, str, int, str, str, int]:
+LocationIdentity = tuple[str, str, str, int, str]
+
+
+def _plan_field_identity(plan_field) -> LocationIdentity:
     return (
-        str(getattr(pair.key, "source_relpath", "") or "").strip(),
-        str(getattr(pair.key, "original_value", "") or "").strip(),
-        pair.key.occurrence_index_identity(),
-        str(getattr(pair.url, "source_relpath", "") or "").strip(),
-        str(getattr(pair.url, "original_value", "") or "").strip(),
-        pair.url.occurrence_index_identity(),
+        str(plan_field.source_identity() or "").strip(),
+        str(getattr(plan_field, "field", "") or "").strip(),
+        str(plan_field.source_detail_identity() or "").strip(),
+        plan_field.occurrence_index_identity(),
+        str(getattr(plan_field, "original_value", "") or "").strip(),
+    )
+
+
+def _generic_value_identity(generic_value: GenericValue) -> LocationIdentity:
+    return (
+        str(generic_value.source_relpath or "").strip(),
+        str(generic_value.field or "").strip(),
+        generic_value.location.to_source_detail(generic_value.field),
+        generic_value.location.occurrence_index_identity(),
+        str(generic_value.original_value or "").strip(),
+    )
+
+
+def _generic_entry_identity(entry: dict) -> LocationIdentity:
+    try:
+        occurrence_index = int(entry.get("occurrence_index", 1))
+    except (TypeError, ValueError):
+        occurrence_index = 1
+    if occurrence_index <= 0:
+        occurrence_index = 1
+    return (
+        str(entry.get("source", "") or "").strip(),
+        str(entry.get("field", "") or "").strip(),
+        str(entry.get("source_detail", "") or "").strip(),
+        occurrence_index,
+        str(entry.get("value", "") or "").strip(),
+    )
+
+
+def _claimed_location_identities(pairs: list[UrlProxyPair]) -> set[LocationIdentity]:
+    identities: set[LocationIdentity] = set()
+    for pair in pairs:
+        for plan_field in (pair.key, pair.url):
+            identity = _plan_field_identity(plan_field)
+            if any(identity):
+                identities.add(identity)
+    return identities
+
+
+def _pair_identity(pair: UrlProxyPair) -> tuple[LocationIdentity, LocationIdentity]:
+    return (
+        _plan_field_identity(pair.key),
+        _plan_field_identity(pair.url),
     )
 
 
@@ -31,24 +76,21 @@ def dedupe_cross_source_pairs(
         for identity in (_semantic_pair_identity(pair) for pair in runtime_pairs)
         if all(identity)
     }
-    runtime_key_identities = {
-        (
-            str(getattr(pair.key, "source_relpath", "") or "").strip(),
-            str(getattr(pair.key, "original_value", "") or "").strip(),
-        )
-        for pair in runtime_pairs
-        if str(getattr(pair.key, "source_relpath", "") or "").strip()
-        and str(getattr(pair.key, "original_value", "") or "").strip()
-    }
+    runtime_key_identities: set[LocationIdentity] = set()
+    for pair in runtime_pairs:
+        key_identity = _plan_field_identity(pair.key)
+        if key_identity[0] and key_identity[4]:
+            runtime_key_identities.add(key_identity)
     all_pairs: list[UrlProxyPair] = []
-    seen_identities: set[tuple[str, str, int, str, str, int]] = set()
+    seen_identities: set[tuple[LocationIdentity, LocationIdentity]] = set()
     duplicate_count = 0
     for pair_source, pairs in (("runtime", runtime_pairs), ("structured", structured_pairs)):
         for pair in pairs:
             identity = _pair_identity(pair)
             semantic_identity = _semantic_pair_identity(pair)
 
-            if not (identity[1] or identity[4]):
+            key_identity, url_identity = identity
+            if not (key_identity[4] or url_identity[4]):
                 all_pairs.append(pair)
                 continue
             if identity in seen_identities:
@@ -56,7 +98,7 @@ def dedupe_cross_source_pairs(
                 continue
 
 
-            if pair_source == "structured" and (identity[0], identity[1]) in runtime_key_identities:
+            if pair_source == "structured" and key_identity in runtime_key_identities:
                 duplicate_count += 1
                 continue
             if (
@@ -75,31 +117,38 @@ def dedupe_fallback_generic_entries(
     entries: list[dict],
     runtime_pairs: list[UrlProxyPair],
 ) -> list[dict]:
-    runtime_owned_keys: set[tuple[str, str, int]] = set()
-    for pair in runtime_pairs:
-        for plan_field in (pair.key, pair.url):
-            relpath = str(getattr(plan_field, "source_relpath", "") or "").strip()
-            value = str(getattr(plan_field, "original_value", "") or "").strip()
-            occ = plan_field.occurrence_index_identity()
-            if relpath or value:
-                runtime_owned_keys.add((relpath, value, occ))
-
+    claimed_identities = _claimed_location_identities(runtime_pairs)
     deduped: list[dict] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        entry_source = str(entry.get("source", "") or "").strip()
-        entry_value = str(entry.get("value", "") or "").strip()
-        try:
-            entry_occ = int(entry.get("occurrence_index", 1))
-        except (TypeError, ValueError):
-            entry_occ = 1
-        if entry_occ <= 0:
-            entry_occ = 1
-        if (entry_source, entry_value, entry_occ) in runtime_owned_keys:
+        if _generic_entry_identity(entry) in claimed_identities:
             continue
         deduped.append(entry)
     return deduped
+
+
+def filter_url_proxy_claimed_reviewed_input(reviewed_input: ReviewedScanBuildInput) -> ReviewedScanBuildInput:
+    claimed_identities = _claimed_location_identities(list(reviewed_input.url_proxy_pairs))
+    claimed_env_names = collect_claimed_process_env_names(list(reviewed_input.url_proxy_pairs))
+    generic_values = tuple(
+        generic_value
+        for generic_value in reviewed_input.generic_values
+        if _generic_value_identity(generic_value) not in claimed_identities
+    )
+    env_vars = tuple(
+        env_var
+        for env_var in reviewed_input.env_vars
+        if str(env_var.name or "").strip() not in claimed_env_names
+    )
+    if generic_values == reviewed_input.generic_values and env_vars == reviewed_input.env_vars:
+        return reviewed_input
+    return ReviewedScanBuildInput(
+        url_proxy_pairs=reviewed_input.url_proxy_pairs,
+        generic_values=generic_values,
+        env_vars=env_vars,
+        excludes=reviewed_input.excludes,
+    )
 
 
 def collect_claimed_process_env_names(pairs: list[UrlProxyPair]) -> frozenset[str]:
@@ -118,4 +167,5 @@ __all__ = [
     "collect_claimed_process_env_names",
     "dedupe_cross_source_pairs",
     "dedupe_fallback_generic_entries",
+    "filter_url_proxy_claimed_reviewed_input",
 ]

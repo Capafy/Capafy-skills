@@ -2,15 +2,23 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Optional, TypeVar
 
-from packaging.configure.contracts import ReviewedScanBuildInput
+from packaging.configure.contracts import FieldLocation, ReviewedScanBuildInput
 
 
 @dataclass(frozen=True)
 class StripTarget:
     value: str
     placeholder: str
+    source_relpath: str = ""
+    field: str = ""
+    source_detail: str = ""
+    occurrence_index: int = 0
+    location_fmt: str = ""
+    line_number: int = 0
+    json_pointer: str = ""
+    toml_section: str = ""
 
 
 StripValue = StripTarget
@@ -21,7 +29,7 @@ T = TypeVar("T")
 
 def ordered_unique_strip_values(
     items: Iterable[T],
-    extract: Callable[[T], tuple[str, str] | None],
+    extract: Callable[[T], Optional[tuple[str, str]]],
     *,
     sort_ties_by_value: bool = False,
 ) -> list[StripTarget]:
@@ -101,14 +109,76 @@ def collect_strip_item_targets(
 
 def collect_reviewed_scan_input_strip_targets(reviewed_scan_input: ReviewedScanBuildInput) -> list[StripTarget]:
     raw_targets = [
-        *((f.original_value, f.placeholder) for pair in reviewed_scan_input.url_proxy_pairs for f in (pair.key, pair.url)),
-        *((gv.original_value, gv.placeholder) for gv in reviewed_scan_input.generic_values),
-        *((ev.process_value, ev.placeholder) for ev in reviewed_scan_input.env_vars),
+        *(
+            _target_from_plan_field(f)
+            for pair in reviewed_scan_input.url_proxy_pairs
+            for f in (pair.key, pair.url)
+        ),
+        *(
+            StripTarget(
+                value=gv.original_value,
+                placeholder=gv.placeholder,
+                source_relpath=gv.source_relpath,
+                field=gv.field,
+                source_detail=gv.location.to_source_detail(gv.field),
+                occurrence_index=gv.location.occurrence_index_identity(),
+                location_fmt=gv.location.fmt,
+                line_number=gv.location.line_number,
+                json_pointer=gv.location.json_pointer,
+                toml_section=gv.location.toml_section,
+            )
+            for gv in reviewed_scan_input.generic_values
+        ),
+        *(
+            StripTarget(
+                value=ev.process_value,
+                placeholder=ev.placeholder,
+                field=ev.name,
+            )
+            for ev in reviewed_scan_input.env_vars
+        ),
     ]
-    return [
-        StripTarget(value=target.value, placeholder=target.placeholder)
-        for target in ordered_unique_strip_values(raw_targets, lambda item: item)
-    ]
+
+    targets_by_identity: dict[tuple[str, str, str, int, str], StripTarget] = {}
+    for target in raw_targets:
+        if not target.value or not target.placeholder:
+            continue
+        identity = (
+            target.source_relpath,
+            target.field,
+            target.source_detail,
+            target.occurrence_index,
+            target.value,
+        )
+        targets_by_identity.setdefault(identity, target)
+    return sorted(
+        targets_by_identity.values(),
+        key=lambda target: (-len(target.value), target.source_relpath, target.occurrence_index),
+    )
+
+
+def _target_from_plan_field(plan_field) -> StripTarget:
+    source_detail = plan_field.source_detail_identity()
+    location = _plan_field_location(plan_field, source_detail)
+    occurrence_index = plan_field.occurrence_index_identity() if location is not None else 0
+    return StripTarget(
+        value=plan_field.original_value,
+        placeholder=plan_field.placeholder,
+        source_relpath=plan_field.source_identity(),
+        field=plan_field.field,
+        source_detail=source_detail,
+        occurrence_index=occurrence_index,
+        location_fmt=location.fmt if location is not None else "",
+        line_number=location.line_number if location is not None else 0,
+        json_pointer=location.json_pointer if location is not None else "",
+        toml_section=location.toml_section if location is not None else "",
+    )
+
+
+def _plan_field_location(plan_field, source_detail: str):
+    if source_detail:
+        return FieldLocation.from_source_detail(source_detail, field=plan_field.field)
+    return plan_field.location
 
 
 __all__ = [

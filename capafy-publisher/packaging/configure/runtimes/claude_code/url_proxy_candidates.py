@@ -1,10 +1,17 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import SourceKind
+from packaging.configure.runtimes.claude_code.auth import (
+    CLAUDE_AUTH_ENV_KEY,
+    CLAUDE_AUTH_TOKEN_ENV_KEY,
+    CLAUDE_BASE_URL_ENV_KEY,
+)
 
 SETTINGS_SCAN_RELPATHS = (
     ".claude/managed-settings.json",
@@ -12,11 +19,11 @@ SETTINGS_SCAN_RELPATHS = (
     ".claude/settings.json",
 )
 API_KEY_FIELD_ORDER = {
-    "ANTHROPIC_AUTH_TOKEN": 0,
-    "ANTHROPIC_API_KEY": 1,
+    CLAUDE_AUTH_TOKEN_ENV_KEY: 0,
+    CLAUDE_AUTH_ENV_KEY: 1,
 }
 BASE_URL_FIELD_ORDER = {
-    "ANTHROPIC_BASE_URL": 0,
+    CLAUDE_BASE_URL_ENV_KEY: 0,
 }
 
 _SETTINGS_SOURCE_ORDER = {
@@ -47,15 +54,7 @@ def settings_model(staging_root: Path) -> str:
 def candidate_with_model(candidate: Candidate, model: str) -> Candidate:
     extra = dict(candidate.extra)
     extra.setdefault("model", model)
-    return Candidate(
-        role=candidate.role,
-        field=candidate.field,
-        value=candidate.value,
-        source_kind=candidate.source_kind,
-        source_relpath=candidate.source_relpath,
-        location=candidate.location,
-        extra=extra,
-    )
+    return replace(candidate, extra=extra)
 
 
 def annotate_candidates_with_settings_model(
@@ -73,7 +72,7 @@ def select_preferred_candidate(
     *,
     roles: set[str],
     field_order: dict[str, int],
-) -> Candidate | None:
+) -> Optional[Candidate]:
     matching = [candidate for candidate in candidates if candidate.role in roles]
     if not matching:
         return None

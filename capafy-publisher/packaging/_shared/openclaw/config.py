@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.local_path_detection import (
     LOCAL_PATH_PLACEHOLDER,
@@ -126,7 +126,7 @@ def rewrite_packaged_openclaw_config_as_overlay(runtime_root: Path) -> int:
 def merge_openclaw_overlay_with_base(
     runtime_root: Path,
     *,
-    base_config_path: Path | None = None,
+    base_config_path: Optional[Path] = None,
 ) -> dict[str, object]:
     config_path = runtime_root / ".openclaw" / "openclaw.json"
     if not config_path.is_file():
@@ -190,7 +190,7 @@ def _entry_matches_path(raw_path: str, entry: dict) -> bool:
     return bool(resolved_candidate and resolved_source_path and resolved_candidate == resolved_source_path)
 
 
-def _matching_entry(raw_path: str, entries: list[dict]) -> dict | None:
+def _matching_entry(raw_path: str, entries: list[dict]) -> Optional[dict]:
     for entry in entries:
         if _entry_matches_path(raw_path, entry):
             return entry
@@ -236,7 +236,7 @@ def _set_path_value_for_config_item(values: list, index: int, packaged_ref: str)
     return False
 
 
-def _discover_packaged_workspace_name(runtime_root: Path) -> str | None:
+def _discover_packaged_workspace_name(runtime_root: Path) -> Optional[str]:
     openclaw_root = runtime_root / ".openclaw"
     if not openclaw_root.is_dir():
         return None
@@ -268,7 +268,7 @@ def _rewrite_workspace_field(container: dict, packaged_ref: str) -> int:
 def rewrite_packaged_workspace_ref(
     runtime_root: Path,
     *,
-    workspace_name: str | None = None,
+    workspace_name: Optional[str] = None,
 ) -> int:
     config_path = runtime_root / ".openclaw" / "openclaw.json"
     if not config_path.is_file():
@@ -383,7 +383,7 @@ def rewrite_packaged_extra_skill_dirs(runtime_root: Path, stage_plan: StagePlan)
 def rewrite_packaged_workspace_document_refs(
     runtime_root: Path,
     *,
-    workspace_documents_manifest_payload: dict[str, Any] | None = None,
+    workspace_documents_manifest_payload: Optional[dict[str, Any]] = None,
 ) -> int:
     config_path = runtime_root / ".openclaw" / "openclaw.json"
     if not config_path.is_file():
@@ -427,7 +427,7 @@ def rewrite_packaged_workspace_document_refs(
 def validate_packaged_workspace_document_refs(
     runtime_root: Path,
     *,
-    workspace_documents_manifest_payload: dict[str, Any] | None = None,
+    workspace_documents_manifest_payload: Optional[dict[str, Any]] = None,
 ) -> list[str]:
     if not workspace_documents_manifest_payload:
         return []

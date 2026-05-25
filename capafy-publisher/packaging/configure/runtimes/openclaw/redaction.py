@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from packaging._shared.common.constants import PLACEHOLDER
-from packaging._shared.common.fs import path_basename as _path_basename
+from packaging._shared.common.fs import path_basename
 from packaging._shared.common.local_path_detection import (
     LOCAL_HOST_PATTERN,
     LOCAL_PATH_PATTERN,
@@ -65,7 +65,7 @@ def _rewrite_cli_command(value: str) -> str:
     if LOCAL_HOST_PATTERN.search(raw_head):
         rewritten_head = LOCAL_PATH_PLACEHOLDER
     elif LOCAL_PATH_PATTERN.search(raw_head):
-        basename = _path_basename(raw_head.rstrip("/\\"))
+        basename = path_basename(raw_head.rstrip("/\\"))
         if not basename:
             rewritten_head = LOCAL_PATH_PLACEHOLDER
         else:

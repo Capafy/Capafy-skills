@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 import re
-from typing import Any
+from typing import Any, Optional, Union
 
 
 class MinimalTOMLDecodeError(ValueError):
@@ -18,7 +18,7 @@ _FLOAT_PATTERN = re.compile(r"^[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][+-]?\d+)?$")
 
 
 def _strip_comment(line: str) -> str:
-    quote: str | None = None
+    quote: Optional[str] = None
     escaped = False
     for index, char in enumerate(line):
         if quote == '"':
@@ -46,7 +46,7 @@ def _strip_comment(line: str) -> str:
 def _split_unquoted(value: str, separator: str) -> list[str]:
     parts: list[str] = []
     start = 0
-    quote: str | None = None
+    quote: Optional[str] = None
     escaped = False
     depth = 0
     for index, char in enumerate(value):
@@ -84,6 +84,49 @@ def _split_unquoted(value: str, separator: str) -> list[str]:
         raise MinimalTOMLDecodeError("unterminated array")
     parts.append(value[start:].strip())
     return parts
+
+
+def _split_assignment(line: str) -> tuple[str, str]:
+    quote: Optional[str] = None
+    escaped = False
+    depth = 0
+    for index, char in enumerate(line):
+        if quote == '"':
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                quote = None
+            continue
+        if quote == "'":
+            if char == "'":
+                quote = None
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            continue
+        if char == "[":
+            depth += 1
+            continue
+        if char == "]":
+            depth -= 1
+            if depth < 0:
+                raise MinimalTOMLDecodeError("unexpected closing bracket")
+            continue
+        if char == "=" and depth == 0:
+            key = line[:index].strip()
+            value = line[index + 1 :].strip()
+            if not key:
+                raise MinimalTOMLDecodeError("empty key")
+            return key, value
+    if quote is not None:
+        raise MinimalTOMLDecodeError("unterminated string")
+    if depth:
+        raise MinimalTOMLDecodeError("unterminated array")
+    raise MinimalTOMLDecodeError("missing assignment separator")
 
 
 def _parse_basic_string(value: str) -> str:
@@ -154,10 +197,50 @@ def _descend(root: dict[str, Any], path: list[str]) -> dict[str, Any]:
     current = root
     for part in path:
         existing = current.setdefault(part, {})
+        if isinstance(existing, list):
+            if not existing:
+                raise MinimalTOMLDecodeError(f"array table has no entries: {part}")
+            latest = existing[-1]
+            if not isinstance(latest, dict):
+                raise MinimalTOMLDecodeError(f"array table parent is not a table: {part}")
+            current = latest
+            continue
         if not isinstance(existing, dict):
             raise MinimalTOMLDecodeError(f"key is not a table: {part}")
         current = existing
     return current
+
+
+def _descend_array_parent(root: dict[str, Any], path: list[str]) -> dict[str, Any]:
+    current = root
+    for part in path:
+        existing = current.setdefault(part, {})
+        if isinstance(existing, list):
+            if not existing:
+                item: dict[str, Any] = {}
+                existing.append(item)
+                current = item
+                continue
+            latest = existing[-1]
+            if not isinstance(latest, dict):
+                raise MinimalTOMLDecodeError(f"array table parent is not a table: {part}")
+            current = latest
+            continue
+        if not isinstance(existing, dict):
+            raise MinimalTOMLDecodeError(f"key is not a table: {part}")
+        current = existing
+    return current
+
+
+def _append_array_table(root: dict[str, Any], key_path: list[str]) -> dict[str, Any]:
+    parent = _descend_array_parent(root, key_path[:-1])
+    key = key_path[-1]
+    existing = parent.setdefault(key, [])
+    if not isinstance(existing, list):
+        raise MinimalTOMLDecodeError(f"key is not an array of tables: {'.'.join(key_path)}")
+    table: dict[str, Any] = {}
+    existing.append(table)
+    return table
 
 
 def _assign(table: dict[str, Any], key_path: list[str], value: Any) -> None:
@@ -168,7 +251,7 @@ def _assign(table: dict[str, Any], key_path: list[str], value: Any) -> None:
     target[key] = value
 
 
-def loads(text: str | bytes) -> dict[str, Any]:
+def loads(text: Union[str, bytes]) -> dict[str, Any]:
     source = text.decode("utf-8") if isinstance(text, bytes) else str(text)
     root: dict[str, Any] = {}
     current_table = root
@@ -177,14 +260,23 @@ def loads(text: str | bytes) -> dict[str, Any]:
         line = _strip_comment(raw_line).strip()
         if not line:
             continue
+        if line.startswith("[["):
+            if not line.endswith("]]"):
+                raise MinimalTOMLDecodeError(f"invalid table header on line {line_number}")
+            key_path = _parse_key_path(line[2:-2])
+            current_table = _append_array_table(root, key_path)
+            continue
         if line.startswith("["):
-            if not line.endswith("]") or line.startswith("[["):
+            if not line.endswith("]"):
                 raise MinimalTOMLDecodeError(f"invalid table header on line {line_number}")
             key_path = _parse_key_path(line[1:-1])
             current_table = _descend(root, key_path)
             continue
-        key_text, separator, value_text = line.partition("=")
-        if not separator:
+        try:
+            key_text, value_text = _split_assignment(line)
+        except MinimalTOMLDecodeError as exc:
+            raise MinimalTOMLDecodeError(f"invalid assignment on line {line_number}") from exc
+        if not value_text:
             raise MinimalTOMLDecodeError(f"invalid assignment on line {line_number}")
         key_path = _parse_key_path(key_text)
         value = _parse_value(value_text)

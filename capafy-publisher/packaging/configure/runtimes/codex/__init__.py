@@ -4,6 +4,7 @@ from packaging.configure.runtimes.lazy_package import make_runtime_package_getat
 
 _RUNTIME_MODULES = frozenset({
     "auth",
+    "config_state",
     "dotenv",
     "local_files",
     "provider",
@@ -30,6 +31,7 @@ __all__ = [
     "CodexRuntime",
     "CodexTarget",
     "auth",
+    "config_state",
     "dotenv",
     "local_files",
     "provider",

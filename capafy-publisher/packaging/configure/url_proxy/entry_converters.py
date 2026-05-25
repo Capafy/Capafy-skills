@@ -1,15 +1,12 @@
 from __future__ import annotations
+from typing import Optional
 
 from packaging.configure.contracts import FieldLocation, PlanField, SourceKind, UrlProxyPair
-from packaging.configure.scan.entry_finalize import entry_source, finalize_entry
+from packaging.configure.scan.entry_finalize import finalize_entry
 
 
 def _item_value(item: dict, key: str) -> str:
     return str(item.get(key, "") or "").strip()
-
-
-def _source_kind_from_entry_source(source: str) -> SourceKind:
-    return SourceKind.PROCESS_ENV if source == "process.env" else SourceKind.FILE
 
 
 def _plan_field_from_url_proxy_entry_side(item: dict, *, service: str) -> PlanField:
@@ -17,7 +14,7 @@ def _plan_field_from_url_proxy_entry_side(item: dict, *, service: str) -> PlanFi
     return PlanField(
         field=_item_value(item, "field"),
         service=service,
-        source_kind=_source_kind_from_entry_source(source),
+        source_kind=SourceKind.PROCESS_ENV if source == "process.env" else SourceKind.FILE,
         source_relpath="" if source == "process.env" else source,
         location=FieldLocation(fmt="json"),
         original_value=_item_value(item, "value"),
@@ -37,7 +34,7 @@ def build_url_proxy_entry(key_entry: dict, url_entry: dict) -> dict:
             "value": finalized_key["value"],
             "placeholder": finalized_key["placeholder"],
             "field": finalized_key.get("field", ""),
-            "source": entry_source(key_entry),
+            "source": str(key_entry.get("source", "")).strip(),
             "source_detail": finalized_key.get("source_detail", ""),
             "occurrence_index": finalized_key.get("occurrence_index", 1),
             "url": finalized_key.get("url", ""),
@@ -46,7 +43,7 @@ def build_url_proxy_entry(key_entry: dict, url_entry: dict) -> dict:
             "value": finalized_url["value"],
             "placeholder": finalized_url["placeholder"],
             "field": finalized_url.get("field", ""),
-            "source": entry_source(url_entry),
+            "source": str(url_entry.get("source", "")).strip(),
             "source_detail": finalized_url.get("source_detail", ""),
             "occurrence_index": finalized_url.get("occurrence_index", 1),
             "value_type": finalized_url.get("value_type", "url"),
@@ -63,7 +60,7 @@ def url_proxy_entry_to_pair(
     entry: dict,
     *,
     default_contract_id: str,
-) -> UrlProxyPair | None:
+) -> Optional[UrlProxyPair]:
     api_key = entry.get("api_key")
     url = entry.get("url")
     if not isinstance(api_key, dict) or not isinstance(url, dict):

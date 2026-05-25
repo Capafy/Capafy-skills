@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Tuple
 
+from packaging._shared.mode_dispatch import lookup_mode
 from packaging.configure.contexts import ConfigureContext, StageContext
 
 from packaging.configure.buyout.configure import run_buyout_configure
@@ -37,13 +38,7 @@ _REGISTRY: Dict[str, ConfigureMode] = {
 
 
 def get_configure_mode(agent_type: str) -> ConfigureMode:
-    normalized = str(agent_type).strip()
-    if not normalized:
-        raise ValueError("Unknown agent_type: empty")
-    try:
-        return _REGISTRY[normalized]
-    except KeyError as exc:
-        raise ValueError(f"Unknown agent_type: {agent_type}") from exc
+    return lookup_mode(_REGISTRY, agent_type)
 
 
 __all__ = [

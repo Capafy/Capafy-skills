@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import PurePosixPath
 
@@ -61,7 +62,7 @@ def _entry_discovery_root(entry: DiscoveryUnit) -> str:
     return _skill_root_prefix(entry.get("path", ""))
 
 
-def _skill_dedupe_key(entry: DiscoveryUnit) -> str | None:
+def _skill_dedupe_key(entry: DiscoveryUnit) -> Optional[str]:
     if str(entry.get("unit_type", "")) != "skill":
         return None
     path = _normalize_discovery_path(entry.get("path", ""))
@@ -148,7 +149,7 @@ def _target_stage_plan(target, runtime_dir: str):
 
 def discover_context_selection_groups_for_target(
     *,
-    target_name: str | None = None,
+    target_name: Optional[str] = None,
     runtime_dir: str,
 ) -> dict[str, list[dict]]:
     from packaging.runtimes import get_default_target, get_target
@@ -170,20 +171,9 @@ def discover_context_selection_groups_for_target(
     )
 
 
-def resolve_skills(
-    discovered_units: list[DiscoveryUnit],
-    *,
-    target=None,
-) -> dict:
-    return candidate_selection_groups(
-        _candidate_units(discovered_units, target=target),
-        target=target,
-    )
-
-
 def resolve_skills_for_target(
     *,
-    target_name: str | None = None,
+    target_name: Optional[str] = None,
     runtime_dir: str,
 ) -> dict:
     from packaging.runtimes import get_default_target, get_target
@@ -199,14 +189,13 @@ def resolve_skills_for_target(
         raise ValueError(str(exc)) from exc
 
     discovered_units, _suspicious_units = discover_units(stage_plan, target=target)
-    return resolve_skills(
-        discovered_units,
+    return candidate_selection_groups(
+        _candidate_units(discovered_units, target=target),
         target=target,
     )
 
 
 __all__ = [
     "discover_context_selection_groups_for_target",
-    "resolve_skills",
     "resolve_skills_for_target",
 ]

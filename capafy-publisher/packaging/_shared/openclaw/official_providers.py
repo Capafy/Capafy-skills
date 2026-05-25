@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass
 
@@ -102,7 +103,7 @@ OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME = {
 
 def match_openclaw_builtin_model_provider(
     model_ref: str,
-) -> tuple[OpenClawOfficialProviderSpec, str] | None:
+) -> Optional[tuple[OpenClawOfficialProviderSpec, str]]:
     normalized = str(model_ref or "").strip()
     lowered = normalized.lower()
     for spec in OPENCLAW_OFFICIAL_PROVIDER_SPECS:
@@ -114,7 +115,7 @@ def match_openclaw_builtin_model_provider(
 
 def find_openclaw_official_provider_by_marker(
     value: str,
-) -> OpenClawOfficialProviderSpec | None:
+) -> Optional[OpenClawOfficialProviderSpec]:
     normalized = str(value or "").strip().lower()
     if not normalized:
         return None
@@ -126,7 +127,7 @@ def find_openclaw_official_provider_by_marker(
 
 def find_openclaw_official_provider_in_text(
     value: str,
-) -> OpenClawOfficialProviderSpec | None:
+) -> Optional[OpenClawOfficialProviderSpec]:
     normalized = str(value or "").strip().lower()
     if not normalized:
         return None

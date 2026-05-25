@@ -12,7 +12,7 @@ from packaging.configure.sensitive.literals import (
 from packaging._shared.common.url_values import find_domains
 
 from .candidate_annotation import annotate_candidate
-from .support import append_candidate as _append_candidate, pick_domain
+from .support import append_candidate, pick_domain
 
 
 XML_SCAN_BASENAMES = {
@@ -80,7 +80,7 @@ def _collect_netrc_candidates(text: str, relpath: str) -> list[dict]:
         source = f"{relpath} line {line_no}"
         url = host.lower()
         if "login" in fields:
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
@@ -101,7 +101,7 @@ def _collect_netrc_candidates(text: str, relpath: str) -> list[dict]:
             secret_value = fields.get(secret_key)
             if not secret_value:
                 continue
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
@@ -138,7 +138,7 @@ def _collect_git_credentials_candidates(text: str, relpath: str) -> list[dict]:
         url = host.lower()
         source = f"{relpath} line {line_no}"
         if parsed.username:
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
@@ -156,7 +156,7 @@ def _collect_git_credentials_candidates(text: str, relpath: str) -> list[dict]:
                 )
             )
         if parsed.password:
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
@@ -200,7 +200,7 @@ def _collect_xml_value_candidates(text: str, relpath: str) -> list[dict]:
             if not extracted_value:
                 continue
             line_no = text.count("\n", 0, match.start()) + 1
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
@@ -234,7 +234,7 @@ def _collect_rubygems_candidates(text: str, relpath: str) -> list[dict]:
         if not extracted_value:
             continue
         entry_type = "api_key" if contains_explicit_secret_keyword(key) else "managed_value"
-        _append_candidate(
+        append_candidate(
             candidates,
             annotate_candidate(
                 {

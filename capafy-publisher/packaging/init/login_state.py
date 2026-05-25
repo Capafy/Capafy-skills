@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Optional
 
 from capafy_platform.api import list_agents_raw
 from capafy_platform.token_store import load_persisted_access_token
@@ -9,7 +9,7 @@ from capafy_platform.token_store import load_persisted_access_token
 from packaging._shared.common.cli import build_publish_error
 
 
-def platform_login_error() -> dict[str, Any] | None:
+def platform_login_error() -> Optional[dict[str, Any]]:
     env_token = str(os.environ.get("CAPAFY_ACCESS_TOKEN", "") or "").strip()
 
     persisted = None

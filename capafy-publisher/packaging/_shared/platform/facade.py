@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from capafy_platform.api import (
     create_agent,
@@ -22,7 +22,7 @@ from packaging._shared.platform.response_normalize import (
 )
 
 
-def get_latest_version(agent_id: str, *, access_token: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+def get_latest_version(agent_id: str, *, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:
         raise ValueError("agent_id must not be empty")
@@ -33,8 +33,8 @@ def get_latest_version(agent_id: str, *, access_token: str | None = None, base_u
 def create_agent_from_draft(
     card_draft: dict,
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     request_body = build_agent_create_request(card_draft)
     data = create_agent(request_body, access_token=access_token, base_url=base_url)
@@ -45,8 +45,8 @@ def create_version_from_draft(
     agent_id: str,
     card_draft: dict,
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     request_body = build_agent_version_create_request(agent_id, card_draft)
     data = create_agent_version(request_body, access_token=access_token, base_url=base_url)
@@ -59,8 +59,8 @@ def save_config_keys(
     agent_version_id: str,
     reviewed_scan_payload: dict,
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:
@@ -87,8 +87,8 @@ def report_package(
     agent_version_id: str,
     package_url: str,
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:

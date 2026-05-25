@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.cli import build_publish_error, emit_json
 from packaging._shared.common.constants import (
@@ -34,7 +34,7 @@ def _build_ship_error(
     error: str,
     failed_step: str,
     blocking_category: str,
-    developer_next_steps: list[str] | None = None,
+    developer_next_steps: Optional[list[str]] = None,
     **extra: Any,
 ) -> dict[str, Any]:
     payload = build_publish_error(

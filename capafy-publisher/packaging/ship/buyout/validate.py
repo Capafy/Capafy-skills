@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -13,9 +14,9 @@ from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME
 
 def load_buyout_reviewed_scan_payload(
     *,
-    reviewed_scan_json: str | None = None,
-    reviewed_scan_file: str | None = None,
-) -> dict | None:
+    reviewed_scan_json: Optional[str] = None,
+    reviewed_scan_file: Optional[str] = None,
+) -> Optional[dict]:
     if reviewed_scan_json and reviewed_scan_file:
         raise ValueError("--reviewed-scan-json and --reviewed-scan-file cannot be passed together")
     if reviewed_scan_json:
@@ -72,7 +73,7 @@ def _reviewed_scan_entry(entry: dict) -> dict:
     }
 
 
-def _iter_reviewed_scan_entries(reviewed_scan_payload: dict | None) -> list[dict]:
+def _iter_reviewed_scan_entries(reviewed_scan_payload: Optional[dict]) -> list[dict]:
     if not isinstance(reviewed_scan_payload, dict):
         return []
     items: list[dict] = []
@@ -140,7 +141,7 @@ def _validate_structure_check(runtime_root: Path) -> dict:
     }
 
 
-def _validate_disposition_consistency(runtime_root: Path, reviewed_scan_payload: dict | None) -> dict:
+def _validate_disposition_consistency(runtime_root: Path, reviewed_scan_payload: Optional[dict]) -> dict:
     runtime_text = _collect_runtime_text(runtime_root)
     placeholder_to_disposition: list[dict] = []
     excluded_value_cleaned: list[dict] = []
@@ -171,7 +172,7 @@ def validate_buyout_runtime(
     runtime_root: Path,
     *,
     target_name: str,
-    reviewed_scan_payload: dict | None = None,
+    reviewed_scan_payload: Optional[dict] = None,
 ) -> dict:
     checks: list[dict] = []
     errors: list[str] = []

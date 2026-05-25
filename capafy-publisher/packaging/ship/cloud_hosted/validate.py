@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 from packaging._shared.common.fs import normalize_path
 from packaging._shared.contracts.reviewed_scan import load_reviewed_scan_payload, normalize_reviewed_scan_payload
@@ -14,9 +14,9 @@ class CloudHostedValidationScan(NamedTuple):
 
 def load_cloud_hosted_reviewed_scan_payload(
     *,
-    reviewed_scan_json: str | None = None,
-    reviewed_scan_file: str | None = None,
-) -> CloudHostedValidationScan | None:
+    reviewed_scan_json: Optional[str] = None,
+    reviewed_scan_file: Optional[str] = None,
+) -> Optional[CloudHostedValidationScan]:
     if reviewed_scan_json and reviewed_scan_file:
         raise ValueError("--reviewed-scan-json and --reviewed-scan-file cannot be passed together")
 
@@ -45,7 +45,7 @@ def load_cloud_hosted_reviewed_scan_payload(
 
 def _load_validation_inputs(
     *,
-    reviewed_scan_payload: CloudHostedValidationScan | None = None,
+    reviewed_scan_payload: Optional[CloudHostedValidationScan] = None,
 ) -> CloudHostedValidationScan:
     if reviewed_scan_payload is not None:
         return reviewed_scan_payload
@@ -57,8 +57,8 @@ def validate_cloud_hosted_runtime(
     runtime_root: Path,
     *,
     target,
-    expected_version: str | None = None,
-    reviewed_scan_payload: CloudHostedValidationScan | None = None,
+    expected_version: Optional[str] = None,
+    reviewed_scan_payload: Optional[CloudHostedValidationScan] = None,
 ) -> dict:
     validation_scan = _load_validation_inputs(
         reviewed_scan_payload=reviewed_scan_payload,
@@ -79,8 +79,8 @@ def build_cloud_hosted_validation_payload(
     *,
     runtime_root: Path,
     target,
-    expected_version: str | None,
-    reviewed_scan_payload: CloudHostedValidationScan | None,
+    expected_version: Optional[str],
+    reviewed_scan_payload: Optional[CloudHostedValidationScan],
 ) -> dict:
     return validate_cloud_hosted_runtime(
         runtime_root=runtime_root,

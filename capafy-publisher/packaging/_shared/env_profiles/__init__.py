@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import copy
 import json
@@ -38,7 +39,7 @@ def _require_list(value: object, *, label: str, path: Path) -> list:
     return value
 
 
-def _validate_profile(profile: object, *, path: Path, expected_env_id: str | None = None) -> dict:
+def _validate_profile(profile: object, *, path: Path, expected_env_id: Optional[str] = None) -> dict:
     if not isinstance(profile, dict):
         raise ValueError(f"invalid profile format: {path}")
     if expected_env_id is not None and profile.get("env_id") != expected_env_id:
@@ -72,7 +73,7 @@ def _validate_profile(profile: object, *, path: Path, expected_env_id: str | Non
     return profile
 
 
-def _load_profile_from_path(path: Path, *, expected_env_id: str | None = None) -> dict:
+def _load_profile_from_path(path: Path, *, expected_env_id: Optional[str] = None) -> dict:
     profile = json.loads(path.read_text(encoding="utf-8"))
     return _validate_profile(profile, path=path, expected_env_id=expected_env_id)
 

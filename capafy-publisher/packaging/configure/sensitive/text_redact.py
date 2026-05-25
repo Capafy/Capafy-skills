@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from pathlib import Path
@@ -47,7 +48,7 @@ def _replace_line_values(
     pattern: re.Pattern[str],
     replacement: str,
     *,
-    suffix_group: int | None = None,
+    suffix_group: Optional[int] = None,
 ) -> tuple[str, int]:
     def replace_match(match: re.Match[str]) -> str:
         suffix = ""
@@ -227,7 +228,7 @@ def clean_special_files_in_staging(staging_root: Path) -> dict:
     }
 
 
-def replace_local_patterns(text: str, *, source_path: Path | None = None) -> tuple[str, int]:
+def replace_local_patterns(text: str, *, source_path: Optional[Path] = None) -> tuple[str, int]:
     updated, replacements = redact_local_traces_in_text(
         text,
         replacement="[removed]",

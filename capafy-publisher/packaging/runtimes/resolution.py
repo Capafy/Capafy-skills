@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from dataclasses import dataclass
@@ -21,17 +22,17 @@ OPENCLAW_MODERN_TARGET = "openclaw_bundle_aware"
 class TargetResolution:
     requested_name: str
     resolved_name: str
-    runtime_generation: str | None = None
-    runtime_version: str | None = None
-    runtime_version_source: str | None = None
+    runtime_generation: Optional[str] = None
+    runtime_version: Optional[str] = None
+    runtime_version_source: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class TargetResolutionRule:
     resolution_strategy: str = "identity"
-    resolution_target_id: str | None = None
-    runtime_validation_target_id: str | None = None
-    runtime_validation_reported_name: str | None = None
+    resolution_target_id: Optional[str] = None
+    runtime_validation_target_id: Optional[str] = None
+    runtime_validation_reported_name: Optional[str] = None
 
 
 def _target_descriptor(name: str) -> TargetDescriptor:
@@ -52,7 +53,7 @@ def get_target_resolution_rule(name: str) -> TargetResolutionRule:
     return rules.get(descriptor.target_id, TargetResolutionRule())
 
 
-def _read_json(path: Path) -> dict | None:
+def _read_json(path: Path) -> Optional[dict]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -62,7 +63,7 @@ def _read_json(path: Path) -> dict | None:
     return payload
 
 
-def _lookup_openclaw_config_version(path: Path) -> str | None:
+def _lookup_openclaw_config_version(path: Path) -> Optional[str]:
     payload = _read_json(path)
     if payload is None:
         return None
@@ -78,7 +79,7 @@ def _lookup_openclaw_config_version(path: Path) -> str | None:
     return None
 
 
-def _resolve_openclaw_config_path(home: Path | None = None) -> Path:
+def _resolve_openclaw_config_path(home: Optional[Path] = None) -> Path:
     if home is not None:
         return (home.expanduser() / ".openclaw" / "openclaw.json").resolve()
     from packaging.configure.runtimes.openclaw import target as openclaw_target
@@ -86,7 +87,7 @@ def _resolve_openclaw_config_path(home: Path | None = None) -> Path:
     return (openclaw_target.OPENCLAW_ROOT / "openclaw.json").expanduser().resolve()
 
 
-def detect_openclaw_target_resolution(*, home: Path | None = None) -> TargetResolution:
+def detect_openclaw_target_resolution(*, home: Optional[Path] = None) -> TargetResolution:
     config_path = _resolve_openclaw_config_path(home)
     config_version = _lookup_openclaw_config_version(config_path) if config_path.is_file() else None
     cli_line = collect_optional_command_first_line(["openclaw", "--version"])
@@ -131,7 +132,7 @@ def _resolve_static_target(
     )
 
 
-def resolve_target_request(requested_name: str, *, home: Path | None = None) -> TargetResolution:
+def resolve_target_request(requested_name: str, *, home: Optional[Path] = None) -> TargetResolution:
     normalized = requested_name.strip()
     descriptor = _target_descriptor(normalized)
     resolution_rule = get_target_resolution_rule(normalized)
@@ -140,11 +141,11 @@ def resolve_target_request(requested_name: str, *, home: Path | None = None) -> 
     return _resolve_static_target(normalized, descriptor, resolution_rule)
 
 
-def resolve_target_name(requested_name: str, *, home: Path | None = None) -> str:
+def resolve_target_name(requested_name: str, *, home: Optional[Path] = None) -> str:
     return resolve_target_request(requested_name, home=home).resolved_name
 
 
-def resolve_runtime_validation_target(requested_name: str | None) -> tuple[str, str]:
+def resolve_runtime_validation_target(requested_name: Optional[str]) -> tuple[str, str]:
     normalized = (requested_name or "").strip() or "openclaw"
     resolution_rule = get_target_resolution_rule(normalized)
     if resolution_rule.runtime_validation_target_id:
@@ -155,7 +156,7 @@ def resolve_runtime_validation_target(requested_name: str | None) -> tuple[str, 
     return resolution.resolved_name, reported_name
 
 
-def build_runtime_metadata(env_id: str, *, home: Path | None = None) -> dict[str, str]:
+def build_runtime_metadata(env_id: str, *, home: Optional[Path] = None) -> dict[str, str]:
     resolution = resolve_target_request(env_id, home=home)
     payload = {"resolved_target": resolution.resolved_name}
     if resolution.runtime_generation:

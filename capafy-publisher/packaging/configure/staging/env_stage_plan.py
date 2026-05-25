@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
@@ -7,10 +8,6 @@ from packaging._shared.contracts.selectable import is_instruction_doc
 from packaging._shared.contracts.stage_plan import StageFileSource, StagePlan, StageTreeSource
 from packaging._shared.env_profiles import string_tuple_profile_value
 from packaging._shared.env_profiles.path_resolver import resolve_path_spec
-
-
-def resolve_profile_path(spec: dict, runtime_dir: str | None = None) -> Path:
-    return resolve_path_spec(spec, runtime_dir=runtime_dir)
 
 
 def iter_tree_root_specs(profile: dict) -> list[dict]:
@@ -23,7 +20,7 @@ def iter_tree_root_specs(profile: dict) -> list[dict]:
     return specs
 
 
-def format_source_value(raw: str, workspace_path: str | None = None) -> str:
+def format_source_value(raw: str, workspace_path: Optional[str] = None) -> str:
     if raw == "{workspace_path}":
         if workspace_path is None:
             raise ValueError("workspace_path is required to format source_value")
@@ -33,7 +30,7 @@ def format_source_value(raw: str, workspace_path: str | None = None) -> str:
 
 def build_stage_plan(
     target,
-    runtime_dir: str | None,
+    runtime_dir: Optional[str],
 ) -> StagePlan:
     tree_sources: list[StageTreeSource] = []
     file_sources: list[StageFileSource] = []
@@ -41,7 +38,7 @@ def build_stage_plan(
     for root_spec in iter_tree_root_specs(target.profile):
         tree_sources.append(
             StageTreeSource(
-                source_root=resolve_profile_path(root_spec, runtime_dir),
+                source_root=resolve_path_spec(root_spec, runtime_dir=runtime_dir),
                 relative_target_root=Path(str(root_spec.get("target_path", ""))),
                 display_prefix=str(root_spec.get("display_prefix", "")),
                 source_key=str(root_spec.get("source_key", "")),
@@ -59,7 +56,7 @@ def build_stage_plan(
         target_path = str(file_spec.get("target_path", "")).strip()
         file_sources.append(
             StageFileSource(
-                source_file=resolve_profile_path(file_spec, runtime_dir),
+                source_file=resolve_path_spec(file_spec, runtime_dir=runtime_dir),
                 relative_target_path=Path(target_path),
                 source_key=str(file_spec.get("source_key", "")),
                 source_value=format_source_value(str(file_spec.get("source_value", "copied")), runtime_dir),
@@ -87,7 +84,7 @@ def build_stage_plan(
             continue
         file_sources.append(
             StageFileSource(
-                source_file=resolve_profile_path(file_spec, runtime_dir),
+                source_file=resolve_path_spec(file_spec, runtime_dir=runtime_dir),
                 relative_target_path=Path("_scan_only").joinpath(*PurePosixPath(normalized_display_path).parts),
                 source_key=str(file_spec.get("display_path", display_path)),
                 source_value="scan_only_reference",

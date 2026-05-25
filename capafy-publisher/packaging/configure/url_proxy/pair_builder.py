@@ -23,10 +23,6 @@ def _reviewed_occurrence_index(candidate: Candidate) -> int:
     return location.occurrence_index_identity()
 
 
-def _candidate_extra_text(candidate: Candidate, key: str) -> str:
-    return str(candidate.extra.get(key, "") or "").strip()
-
-
 def make_pair(
     *,
     contract_id: str,
@@ -42,13 +38,13 @@ def make_pair(
     resolved_group = group or source_for_group or f"<{contract_id}:{key_candidate.field}>"
     resolved_model = (
         model
-        or _candidate_extra_text(key_candidate, "model")
-        or _candidate_extra_text(url_candidate, "model")
+        or str(key_candidate.extra.get("model", "") or "").strip()
+        or str(url_candidate.extra.get("model", "") or "").strip()
     )
     resolved_api_format = (
         api_format
-        or _candidate_extra_text(key_candidate, "api_format")
-        or _candidate_extra_text(url_candidate, "api_format")
+        or str(key_candidate.extra.get("api_format", "") or "").strip()
+        or str(url_candidate.extra.get("api_format", "") or "").strip()
     )
     key_placeholder_source = key_candidate.source_relpath or (
         "" if url_candidate.source_kind == SourceKind.SYNTHESIZED else source_for_group

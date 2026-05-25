@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
@@ -34,7 +34,7 @@ def load_auth_profile_keys(ctx: Any) -> dict[str, list[str]]:
 
     result: dict[str, list[str]] = {}
 
-    def extract_key(node: dict) -> str | None:
+    def extract_key(node: dict) -> Optional[str]:
         for field in ("key", "apiKey", "api_key", "apikey"):
             value = node.get(field)
             if isinstance(value, str) and value.strip():
@@ -70,7 +70,7 @@ def _normalize_auth_profile_provider_name(value: object) -> str:
     return text
 
 
-def _infer_auth_profile_provider_name(node: dict, parts: list[str]) -> str | None:
+def _infer_auth_profile_provider_name(node: dict, parts: list[str]) -> Optional[str]:
     for key in ("provider", "service", "name", "api"):
         candidate = _normalize_auth_profile_provider_name(node.get(key))
         if candidate:

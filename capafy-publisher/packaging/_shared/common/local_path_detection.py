@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional, Union
 
 import re
 from pathlib import Path
@@ -78,7 +79,7 @@ _CODE_SYNTAX_FILE_SUFFIXES = {
 }
 
 
-def _should_skip_code_syntax_tokens(source_path: str | Path | None) -> bool:
+def _should_skip_code_syntax_tokens(source_path: Optional[Union[str, Path]]) -> bool:
     if source_path is None:
         return False
     suffix = Path(source_path).suffix.lower()
@@ -124,7 +125,7 @@ def redact_local_traces_in_text(
     text: str,
     *,
     replacement: str = "[removed]",
-    source_path: str | Path | None = None,
+    source_path: Optional[Union[str, Path]] = None,
 ) -> tuple[str, int]:
     updated = text
     replacements = 0

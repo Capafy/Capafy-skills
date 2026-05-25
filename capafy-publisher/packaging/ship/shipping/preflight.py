@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 from packaging._shared.common.constants import DEFAULT_STAGING_PATH
 from packaging._shared.common.cli import build_publish_error
@@ -39,7 +39,7 @@ class ShipContext:
 
 def _first_failed_check(
     checks: tuple[tuple[bool, dict[str, Any]], ...],
-) -> tuple[dict[str, Any], int] | None:
+) -> Optional[tuple[dict[str, Any], int]]:
     for failed, error_kwargs in checks:
         if failed:
             return build_publish_error(**error_kwargs), 1
@@ -51,8 +51,8 @@ def _error_args(
     failed_step: str,
     blocking_category: str,
     *,
-    next_step: str | None = None,
-    developer_next_steps: list[str] | None = None,
+    next_step: Optional[str] = None,
+    developer_next_steps: Optional[list[str]] = None,
     **extra: Any,
 ) -> dict[str, Any]:
     args: dict[str, Any] = {
@@ -74,7 +74,7 @@ def prepare_ship_context(
     latest: dict[str, Any],
     developer_work_dir_path: Path,
     default_staging_path: str = DEFAULT_STAGING_PATH,
-) -> tuple[ShipContext | dict[str, Any], int]:
+) -> tuple[Union[ShipContext, dict[str, Any]], int]:
     latest_state = parse_latest_version(latest)
     env_id = latest_state.env_id
     agent_type = latest_state.agent_type

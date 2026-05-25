@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 def build_cloud_hosted_stage_payload(
@@ -17,11 +17,11 @@ def build_cloud_hosted_stage_payload(
     runtime_dependencies_path: Path,
     runtime_environment_path: Path,
     stage_manifest_path: Path,
-    selected_units_manifest_path: Path | None,
-    workspace_documents_manifest_path: Path | None = None,
-    selected_skill_paths: set[str] | None,
-    selected_plugin_paths: set[str] | None,
-    selected_cron_paths: set[str] | None,
+    selected_units_manifest_path: Optional[Path],
+    workspace_documents_manifest_path: Optional[Path] = None,
+    selected_skill_paths: Optional[set[str]],
+    selected_plugin_paths: Optional[set[str]],
+    selected_cron_paths: Optional[set[str]],
     runtime_validation_target: str,
     postprocess_summary: dict[str, Any],
     main_tree_redaction_summary: dict[str, int],

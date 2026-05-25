@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Union
 
 from packaging.configure.contracts import (
     EnvVar,
@@ -27,8 +27,8 @@ def run_general_scan(
     *,
     process_env: dict[str, str],
     claimed_process_env_names: frozenset[str],
-    referenced_env_names: frozenset[str] | set[str] = frozenset(),
-    env_url_hints: dict[str, str] | None = None,
+    referenced_env_names: Union[frozenset[str], set[str]] = frozenset(),
+    env_url_hints: Optional[dict[str, str]] = None,
 ) -> GeneralScanResult:
 
     raw_generic = raw_scan.get("generic", [])

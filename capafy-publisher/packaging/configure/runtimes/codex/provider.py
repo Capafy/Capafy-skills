@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import OPENAI_OFFICIAL_URL_V1
 from packaging._shared.common.toml_loader import safe_toml_loads, tomllib
@@ -11,123 +11,54 @@ from packaging.configure.runtimes.toml_text import (
     newline_for as _newline_for,
     toml_string as _toml_string,
 )
-from packaging.configure.sensitive.keywords import normalize_key_name
-from packaging._shared.reviewed_scan.query import reviewed_url_proxy_groups as _reviewed_url_proxy_groups
+from packaging.configure.runtimes.codex.auth import CODEX_AUTH_PROVIDER_NAME
+from packaging.configure.runtimes.codex.config_state import load_codex_config_state_from_text
 
 
-_ENDPOINT_SUFFIX_KEYS = ("baseurl", "apibase", "endpoint")
-
-
-def official_codex_url_for_env_key(env_key: str) -> str:
-    return OPENAI_OFFICIAL_URL_V1 if str(env_key or "").strip() else ""
-
-
-def _looks_like_openai_model(model_name: str) -> bool:
-    normalized = str(model_name or "").strip().lower()
-    if not normalized:
-        return False
-    if normalized.startswith("openai/"):
-        normalized = normalized.split("/", 1)[1]
-    if normalized.startswith(("gpt", "o1", "o3", "o4")):
-        return True
-    if normalized in {"codex-mini-latest", "codex-latest"}:
-        return True
-    if normalized.startswith("codex-"):
-        return True
-    return False
-
-
-def _provider_base_url(provider_payload: dict) -> str:
-    for raw_key, raw_value in provider_payload.items():
-        if not isinstance(raw_value, str) or not raw_value.strip():
-            continue
-        normalized_key = normalize_key_name(str(raw_key))
-        if normalized_key == "url":
-            return raw_value.strip()
-        if any(normalized_key.endswith(suffix) for suffix in _ENDPOINT_SUFFIX_KEYS):
-            return raw_value.strip()
-    return ""
-
-
-def infer_selected_codex_provider_url(
-    env_key: str,
-    *,
-    top_level_model: str = "",
-) -> str:
-    official_url = official_codex_url_for_env_key(env_key)
-    if official_url:
-        return official_url
-    if _looks_like_openai_model(top_level_model):
-        return OPENAI_OFFICIAL_URL_V1
-    return ""
+_CODEX_PROVIDER_GROUP_PREFIX = ".codex/config.toml#model_providers."
 
 
 def collect_codex_official_base_url_targets(config_text: str) -> list[dict[str, str]]:
-    try:
-        payload = safe_toml_loads(config_text)
-    except tomllib.TOMLDecodeError:
+    state = load_codex_config_state_from_text(config_text).provider
+    if state is None:
         return []
-    if not isinstance(payload, dict):
+    if not state.provider_exists or state.base_url or state.selected_provider != CODEX_AUTH_PROVIDER_NAME:
         return []
-
-    providers = payload.get("model_providers")
-    if not isinstance(providers, dict):
+    if not state.env_key:
         return []
-
-    top_level_model = str(payload.get("model", "")).strip()
-
-    inferred_targets: list[dict[str, str]] = []
-    for provider_name, provider_payload in providers.items():
-        if not isinstance(provider_payload, dict):
-            continue
-        env_key = str(provider_payload.get("env_key", "")).strip()
-        if not env_key or _provider_base_url(provider_payload):
-            continue
-        official_url = official_codex_url_for_env_key(env_key)
-        if not official_url:
-            continue
-        inferred_targets.append(
-            {
-                "provider_name": str(provider_name).strip(),
-                "env_key": env_key,
-                "url": infer_selected_codex_provider_url(env_key, top_level_model=top_level_model),
-            }
-        )
-    return inferred_targets
+    return [{
+        "provider_name": state.selected_provider,
+        "env_key": state.env_key,
+        "url": OPENAI_OFFICIAL_URL_V1,
+    }]
 
 
-def _allowed_provider_names(reviewed_scan: dict[str, Any]) -> set[str]:
-    prefix = ".codex/config.toml#model_providers."
-    providers: set[str] = set()
-    for group in _reviewed_url_proxy_groups(reviewed_scan):
-        if not group.startswith(prefix):
-            continue
-        provider = group[len(prefix) :].split(".", 1)[0].strip()
-        if provider:
-            providers.add(provider.strip("\"'"))
-    return providers
+def _provider_name_from_group(group: object) -> str:
+    normalized = str(group or "").strip()
+    if not normalized.startswith(_CODEX_PROVIDER_GROUP_PREFIX):
+        return ""
+    return normalized[len(_CODEX_PROVIDER_GROUP_PREFIX) :].split(".", 1)[0].strip().strip("\"'")
 
 
-def _confirmed_model_by_provider(reviewed_scan: dict[str, Any]) -> dict[str, str]:
-    prefix = ".codex/config.toml#model_providers."
-    models: dict[str, str] = {}
+def _confirmed_provider_summary(reviewed_scan: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {"providers": set(), "models": {}}
     url_proxy = reviewed_scan.get("url_proxy", [])
     if not isinstance(url_proxy, list):
-        return models
+        return summary
     for entry in url_proxy:
         if not isinstance(entry, dict):
             continue
-        group = str(entry.get("url_proxy_group", "") or "").strip()
-        if not group.startswith(prefix):
+        provider = _provider_name_from_group(entry.get("url_proxy_group", ""))
+        if not provider:
             continue
-        provider = group[len(prefix) :].split(".", 1)[0].strip().strip("\"'")
+        summary["providers"].add(provider)
         model = str(entry.get("model", "") or "").strip()
-        if provider and model:
-            models[provider] = model
-    return models
+        if model:
+            summary["models"][provider] = model
+    return summary
 
 
-def _toml_provider_name(section_name: str) -> str | None:
+def _toml_provider_name(section_name: str) -> Optional[str]:
     normalized = str(section_name or "").strip()
     if not normalized.startswith("model_providers."):
         return None
@@ -268,7 +199,8 @@ def rewrite_codex_confirmed_providers(
     staging_root: Path,
     reviewed_scan: dict[str, Any],
 ) -> dict[str, Any]:
-    allowed = _allowed_provider_names(reviewed_scan)
+    confirmed_summary = _confirmed_provider_summary(reviewed_scan)
+    allowed = confirmed_summary["providers"]
     if not allowed:
         return {"codex_confirmed_provider_rewrites": 0}
     config_path = staging_root / ".codex" / "config.toml"
@@ -291,7 +223,7 @@ def rewrite_codex_confirmed_providers(
         selected_provider=selected_provider,
         allowed_providers=set(ordered_allowed),
     )
-    confirmed_models = _confirmed_model_by_provider(reviewed_scan)
+    confirmed_models = confirmed_summary["models"]
     updated_text, model_rewrites = _rewrite_top_level_model_line(
         updated_text,
         model=confirmed_models.get(selected_provider, ""),
@@ -310,7 +242,5 @@ def rewrite_codex_confirmed_providers(
 
 __all__ = [
     "collect_codex_official_base_url_targets",
-    "infer_selected_codex_provider_url",
-    "official_codex_url_for_env_key",
     "rewrite_codex_confirmed_providers",
 ]

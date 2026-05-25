@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 
 class SourceKind(str, Enum):
@@ -71,7 +71,7 @@ class PlanField:
     service: str
     source_kind: SourceKind
     source_relpath: str
-    location: FieldLocation | None
+    location: Optional[FieldLocation]
     original_value: str
     placeholder: str
     reviewed_source: str = ""

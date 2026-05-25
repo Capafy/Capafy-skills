@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from collections.abc import Callable
@@ -64,10 +65,6 @@ def normalize_path_text(value: str) -> str:
     return normalized.rstrip("/")
 
 
-def current_home_roots() -> list[Path]:
-    return home_roots_from_env()
-
-
 def home_alias_texts(home_root: Path) -> list[str]:
     normalized = normalize_path_text(str(home_root))
     aliases = [normalized]
@@ -112,7 +109,7 @@ def home_alias_texts(home_root: Path) -> list[str]:
 def current_home_aliases() -> list[tuple[str, Path]]:
     aliases: list[tuple[str, Path]] = []
     seen: set[tuple[str, str]] = set()
-    for home_root in current_home_roots():
+    for home_root in home_roots_from_env():
         for alias in home_alias_texts(home_root):
             key = (
                 normalize_path_text(alias).casefold(),
@@ -195,7 +192,7 @@ def resolve_reference(
     home_aliases: Callable[[], list[tuple[str, Path]]] = current_home_aliases,
     windows_drive_mount_candidates: Callable[[str], list[Path]] = _default_windows_drive_mount_candidates,
     windows_path_parts: Callable[[str], list[str]] = _default_windows_path_parts,
-) -> tuple[Path, str, str] | None:
+) -> Optional[tuple[Path, str, str]]:
     _leading, value, _trailing = unwrap_destination(raw_value)
     path_part, suffix = strip_fragment_and_query(value)
     path_part = unquote(path_part.strip())
@@ -230,7 +227,6 @@ def resolve_reference(
 __all__ = [
     "current_home_aliases",
     "current_home_alias_candidates",
-    "current_home_roots",
     "dedupe_path_candidates",
     "home_alias_texts",
     "looks_like_local_destination",

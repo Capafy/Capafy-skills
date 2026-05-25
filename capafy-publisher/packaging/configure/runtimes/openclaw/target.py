@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
@@ -6,8 +7,7 @@ from packaging._shared.common.home import safe_expanduser_path
 from packaging._shared.contracts.path_shapes import (
     basic_owning_selectable_paths,
     classify_basic_selectable_directory,
-    classify_basic_selectable_file,
-    unit_type_from_path,
+    extract_skill_dir_display_path,
 )
 from packaging._shared.env_profiles import load_profile, string_tuple_profile_value
 from packaging._shared.openclaw.config import OPENCLAW_CONFIG_MODE_OVERLAY_MERGE
@@ -27,13 +27,12 @@ from packaging.configure.runtimes.openclaw import cron_units
 from packaging.configure.runtimes.openclaw import scan_hints as openclaw_scan_hints
 from packaging.configure.runtimes.openclaw.selection_units import (
     extract_openclaw_plugin_display_path,
-    build_openclaw_selection_runtime_validation,
     classify_openclaw_directory_unit,
-    classify_openclaw_file_unit,
     finalize_openclaw_selectable_entry,
     infer_openclaw_unit_type_from_path,
     openclaw_owning_selectable_paths,
 )
+from packaging.configure.runtimes.openclaw.selection_validation import build_openclaw_selection_runtime_validation
 from packaging.configure.runtimes.openclaw.workspace_plans import build_stage_plan as build_openclaw_stage_plan
 from packaging.configure.runtimes.openclaw.workspace_postprocess import (
     collect_runtime_environment_fields as collect_openclaw_runtime_environment_fields,
@@ -60,20 +59,16 @@ _OPENCLAW_VALIDATE_PROFILE_PATCH = {
 }
 
 
-def build_stage_plan(
-    runtime_dir: str,
-) -> StagePlan:
-    return build_openclaw_stage_plan(
-        runtime_dir,
-        openclaw_root=OPENCLAW_ROOT,
-        agents_skills_root=AGENTS_SKILLS_ROOT,
-        stage_root_files=OPENCLAW_STAGE_ROOT_FILES,
-        extensions_dirname=OPENCLAW_EXTENSIONS_DIRNAME,
-    )
-
-
-def collect_runtime_environment_fields() -> dict[str, str | None]:
-    return collect_openclaw_runtime_environment_fields()
+def _merged_validate_profile(profile: dict) -> dict:
+    merged = dict(profile)
+    for key in ("fixed_stage_files", "redact_files"):
+        profile_items = profile.get(key, [])
+        patch_items = _OPENCLAW_VALIDATE_PROFILE_PATCH.get(key, [])
+        if isinstance(profile_items, list):
+            merged[key] = [*profile_items, *patch_items]
+        else:
+            merged[key] = list(patch_items)
+    return merged
 
 
 class OpenClawTarget:
@@ -81,7 +76,7 @@ class OpenClawTarget:
         self.generation = generation
         self.profile = load_profile("openclaw")
 
-    def profile_env_id(self) -> str | None:
+    def profile_env_id(self) -> Optional[str]:
         return "openclaw"
 
     def prepare_runtime_dir(self, runtime_dir: str) -> str:
@@ -98,7 +93,7 @@ class OpenClawTarget:
         self,
         *,
         stage_plan: StagePlan,
-    ) -> set[str] | None:
+    ) -> Optional[set[str]]:
         for ts in stage_plan.tree_sources:
             if ts.source_key == ".openclaw/workspace":
                 workspace_root = safe_expanduser_path(ts.source_root)
@@ -139,7 +134,7 @@ class OpenClawTarget:
         self,
         stage_plan: StagePlan,
         *,
-        selected_cron_paths: set[str] | None = None,
+        selected_cron_paths: Optional[set[str]] = None,
     ) -> StagePlan:
         return cron_units.augment_stage_plan_with_selected_cron_jobs(
             stage_plan,
@@ -147,7 +142,7 @@ class OpenClawTarget:
             openclaw_root=OPENCLAW_ROOT,
         )
 
-    def resolve_workspace_reference(self, workspace_name: str) -> Path | None:
+    def resolve_workspace_reference(self, workspace_name: str) -> Optional[Path]:
         try:
             return workspace_paths.resolve_openclaw_workspace_runtime_dir(
                 workspace_name,
@@ -189,7 +184,7 @@ class OpenClawTarget:
     def looks_like_plugin_related_path(self, display_path: str) -> bool:
         return bool(extract_openclaw_plugin_display_path(display_path))
 
-    def primary_instruction_doc(self, unit_path: Path, unit_type: str) -> Path | None:
+    def primary_instruction_doc(self, unit_path: Path, unit_type: str) -> Optional[Path]:
         if unit_type != "openclaw_plugin":
             return None
         for filename in ("README.md", "openclaw.plugin.json", "package.json"):
@@ -202,18 +197,10 @@ class OpenClawTarget:
         self,
         unit_path: Path,
         display_path: str,
-    ) -> tuple[str | None, str, bool]:
+    ) -> tuple[Optional[str], str, bool]:
         if not self.allows_bundle_units():
             return classify_basic_selectable_directory(unit_path, display_path)
         return classify_openclaw_directory_unit(unit_path, display_path)
-
-    def classify_selectable_file(
-        self,
-        display_path: str,
-    ) -> tuple[str | None, str]:
-        if not self.allows_bundle_units():
-            return classify_basic_selectable_file(display_path)
-        return classify_openclaw_file_unit(display_path)
 
     def owning_selectable_paths(self, display_path: str) -> tuple[str, ...]:
         if not self.allows_bundle_units():
@@ -222,7 +209,7 @@ class OpenClawTarget:
 
     def infer_unit_type_from_path(self, display_path: str) -> str:
         if not self.allows_bundle_units():
-            return unit_type_from_path(display_path, allow_bundle_units=False)
+            return "skill" if extract_skill_dir_display_path(display_path) else "unknown"
         return infer_openclaw_unit_type_from_path(display_path)
 
     def discovery_skill_precedence(self) -> tuple[str, ...]:
@@ -243,7 +230,13 @@ class OpenClawTarget:
         self,
         runtime_dir: str,
     ) -> StagePlan:
-        plan = build_stage_plan(runtime_dir)
+        plan = build_openclaw_stage_plan(
+            runtime_dir,
+            openclaw_root=OPENCLAW_ROOT,
+            agents_skills_root=AGENTS_SKILLS_ROOT,
+            stage_root_files=OPENCLAW_STAGE_ROOT_FILES,
+            extensions_dirname=OPENCLAW_EXTENSIONS_DIRNAME,
+        )
         return StagePlan(
             tree_sources=plan.tree_sources,
             file_sources=plan.file_sources,
@@ -261,7 +254,7 @@ class OpenClawTarget:
         stage_plan: StagePlan,
         *,
         agent_type: str = "",
-        workspace_documents_manifest_payload: dict | None = None,
+        workspace_documents_manifest_payload: Optional[dict] = None,
     ) -> dict:
         return finalize_openclaw_packaging(
             staging_root,
@@ -273,7 +266,7 @@ class OpenClawTarget:
     def sync_confirmed_skill_entries(
         self,
         staging_root: Path,
-        selection_runtime_validation: dict | None,
+        selection_runtime_validation: Optional[dict],
     ) -> dict[str, int]:
         return sync_confirmed_skill_entries(
             staging_root,
@@ -281,7 +274,7 @@ class OpenClawTarget:
         )
 
     def collect_runtime_environment_fields(self) -> dict:
-        payload = collect_runtime_environment_fields()
+        payload = collect_openclaw_runtime_environment_fields()
         payload["openclaw_runtime_generation"] = self.generation
         payload["openclaw_config_mode"] = OPENCLAW_CONFIG_MODE_OVERLAY_MERGE
         return payload
@@ -290,14 +283,11 @@ class OpenClawTarget:
         self,
         runtime_root: Path,
         *,
-        expected_version: str | None = None,
+        expected_version: Optional[str] = None,
     ) -> dict:
         from packaging.ship.artifacts.runtimes.env_validate import validate_env_runtime
 
-        validate_profile = {
-            **self.profile,
-            **_OPENCLAW_VALIDATE_PROFILE_PATCH,
-        }
+        validate_profile = _merged_validate_profile(self.profile)
         return validate_env_runtime(
             validate_profile,
             runtime_root,
@@ -308,7 +298,6 @@ class OpenClawTarget:
 
 LEGACY_TARGET = OpenClawTarget(OPENCLAW_LEGACY_TARGET)
 MODERN_TARGET = OpenClawTarget(OPENCLAW_MODERN_TARGET)
-TARGET = MODERN_TARGET
 
 
 __all__ = [
@@ -319,7 +308,4 @@ __all__ = [
     "OPENCLAW_ROOT",
     "OPENCLAW_STAGE_ROOT_FILES",
     "OpenClawTarget",
-    "TARGET",
-    "build_stage_plan",
-    "collect_runtime_environment_fields",
 ]

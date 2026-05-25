@@ -7,15 +7,16 @@ from packaging.configure.contracts import PlanField, SourceKind, UrlProxyPair
 from packaging.configure.runtimes.codex.auth import CODEX_AUTH_PROVIDER_NAME
 from packaging.configure.runtimes.codex.provider_config import (
     disable_requires_openai_auth,
+    ensure_model_provider,
     ensure_provider_section,
     provider_name_from_codex_section,
     provider_name_from_pair_group,
     remove_top_level_toml_key,
 )
+from packaging.configure.runtimes.codex.url_proxy_pairs import CODEX_CONTRACT_ID
 
 
 _ENV_KEY_PATTERN = re.compile(r"^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.*)$")
-_CODEX_REWRITE_CONTRACT_IDS = frozenset({"codex"})
 
 
 def handle_codex_rewrite_field(staging_root: Path, plan_field: PlanField, pair: UrlProxyPair) -> bool:
@@ -32,7 +33,7 @@ def _maybe_materialize_env_key(
     plan_field: PlanField,
     pair: UrlProxyPair,
 ) -> bool:
-    if pair.contract_id not in _CODEX_REWRITE_CONTRACT_IDS:
+    if pair.contract_id != CODEX_CONTRACT_ID:
         return False
     if plan_field != pair.key:
         return False
@@ -49,8 +50,17 @@ def _maybe_materialize_env_key(
 
 
 def finalize_codex_rewrites(staging_root: Path, pairs: list[UrlProxyPair]) -> None:
-    if any(pair.contract_id in _CODEX_REWRITE_CONTRACT_IDS for pair in pairs):
-        disable_requires_openai_auth(staging_root)
+    codex_pairs = [pair for pair in pairs if pair.contract_id == CODEX_CONTRACT_ID]
+    if not codex_pairs:
+        return
+    for pair in codex_pairs:
+        if provider_name_from_pair_group(pair.group) == CODEX_AUTH_PROVIDER_NAME:
+            ensure_model_provider(
+                staging_root / ".codex" / "config.toml",
+                provider=CODEX_AUTH_PROVIDER_NAME,
+            )
+            break
+    disable_requires_openai_auth(staging_root)
 
 
 def _maybe_rehome_top_level_openai_base_url(
@@ -58,7 +68,7 @@ def _maybe_rehome_top_level_openai_base_url(
     plan_field: PlanField,
     pair: UrlProxyPair,
 ) -> bool:
-    if pair.contract_id not in _CODEX_REWRITE_CONTRACT_IDS:
+    if pair.contract_id != CODEX_CONTRACT_ID:
         return False
     if plan_field.field != "openai_base_url":
         return False
@@ -85,7 +95,7 @@ def _maybe_materialize_process_env_base_url(
     plan_field: PlanField,
     pair: UrlProxyPair,
 ) -> bool:
-    if pair.contract_id not in _CODEX_REWRITE_CONTRACT_IDS:
+    if pair.contract_id != CODEX_CONTRACT_ID:
         return False
     if plan_field != pair.url:
         return False
@@ -110,7 +120,7 @@ def _maybe_synthesize_provider_field(
     plan_field: PlanField,
     pair: UrlProxyPair,
 ) -> bool:
-    if pair.contract_id not in _CODEX_REWRITE_CONTRACT_IDS:
+    if pair.contract_id != CODEX_CONTRACT_ID:
         return False
     if plan_field.source_kind != SourceKind.SYNTHESIZED:
         return False

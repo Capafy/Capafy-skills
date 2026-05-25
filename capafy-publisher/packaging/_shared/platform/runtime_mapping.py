@@ -8,15 +8,10 @@ from packaging._shared.contracts.bundle_context import VALID_AGENT_TYPES
 PACKAGE_REPORT_ALLOWED_STATUSES = {0, 2}
 
 _DOCUMENTED_AGENT_RUNTIME_BY_ENV_ID = {
-    "claude": "claude",
     "claude_code": "claude",
     "codex": "codex",
     "openclaw": "openclaw",
 }
-_DOCUMENTED_AGENT_RUNTIME_VARIANT_PREFIXES = (
-    ("codex_", "codex"),
-    ("openclaw_", "openclaw"),
-)
 _ENV_ID_BY_DOCUMENTED_AGENT_RUNTIME = {
     "claude": "claude_code",
     "claude_code": "claude_code",
@@ -33,9 +28,6 @@ def documented_agent_runtime_from_values(*values: object) -> str:
         runtime = _DOCUMENTED_AGENT_RUNTIME_BY_ENV_ID.get(candidate)
         if runtime:
             return runtime
-        for prefix, family in _DOCUMENTED_AGENT_RUNTIME_VARIANT_PREFIXES:
-            if candidate.startswith(prefix):
-                return family
     return ""
 
 
@@ -46,9 +38,6 @@ def env_id_from_agent_runtime(agent_runtime: object) -> str:
     env_id = _ENV_ID_BY_DOCUMENTED_AGENT_RUNTIME.get(runtime)
     if env_id:
         return env_id
-    for prefix, family in _DOCUMENTED_AGENT_RUNTIME_VARIANT_PREFIXES:
-        if runtime.startswith(prefix):
-            return family
     return ""
 
 
@@ -61,7 +50,7 @@ def normalize_agent_type(agent_type: object) -> str:
     return normalized
 
 
-def _normalize_int(value: object) -> int | None:
+def _normalize_int(value: object) -> Optional[int]:
     if isinstance(value, bool):
         return int(value)
     if isinstance(value, int):

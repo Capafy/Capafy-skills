@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 
 
@@ -35,7 +35,7 @@ def pick_domain(domains: Iterable[str], service: str, default_url: str) -> str:
     return domain_list[0]
 
 
-def append_candidate(candidates: list[dict], candidate: dict | None) -> None:
+def append_candidate(candidates: list[dict], candidate: Optional[dict]) -> None:
     if candidate is not None:
         candidates.append(candidate)
 

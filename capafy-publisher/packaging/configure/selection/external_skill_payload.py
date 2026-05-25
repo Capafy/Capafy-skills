@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import PurePosixPath
@@ -8,7 +9,7 @@ from packaging._shared.contracts.selectable import validate_logical_path
 
 def load_external_skill_sources_payload(
     *,
-    skills_plan_json: str | None,
+    skills_plan_json: Optional[str],
 ) -> list[dict]:
     if not skills_plan_json:
         return []

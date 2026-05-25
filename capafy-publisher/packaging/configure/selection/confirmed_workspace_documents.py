@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from dataclasses import dataclass
@@ -21,9 +22,7 @@ from .confirmed_payload import (
 )
 from .confirmed_resolution import (
     packaged_path_for_entry,
-    preserved_logical_root_prefixes,
     resolve_logical_source_path,
-    target_relative_packaged_path,
 )
 from .support import resolve_workspace_root
 
@@ -37,44 +36,6 @@ class ConfirmedWorkspaceDocumentEntry:
     source_kind: str
 
 
-def _resolve_logical_source_path(
-    logical_path: str,
-    *,
-    workspace_root: Path | None,
-    target_name: str | None,
-) -> Path:
-    return resolve_logical_source_path(
-        logical_path,
-        workspace_root=workspace_root,
-        target_name=target_name,
-    )
-
-
-def _target_relative_packaged_path(logical_path: str, *, target_name: str | None) -> tuple[str, bool]:
-    return target_relative_packaged_path(logical_path, target_name=target_name)
-
-
-def _preserved_logical_root_prefixes(*, target_name: str | None) -> set[str]:
-    return preserved_logical_root_prefixes(target_name=target_name)
-
-
-def _packaged_path_for_entry(
-    logical_path: str,
-    source_path: Path,
-    *,
-    target_name: str | None,
-    agent_type: str,
-    used_paths: set[str],
-) -> str:
-    return packaged_path_for_entry(
-        logical_path,
-        source_path,
-        target_name=target_name,
-        agent_type=agent_type,
-        used_paths=used_paths,
-    )
-
-
 def _entry_source_kind(source_path: Path, logical_path: str) -> str:
     if source_path.is_dir():
         return "directory"
@@ -86,8 +47,8 @@ def _entry_source_kind(source_path: Path, logical_path: str) -> str:
 def normalize_confirmed_workspace_document_entries(
     payload: dict,
     *,
-    target_name: str | None,
-    workspace: str | None,
+    target_name: Optional[str],
+    workspace: Optional[str],
     agent_type: str,
 ) -> dict[str, list[ConfirmedWorkspaceDocumentEntry]]:
     normalized_payload = normalize_payload_categories(payload)
@@ -108,7 +69,7 @@ def normalize_confirmed_workspace_document_entries(
             logical_path = normalize_text(raw_item.get("path") if isinstance(raw_item, dict) else raw_item)
             if not logical_path or logical_path in excluded_paths:
                 continue
-            source_path = _resolve_logical_source_path(
+            source_path = resolve_logical_source_path(
                 logical_path,
                 workspace_root=workspace_root,
                 target_name=target_name,
@@ -118,7 +79,7 @@ def normalize_confirmed_workspace_document_entries(
                 text, _encoding = read_text(source_path)
                 if text is not None and not text.strip():
                     continue
-            packaged_path = _packaged_path_for_entry(
+            packaged_path = packaged_path_for_entry(
                 logical_path,
                 source_path,
                 target_name=target_name,
@@ -140,7 +101,7 @@ def normalize_confirmed_workspace_document_entries(
         if not logical_path:
             continue
         try:
-            source_path = _resolve_logical_source_path(
+            source_path = resolve_logical_source_path(
                 logical_path,
                 workspace_root=workspace_root,
                 target_name=target_name,
@@ -165,11 +126,11 @@ def normalize_confirmed_workspace_document_entries(
 
 def build_confirmed_workspace_document_stage_additions(
     *,
-    skills_plan_json: str | None,
-    target_name: str | None,
-    workspace: str | None,
+    skills_plan_json: Optional[str],
+    target_name: Optional[str],
+    workspace: Optional[str],
     agent_type: str,
-) -> tuple[list[StageTreeSource], list[StageFileSource], dict | None]:
+) -> tuple[list[StageTreeSource], list[StageFileSource], Optional[dict]]:
     if agent_type == "download":
         return [], [], None
 
@@ -213,7 +174,7 @@ def build_confirmed_workspace_document_stage_additions(
     return tree_sources, file_sources, manifest_payload
 
 
-def write_confirmed_workspace_documents_manifest(staging_root: Path, payload: dict | None) -> Path | None:
+def write_confirmed_workspace_documents_manifest(staging_root: Path, payload: Optional[dict]) -> Optional[Path]:
     if not payload:
         return None
     output_path = staging_root / WORKSPACE_DOCUMENTS_MANIFEST_NAME

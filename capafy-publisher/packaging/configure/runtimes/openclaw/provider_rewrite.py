@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -6,13 +7,19 @@ from pathlib import Path
 from packaging._shared.openclaw.official_providers import (
     OpenClawOfficialProviderSpec,
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
+    find_openclaw_official_provider_by_marker,
     match_openclaw_builtin_model_provider,
 )
+from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.runtimes.openclaw.provider_keys import (
     collect_provider_api_key_items,
     is_env_reference,
     real_value,
     resolve_api_key_config_value,
+)
+from packaging.configure.runtimes.openclaw.provider_usage import (
+    openclaw_model_id_from_entry,
+    path_likely_contains_openclaw_model_ref,
 )
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 from packaging.configure.sensitive.placeholders import build_placeholder
@@ -40,10 +47,6 @@ _DEFAULT_MODEL_TEMPLATE = {
 }
 
 
-def _match_builtin_provider_spec(model_ref: str) -> tuple[OpenClawOfficialProviderSpec, str] | None:
-    return match_openclaw_builtin_model_provider(model_ref)
-
-
 def _official_provider_placeholder(
     spec: OpenClawOfficialProviderSpec,
     provider_name: str,
@@ -61,7 +64,7 @@ def _official_provider_placeholder(
     )
 
 
-def _discover_model_template(payload: dict[str, object]) -> dict[str, object] | None:
+def _discover_model_template(payload: dict[str, object]) -> Optional[dict[str, object]]:
     models = payload.get("models")
     if not isinstance(models, dict):
         return None
@@ -80,7 +83,7 @@ def _discover_model_template(payload: dict[str, object]) -> dict[str, object] | 
     return None
 
 
-def _build_model_entry(model_name: str, template: dict[str, object] | None) -> dict[str, object]:
+def _build_model_entry(model_name: str, template: Optional[dict[str, object]]) -> dict[str, object]:
     entry_template = clone_json_value(template) if isinstance(template, dict) else clone_json_value(_DEFAULT_MODEL_TEMPLATE)
     if not isinstance(entry_template, dict):
         entry_template = clone_json_value(_DEFAULT_MODEL_TEMPLATE)
@@ -98,6 +101,10 @@ def _provider_name_for_spec(
     if family in assigned_names:
         return assigned_names[family]
 
+    if isinstance(providers.get(spec.provider_name), dict):
+        assigned_names[family] = spec.provider_name
+        return spec.provider_name
+
     candidate = spec.provider_name
     suffix = 2
     while True:
@@ -110,6 +117,104 @@ def _provider_name_for_spec(
             return candidate
         candidate = f"{spec.provider_name}_{suffix}"
         suffix += 1
+
+
+def _provider_alias_matches_spec(provider_name: str, payload: dict[str, object]) -> Optional[OpenClawOfficialProviderSpec]:
+    spec = find_openclaw_official_provider_by_marker(provider_name)
+    if spec is None:
+        return None
+    api = str(payload.get("api", "") or "").strip()
+    if api and api != spec.api:
+        return None
+    return spec
+
+
+def _merge_provider_models(target: dict[str, object], source: dict[str, object]) -> bool:
+    source_models = source.get("models")
+    if not isinstance(source_models, list):
+        return False
+    target_models = target.get("models")
+    if not isinstance(target_models, list):
+        target_models = []
+        target["models"] = target_models
+    seen = {
+        key
+        for key in (openclaw_model_id_from_entry(item) for item in target_models)
+        if key
+    }
+    changed = False
+    for item in source_models:
+        key = openclaw_model_id_from_entry(item)
+        if key and key in seen:
+            continue
+        target_models.append(clone_json_value(item))
+        if key:
+            seen.add(key)
+        changed = True
+    return changed
+
+
+def _merge_official_provider_alias(
+    target: dict[str, object],
+    source: dict[str, object],
+    spec: OpenClawOfficialProviderSpec,
+) -> bool:
+    changed = False
+    for key, value in source.items():
+        if key in {"api", "apiKey", "baseUrl", "models"}:
+            continue
+        if key not in target:
+            target[key] = clone_json_value(value)
+            changed = True
+
+    source_key = str(source.get("apiKey", "") or "").strip()
+    target_key = str(target.get("apiKey", "") or "").strip()
+    if source_key and (not target_key or looks_like_platform_managed_placeholder_value(target_key)):
+        target["apiKey"] = source_key
+        changed = True
+
+    source_url = str(source.get("baseUrl", "") or "").strip()
+    target_url = str(target.get("baseUrl", "") or "").strip()
+    if source_url and (
+        not target_url
+        or looks_like_platform_managed_placeholder_value(target_url)
+        or not normalize_http_url_candidate(target_url)
+    ):
+        target["baseUrl"] = source_url
+        changed = True
+
+    changed = _merge_provider_models(target, source) or changed
+    if target.get("api") != spec.api:
+        target["api"] = spec.api
+        changed = True
+    return changed
+
+
+def _canonicalize_official_provider_aliases(providers: dict[str, object]) -> int:
+    rewrites = 0
+    for provider_name in list(providers):
+        provider = providers.get(provider_name)
+        if not isinstance(provider, dict):
+            continue
+        spec = _provider_alias_matches_spec(provider_name, provider)
+        if spec is None:
+            continue
+
+        canonical_name = spec.provider_name
+        canonical_provider = providers.get(canonical_name)
+        if not isinstance(canonical_provider, dict):
+            providers[canonical_name] = provider
+            providers.pop(provider_name, None)
+            if provider.get("api") != spec.api:
+                provider["api"] = spec.api
+            rewrites += 1
+            continue
+
+        if _merge_official_provider_alias(canonical_provider, provider, spec):
+            rewrites += 1
+        providers.pop(provider_name, None)
+        rewrites += 1
+    return rewrites
 
 
 def _provider_payload_matches_spec(
@@ -146,20 +251,13 @@ def _provider_payload_matches_spec(
     return key_matches and url_matches
 
 
-def _path_likely_contains_model_ref(path_parts: tuple[str, ...]) -> bool:
-    lowered = [part.lower() for part in path_parts]
-    if "memorysearch" in lowered:
-        return False
-    return any("model" in part or "fallback" in part for part in lowered)
-
-
 def _ensure_provider_payload(
     providers: dict[str, object],
     provider_name: str,
     *,
     spec: OpenClawOfficialProviderSpec,
     model_name: str,
-    model_template: dict[str, object] | None,
+    model_template: Optional[dict[str, object]],
 ) -> None:
     provider_payload = providers.get(provider_name)
     if not isinstance(provider_payload, dict):
@@ -167,13 +265,21 @@ def _ensure_provider_payload(
         providers[provider_name] = provider_payload
 
     provider_payload["api"] = spec.api
-    provider_payload["apiKey"] = _official_provider_placeholder(spec, provider_name, field="apiKey")
-    provider_payload["baseUrl"] = _official_provider_placeholder(
-        spec,
-        provider_name,
-        field="baseUrl",
-        value_type="url",
-    )
+    api_key = str(provider_payload.get("apiKey", "") or "").strip()
+    if not api_key or looks_like_platform_managed_placeholder_value(api_key):
+        provider_payload["apiKey"] = _official_provider_placeholder(spec, provider_name, field="apiKey")
+    base_url = str(provider_payload.get("baseUrl", "") or "").strip()
+    if (
+        not base_url
+        or looks_like_platform_managed_placeholder_value(base_url)
+        or not normalize_http_url_candidate(base_url)
+    ):
+        provider_payload["baseUrl"] = _official_provider_placeholder(
+            spec,
+            provider_name,
+            field="baseUrl",
+            value_type="url",
+        )
 
     model_entries = provider_payload.get("models")
     if not isinstance(model_entries, list):
@@ -197,16 +303,6 @@ def _openclaw_config_env(payload: dict[str, object]) -> dict[str, str]:
     return result
 
 
-def _official_provider_env_item(
-    spec: OpenClawOfficialProviderSpec,
-    config_env: dict[str, str],
-) -> dict[str, object] | None:
-    key_items = collect_provider_api_key_items(spec, config_env)
-    if not key_items:
-        return None
-    return key_items[0]
-
-
 def _provider_has_inline_api_key(provider: dict[str, object]) -> bool:
     api_key = str(provider.get("apiKey", "") or "").strip()
     if not api_key:
@@ -228,7 +324,8 @@ def _materialize_official_provider_env_keys(
             continue
         if str(provider.get("api", "") or "").strip() != spec.api:
             continue
-        env_item = _official_provider_env_item(spec, config_env)
+        key_items = collect_provider_api_key_items(spec, config_env)
+        env_item = key_items[0] if key_items else None
         env_key = str(env_item.get("value", "") or "").strip() if env_item else ""
         if not env_key or _provider_has_inline_api_key(provider):
             continue
@@ -310,9 +407,9 @@ def _builtin_model_env_names(
         for index, value in enumerate(node):
             names.update(_builtin_model_env_names(value, path_parts=(*path_parts, str(index))))
         return names
-    if not isinstance(node, str) or not _path_likely_contains_model_ref(path_parts):
+    if not isinstance(node, str) or not path_likely_contains_openclaw_model_ref(path_parts):
         return set()
-    matched = _match_builtin_provider_spec(node)
+    matched = match_openclaw_builtin_model_provider(node)
     if matched is None:
         return set()
     spec, _model_name = matched
@@ -382,7 +479,7 @@ def _rewrite_builtin_model_refs(
     path_parts: tuple[str, ...],
     providers: dict[str, object],
     assigned_names: dict[str, str],
-    model_template: dict[str, object] | None,
+    model_template: Optional[dict[str, object]],
 ) -> tuple[object, int]:
     if isinstance(node, dict):
         updated: dict[str, object] = {}
@@ -414,10 +511,10 @@ def _rewrite_builtin_model_refs(
             rewrites += next_rewrites
         return updated_items, rewrites
 
-    if not isinstance(node, str) or not _path_likely_contains_model_ref(path_parts):
+    if not isinstance(node, str) or not path_likely_contains_openclaw_model_ref(path_parts):
         return node, 0
 
-    matched = _match_builtin_provider_spec(node)
+    matched = match_openclaw_builtin_model_provider(node)
     if matched is None:
         return node, 0
     spec, model_name = matched
@@ -442,7 +539,7 @@ def _rewrite_builtin_model_refs(
 def rewrite_openclaw_builtin_models_as_explicit_providers(
     config_text: str,
     *,
-    dotenv_env: dict[str, str] | None = None,
+    dotenv_env: Optional[dict[str, str]] = None,
 ) -> tuple[str, int]:
     try:
         payload = json.loads(config_text)
@@ -460,6 +557,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     if not isinstance(providers, dict):
         providers = {}
         models["providers"] = providers
+    alias_rewrites = _canonicalize_official_provider_aliases(providers)
     config_env = dict(dotenv_env or {})
     config_env.update(_openclaw_config_env(payload))
 
@@ -475,17 +573,18 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     provider_ref_rewrites, provider_ref_consumed_env_names = _materialize_provider_env_references(providers, config_env)
     consumed_env_names.update(provider_ref_consumed_env_names)
     provider_key_rewrites = official_key_rewrites + provider_ref_rewrites
-    if provider_key_rewrites:
+    if provider_key_rewrites or alias_rewrites:
         rewritten_payload["models"] = clone_json_value(models)
+    if provider_key_rewrites:
         _drop_consumed_config_env(rewritten_payload, consumed_env_names)
     if rewrite_count <= 0:
-        if provider_key_rewrites <= 0:
+        if provider_key_rewrites + alias_rewrites <= 0:
             return config_text, 0
-        return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", provider_key_rewrites
+        return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", provider_key_rewrites + alias_rewrites
     if not str(models.get("mode", "")).strip():
         models["mode"] = _DEFAULT_MODELS_MODE
     rewritten_payload["models"] = clone_json_value(models)
-    return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", rewrite_count + provider_key_rewrites
+    return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", rewrite_count + provider_key_rewrites + alias_rewrites
 
 
 __all__ = [

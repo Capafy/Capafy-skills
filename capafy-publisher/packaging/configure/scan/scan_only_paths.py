@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, Optional
 
 from packaging.runtimes import get_default_target, get_target
 
@@ -14,8 +14,8 @@ def is_scan_only_source_path(relpath: str) -> bool:
 def is_scan_only_reference_file(
     relpath: str,
     *,
-    target_name: str | None = None,
-    target: Any | None = None,
+    target_name: Optional[str] = None,
+    target: Optional[Any] = None,
 ) -> bool:
     normalized = str(relpath or "").strip().rstrip("/")
     if not normalized:

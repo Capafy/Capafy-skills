@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Any
+from typing import Any, Optional
 
 
 def _build_builtin_runtimes() -> tuple[object, ...]:
@@ -18,7 +18,7 @@ def _build_builtin_runtimes() -> tuple[object, ...]:
 
 class _LazyBuiltinRuntimes(Sequence):
     def __init__(self) -> None:
-        self._cache: tuple[object, ...] | None = None
+        self._cache: Optional[tuple[object, ...]] = None
 
     def _items(self) -> tuple[object, ...]:
         if self._cache is None:

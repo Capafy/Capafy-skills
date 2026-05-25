@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import os
 from pathlib import Path
@@ -9,8 +10,8 @@ from packaging._shared.common.home import current_home_from_env, safe_expanduser
 def _resolve_base_root(
     spec: dict,
     *,
-    home: Path | None = None,
-    runtime_dir: str | None = None,
+    home: Optional[Path] = None,
+    runtime_dir: Optional[str] = None,
 ) -> Path:
     base = str(spec.get("base", "home")).strip() or "home"
     if base == "home":
@@ -30,7 +31,7 @@ def _resolve_base_root(
     raise ValueError(f"unknown path base: {base}")
 
 
-def _resolve_root_override(override: dict) -> Path | None:
+def _resolve_root_override(override: dict) -> Optional[Path]:
     env_name = str(override.get("env", "")).strip()
     if not env_name:
         return None
@@ -47,8 +48,8 @@ def _resolve_root_override(override: dict) -> Path | None:
 def resolve_path_spec(
     spec: dict,
     *,
-    home: Path | None = None,
-    runtime_dir: str | None = None,
+    home: Optional[Path] = None,
+    runtime_dir: Optional[str] = None,
 ) -> Path:
     path_env = str(spec.get("path_env", "")).strip()
     if path_env:

@@ -20,6 +20,7 @@ from packaging.configure.sensitive.literals import (
     looks_like_secret_literal,
     looks_like_url_or_dsn,
 )
+from packaging.configure.scan.secret_context import CONTEXTUAL_KEY_SECRET_MARKERS
 
 from .candidate_annotation import annotate_candidate
 from .structured_scan_policy import (
@@ -33,19 +34,6 @@ from .support import pick_domain
 JSON_STRUCTURED_SCAN_SUFFIXES = {".json", ".jsonc"}
 TOML_STRUCTURED_SCAN_SUFFIXES = {".toml"}
 YAML_STRUCTURED_SCAN_SUFFIXES = {".yaml", ".yml"}
-CONTEXTUAL_KEY_SECRET_MARKERS = {
-    "api",
-    "auth",
-    "credential",
-    "credentials",
-    "proactor",
-    "provider",
-    "providers",
-    "secret",
-    "secrets",
-    "token",
-    "tokens",
-}
 ENV_NAME_LITERAL_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,127}$")
 
 
@@ -53,10 +41,6 @@ def _extract_local_url(text: str, start: int, end: int, service: str, default_ur
     context = text[max(0, start - 800) : min(len(text), end + 800)]
     domains = find_domains(context)
     return pick_domain(domains, service, default_url)
-
-
-def _json_source_detail(path_parts: list[str]) -> str:
-    return ".".join(path_parts)
 
 
 def _service_from_json_path(relpath: str, path_parts: list[str], key: str, value: str) -> str:
@@ -111,7 +95,7 @@ def _collect_leaf_value_candidates(payload: object, relpath: str, text: str) -> 
                 "default_url": metadata_url,
                 "local_url": local_url,
                 "source": relpath,
-                "source_detail": _json_source_detail(path_parts),
+                "source_detail": ".".join(path_parts),
                 "env_name": key if ENV_NAME_LITERAL_PATTERN.fullmatch(key) else None,
             },
             relpath,

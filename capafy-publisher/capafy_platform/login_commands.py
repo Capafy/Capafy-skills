@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from capafy_platform.api import get_account_me_raw
 from capafy_platform.auth import login_init, login_verify
@@ -47,7 +47,7 @@ def _platform_command(handler: Callable[..., dict[str, object]]) -> Callable[...
 def command_platform_login_init(
     email: str,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, object]:
     return login_init(email, base_url=base_url)
 
@@ -57,7 +57,7 @@ def command_platform_login_verify(
     challenge_id: str,
     code: str,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, object]:
     payload = login_verify(challenge_id, code, base_url=base_url)
     payload.update(_persist_agent_access_token(payload))
@@ -68,7 +68,7 @@ def command_platform_login_verify(
 def command_platform_login_token(
     access_token: str,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, object]:
     account_payload = get_account_me_raw(
         access_token=access_token,

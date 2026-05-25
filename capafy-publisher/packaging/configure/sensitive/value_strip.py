@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 from packaging._shared.common.fs import (
     iter_workspace_files,
@@ -33,7 +33,7 @@ def _iter_text_files(root: Path) -> Iterable[tuple[Path, str, str]]:
         yield path, text, encoding
 
 
-def _strip_candidates(key_value: str, extra_candidates: Iterable[str] | None = None) -> list[str]:
+def _strip_candidates(key_value: str, extra_candidates: Optional[Iterable[str]] = None) -> list[str]:
     candidates: list[str] = []
 
     def add(candidate: str) -> None:
@@ -58,7 +58,7 @@ def strip_value_from_staging(
     key_value: str,
     placeholder: str,
     *,
-    extra_candidates: Iterable[str] | None = None,
+    extra_candidates: Optional[Iterable[str]] = None,
     allow_empty_placeholder: bool = False,
 ) -> dict:
     if not placeholder and not allow_empty_placeholder:

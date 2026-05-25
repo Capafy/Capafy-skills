@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass
 import os
@@ -50,7 +51,7 @@ def _is_excluded_prefix(relpath: str, excluded_prefixes: tuple[str, ...]) -> boo
 def collect_final_zip_entries(
     staging_root: Path,
     *,
-    exclude_paths: set[str] | None = None,
+    exclude_paths: Optional[set[str]] = None,
     exclude_prefixes: tuple[str, ...] = (),
 ) -> FinalZipEntries:
     directories: set[str] = set()
@@ -120,7 +121,7 @@ def collect_final_zip_entries(
 def final_zip_staging_file_relpaths(
     staging_root: Path,
     *,
-    exclude_paths: set[str] | None = None,
+    exclude_paths: Optional[set[str]] = None,
     exclude_prefixes: tuple[str, ...] = (),
 ) -> frozenset[str]:
     return collect_final_zip_entries(

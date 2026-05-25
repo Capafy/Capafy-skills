@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Iterable
+from typing import Iterable, Optional
 
 from packaging._shared.contracts.selection_groups import (
     is_selected_selection_group_item,
@@ -39,7 +39,7 @@ def _workspace_document_paths(items: Iterable[object], *, selected: bool) -> fro
     return frozenset(paths)
 
 
-def local_reference_confirmation_from_stage_plan(stage_plan: StagePlan | None) -> LocalReferenceConfirmation:
+def local_reference_confirmation_from_stage_plan(stage_plan: Optional[StagePlan]) -> LocalReferenceConfirmation:
     if stage_plan is None:
         return LocalReferenceConfirmation(False, frozenset(), frozenset())
     metadata = getattr(stage_plan, "metadata", {})
@@ -69,7 +69,7 @@ def _append_variant(variants: set[str], prefix: str, relpath: PurePosixPath) -> 
     variants.add(f"{normalized_prefix.rstrip('/')}/{normalized_relpath}")
 
 
-def _path_relative_to(path: Path, root: Path) -> PurePosixPath | None:
+def _path_relative_to(path: Path, root: Path) -> Optional[PurePosixPath]:
     try:
         relpath = path.expanduser().resolve(strict=False).relative_to(root.expanduser().resolve(strict=False))
     except (OSError, ValueError):
@@ -77,7 +77,7 @@ def _path_relative_to(path: Path, root: Path) -> PurePosixPath | None:
     return PurePosixPath(relpath.as_posix())
 
 
-def _stage_plan_path_variants(source_path: Path, stage_plan: StagePlan | None) -> set[str]:
+def _stage_plan_path_variants(source_path: Path, stage_plan: Optional[StagePlan]) -> set[str]:
     variants: set[str] = set()
     if stage_plan is None:
         return variants
@@ -104,7 +104,7 @@ def _stage_plan_path_variants(source_path: Path, stage_plan: StagePlan | None) -
     return {variant for variant in variants if variant}
 
 
-def _root_path_variants(source_path: Path, stage_plan: StagePlan | None) -> set[str]:
+def _root_path_variants(source_path: Path, stage_plan: Optional[StagePlan]) -> set[str]:
     variants: set[str] = set()
     roots: list[tuple[str, Path]] = [
         (".codex", Path.home() / ".codex"),
@@ -132,12 +132,12 @@ def _root_path_variants(source_path: Path, stage_plan: StagePlan | None) -> set[
     return variants
 
 
-def logical_variants_for_local_reference(source_path: Path, stage_plan: StagePlan | None) -> frozenset[str]:
+def logical_variants_for_local_reference(source_path: Path, stage_plan: Optional[StagePlan]) -> frozenset[str]:
     variants = _stage_plan_path_variants(source_path, stage_plan) | _root_path_variants(source_path, stage_plan)
     return frozenset(variant for variant in variants if variant)
 
 
-def display_path_for_local_reference(source_path: Path, stage_plan: StagePlan | None) -> str:
+def display_path_for_local_reference(source_path: Path, stage_plan: Optional[StagePlan]) -> str:
     preferred_prefixes = (
         ".codex/",
         ".config/",
@@ -162,7 +162,7 @@ def display_path_for_local_reference(source_path: Path, stage_plan: StagePlan | 
         return source_path.expanduser().as_posix()
 
 
-def local_reference_should_be_staged(source_path: Path, stage_plan: StagePlan | None) -> bool:
+def local_reference_should_be_staged(source_path: Path, stage_plan: Optional[StagePlan]) -> bool:
     confirmation = local_reference_confirmation_from_stage_plan(stage_plan)
     if not confirmation.has_explicit_selection_groups:
         return True

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging.configure.contracts import DeepScanFindingsInput, ReviewedScanBuildInput
 from packaging._shared.common.process_env import collect_publish_process_env, url_proxy_os_fallback_names
@@ -16,7 +16,7 @@ def build_cloud_hosted_reviewed_scan(
     env_id: str,
     agent_type: str,
     stage_plan: Any,
-    deep_scan_findings: DeepScanFindingsInput = DeepScanFindingsInput(),
+    deep_scan_findings: Optional[DeepScanFindingsInput] = None,
 ) -> tuple[dict, dict, dict]:
     from packaging.configure.sensitive.deep_scan_findings import deep_scan_findings_to_reviewed_inputs_for_staging
     from packaging.configure.env_var.orchestrator import run_general_scan
@@ -24,8 +24,10 @@ def build_cloud_hosted_reviewed_scan(
     from packaging.configure.sensitive.text_redact import clean_special_files_in_staging
     from packaging.configure.staging.strip.fallback import apply_strip
     from packaging.configure.staging.strip.generic import apply_generic_to_staging
+    from packaging.configure.url_proxy.merge import filter_url_proxy_claimed_reviewed_input
     from packaging.configure.url_proxy.orchestrator import build_url_proxy_phase
 
+    deep_scan_findings = deep_scan_findings or DeepScanFindingsInput()
     process_env = collect_publish_process_env()
     url_proxy_process_env = collect_publish_process_env(
         os_fallback_names=url_proxy_os_fallback_names(env_id),
@@ -81,6 +83,8 @@ def build_cloud_hosted_reviewed_scan(
                 env_vars=tuple([*reviewed_scan_input.env_vars, *finding_env_vars]),
                 excludes=reviewed_scan_input.excludes,
             )
+
+    reviewed_scan_input = filter_url_proxy_claimed_reviewed_input(reviewed_scan_input)
 
     packaged_generic_values = filter_generic_values_for_packaged_sources(
         reviewed_scan_input.generic_values,

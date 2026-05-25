@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 from packaging._shared.common.fs import safe_chmod
 from packaging._shared.contracts.reviewed_scan import is_reviewed_scan_payload
@@ -13,7 +13,7 @@ from packaging._shared.reviewed_scan.digest import compute_scan_digest
 logger = logging.getLogger(__name__)
 
 
-def require_reviewed_scan_payload(payload: dict[str, Any] | object) -> dict[str, Any]:
+def require_reviewed_scan_payload(payload: Union[dict[str, Any], object]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("reviewed_scan_payload must be an object")
     if not is_reviewed_scan_payload(payload):

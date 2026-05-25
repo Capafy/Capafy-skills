@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import logging
 import platform
@@ -22,27 +23,27 @@ logger = logging.getLogger(__name__)
 
 
 def _runtime_candidates(
-    candidates: Mapping[str, Sequence[str]] | None,
+    candidates: Optional[Mapping[str, Sequence[str]]],
 ) -> Mapping[str, Sequence[str]]:
     return SYSTEM_PACKAGE_CANDIDATES if candidates is None else candidates
 
 
 def _runtime_which(
-    which: Callable[[str], str | None] | None,
-) -> Callable[[str], str | None]:
+    which: Optional[Callable[[str], Optional[str]]],
+) -> Callable[[str], Optional[str]]:
     return shutil.which if which is None else which
 
 
-def _runtime_logger(log: logging.Logger | None) -> logging.Logger:
+def _runtime_logger(log: Optional[logging.Logger]) -> logging.Logger:
     return logger if log is None else log
 
 
 def detect_windows_system_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
-    log: logging.Logger | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
+    log: Optional[logging.Logger] = None,
 ) -> dict:
     candidates = _runtime_candidates(candidates)
     which = _runtime_which(which)
@@ -58,9 +59,9 @@ def detect_windows_system_packages(
 
 def detect_linux_system_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> dict:
     candidates = _runtime_candidates(candidates)
     which = _runtime_which(which)
@@ -83,11 +84,11 @@ def detect_linux_system_packages(
 
 def detect_system_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
-    system_name: str | None = None,
-    log: logging.Logger | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
+    system_name: Optional[str] = None,
+    log: Optional[logging.Logger] = None,
 ) -> dict:
     candidates = _runtime_candidates(candidates)
     which = _runtime_which(which)

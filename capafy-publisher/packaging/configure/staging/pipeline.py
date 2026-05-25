@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.contracts.bundle_context import load_bundle_context_from_payload, validate_agent_type
 from packaging.configure.contexts import StageContext
@@ -48,9 +48,9 @@ def _selected_payload_value(
 def run_stage_pipeline(
     staging_root: Path,
     *,
-    runtime_dir: str | None = None,
-    target_name: str | None = None,
-    skills_plan_json: str | None = None,
+    runtime_dir: Optional[str] = None,
+    target_name: Optional[str] = None,
+    skills_plan_json: Optional[str] = None,
 ) -> StageBuildResult:
     target = get_target(target_name) if target_name else get_default_target()
     if staging_root.exists() and any(staging_root.iterdir()):

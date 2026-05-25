@@ -11,25 +11,13 @@ from packaging._shared.common.fs import (
 )
 from packaging._shared.common.packaged_files import should_skip_packaged_relpath
 from packaging.configure.selection.support import (
-    build_unit_metadata,
     classify_selectable_directory,
-    classify_selectable_file,
     finalize_selectable_entry,
 )
+from packaging.configure.selection.unit_metadata import build_unit_metadata
 from packaging._shared.contracts.path_shapes import basic_allowed_skill_root_prefixes
 from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 from packaging._shared.runtimes.contracts import call_optional_target_hook
-
-
-def _allowed_skill_root_prefixes(target, display_prefix: str) -> set[str]:
-    return set(
-        call_optional_target_hook(
-            target,
-            "allowed_skill_root_prefixes",
-            display_prefix,
-            default=basic_allowed_skill_root_prefixes(display_prefix),
-        )
-    )
 
 
 def _skill_root_prefix(path: object) -> str:
@@ -118,7 +106,14 @@ def _iter_tree_source_units(
         return []
 
     display_prefix = str(tree_source.display_prefix).strip().rstrip("/")
-    allowed_skill_roots = _allowed_skill_root_prefixes(target, display_prefix)
+    allowed_skill_roots = set(
+        call_optional_target_hook(
+            target,
+            "allowed_skill_root_prefixes",
+            display_prefix,
+            default=basic_allowed_skill_root_prefixes(display_prefix),
+        )
+    )
     discovery_root = _discovery_root_for_tree_source(tree_source)
     discovered: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -190,54 +185,6 @@ def _iter_tree_source_units(
                 kept_dirs.append(dirname)
 
         dirnames[:] = kept_dirs
-
-        for filename in sorted(filenames):
-            source_file = current_path / filename
-            relpath = display_stage_path(current_relpath, filename)
-            display_path = display_stage_path(display_prefix, relpath)
-            skill_root_path = _skill_root_prefix(display_path)
-            selectable_path, unit_type = classify_selectable_file(
-                target,
-                display_path,
-            )
-
-            if looks_like_absolute_symlink(source_file):
-                if selectable_path == display_path and source_file.exists():
-                    _append_discovered_entry(
-                        discovered,
-                        seen,
-                        unit_path=source_file,
-                        display_path=display_path,
-                        display_prefix=display_prefix,
-                        discovery_root=discovery_root,
-                        unit_type=unit_type,
-                        target=target,
-                    )
-                continue
-
-            if should_skip_packaged_relpath(
-                relpath,
-                is_dir=False,
-                skip_skill_runtime_outputs=tree_source.skip_skill_runtime_outputs,
-                skill_runtime_prefixes=tree_source.skill_runtime_prefixes,
-                excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
-            ):
-                continue
-
-            if allowed_skill_roots and skill_root_path and skill_root_path not in allowed_skill_roots:
-                continue
-
-            if selectable_path == display_path:
-                _append_discovered_entry(
-                    discovered,
-                    seen,
-                    unit_path=source_file,
-                    display_path=display_path,
-                    display_prefix=display_prefix,
-                    discovery_root=discovery_root,
-                    unit_type=unit_type,
-                    target=target,
-                )
 
     return discovered
 

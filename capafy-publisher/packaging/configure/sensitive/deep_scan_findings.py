@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from pathlib import Path
@@ -36,6 +37,8 @@ def _load_generic_findings(payload: object) -> tuple[DeepScanFinding, ...]:
         source = str(item.get("source", "") or "").strip()
         if not value or not source:
             continue
+        if looks_like_platform_managed_placeholder_value(value):
+            continue
         field = str(item.get("field", "") or "").strip()
         value_type = str(item.get("value_type", "") or "").strip() or "value"
         findings.append(
@@ -63,6 +66,8 @@ def _load_env_var_findings(payload: object) -> tuple[EnvVar, ...]:
         field = str(item.get("field", "") or "").strip()
         if not value or not field:
             raise ValueError(f"deep_scan_findings.env_var[{index}] must include non-empty value and field")
+        if looks_like_platform_managed_placeholder_value(value):
+            continue
         if not _ENV_NAME_PATTERN.fullmatch(field):
             raise ValueError(f"deep_scan_findings.env_var[{index}].field must be a valid env var name")
         value_type = str(item.get("value_type", "") or "").strip() or infer_managed_value_type(field, value)
@@ -94,7 +99,7 @@ def load_deep_scan_findings(payload: object) -> DeepScanFindingsInput:
     return DeepScanFindingsInput(generic=generic, env_var=env_var)
 
 
-def load_deep_scan_findings_json(raw_json: str | None) -> DeepScanFindingsInput:
+def load_deep_scan_findings_json(raw_json: Optional[str]) -> DeepScanFindingsInput:
     if raw_json is None or not str(raw_json).strip():
         return DeepScanFindingsInput()
     import json
@@ -106,7 +111,7 @@ def load_deep_scan_findings_json(raw_json: str | None) -> DeepScanFindingsInput:
     return load_deep_scan_findings(payload)
 
 
-def load_deep_scan_findings_file(path: str | None) -> DeepScanFindingsInput:
+def load_deep_scan_findings_file(path: Optional[str]) -> DeepScanFindingsInput:
     if not path:
         return DeepScanFindingsInput()
     findings_path = Path(path).expanduser()

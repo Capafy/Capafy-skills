@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -26,7 +27,7 @@ def postprocess_stage(
     stage_plan: StagePlan,
     *,
     agent_type: str = "",
-    workspace_documents_manifest_payload: dict | None = None,
+    workspace_documents_manifest_payload: Optional[dict] = None,
 ) -> dict[str, int]:
     openclaw_config = staging_root / ".openclaw" / "openclaw.json"
     redactions = 0
@@ -94,7 +95,7 @@ def postprocess_stage(
 
 def sync_confirmed_skill_entries(
     staging_root: Path,
-    selection_runtime_validation: dict | None,
+    selection_runtime_validation: Optional[dict],
 ) -> dict[str, int]:
     if not isinstance(selection_runtime_validation, dict):
         return {
@@ -182,7 +183,7 @@ def sync_confirmed_skill_entries(
     }
 
 
-def collect_runtime_environment_fields() -> dict[str, str | None]:
+def collect_runtime_environment_fields() -> dict[str, Optional[str]]:
     return {
         "openclaw_version": collect_optional_command_first_line(["openclaw", "--version"]),
     }

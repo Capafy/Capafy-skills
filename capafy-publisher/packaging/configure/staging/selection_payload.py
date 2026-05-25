@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 
@@ -122,8 +123,8 @@ def selected_cron_paths_from_payload(
 
 def load_skills_plan_payload(
     *,
-    skills_plan_json: str | None = None,
-) -> object | None:
+    skills_plan_json: Optional[str] = None,
+) -> Optional[object]:
     if not skills_plan_json:
         return None
     try:

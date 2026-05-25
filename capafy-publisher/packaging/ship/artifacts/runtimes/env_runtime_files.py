@@ -52,16 +52,7 @@ def collect_required_runtime_paths(profile: dict) -> list[str]:
     return required
 
 
-def _infer_validation_kind(path: str, strategy: str) -> str:
-    if strategy in {"json_local_config", "json_stage_config"}:
-        return "json"
-    if strategy in {"toml_local_config", "toml_stage_config"}:
-        return "toml"
-    if strategy == "env_file":
-        return "env"
-    if strategy == "markdown_instruction":
-        return "text"
-
+def _infer_validation_kind(path: str) -> str:
     pure = PurePosixPath(path)
     lowered = pure.name.lower()
     if pure.suffix.lower() == ".json":
@@ -123,7 +114,7 @@ def _validate_env_text(text: str) -> list[str]:
 
 def validate_target_file(runtime_root: Path, target: dict[str, str]) -> tuple[bool, str]:
     path = runtime_root / target["path"]
-    kind = _infer_validation_kind(target["path"], target.get("strategy", ""))
+    kind = _infer_validation_kind(target["path"])
     text = path.read_text(encoding="utf-8")
 
     if kind == "json":

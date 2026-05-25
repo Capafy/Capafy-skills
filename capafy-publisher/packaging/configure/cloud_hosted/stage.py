@@ -1,7 +1,7 @@
 from __future__ import annotations
+from typing import Optional
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 from packaging._shared.common.fs import record_skip
 from packaging._shared.common.packaged_files import should_skip_packaged_path
@@ -97,7 +97,7 @@ def stage_cloud_hosted(
     sources: dict[str, str] = {}
     scan_only_prefixes: list[str] = []
     scan_only_source_map: dict[str, str] = {}
-    selected_unit_paths: set[str] | None = None
+    selected_unit_paths: Optional[set[str]] = None
     if any(group is not None for group in (selected_skill_paths, selected_plugin_paths, selected_cron_paths)):
 
         selected_unit_paths = selected_workflow_unit_paths(

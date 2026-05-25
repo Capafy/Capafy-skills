@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 import logging
@@ -30,9 +31,9 @@ logger = logging.getLogger(__name__)
 
 def collect_npm_global_packages(
     *,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
-    log: logging.Logger | None = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
+    log: Optional[logging.Logger] = None,
 ) -> list[dict[str, str]]:
     which = runtime_which(which)
     run_command = runtime_run_command(run_command)
@@ -61,9 +62,9 @@ def collect_npm_global_packages(
 
 def collect_apt_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "dpkg-query", "apt",
@@ -77,9 +78,9 @@ def collect_apt_packages(
 
 def collect_brew_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "brew", "brew",
@@ -94,9 +95,9 @@ def collect_brew_packages(
 
 def collect_winget_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "winget", "winget",
@@ -114,9 +115,9 @@ def collect_winget_packages(
 
 def collect_choco_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "choco", "choco",
@@ -131,10 +132,10 @@ def collect_choco_packages(
 
 def collect_scoop_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
-    log: logging.Logger | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
+    log: Optional[logging.Logger] = None,
 ) -> list[dict[str, str]]:
     candidates = runtime_candidates(candidates)
     which = runtime_which(which)
@@ -166,9 +167,9 @@ def collect_scoop_packages(
 def collect_rpm_family_packages(
     candidate_key: str,
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "rpm", candidate_key,
@@ -182,13 +183,13 @@ def collect_rpm_family_packages(
 
 def collect_apk_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     run_command = runtime_run_command(run_command)
 
-    def _parse(package_name: str, result: dict) -> str | None:
+    def _parse(package_name: str, result: dict) -> Optional[str]:
         if not result.get("ok"):
             return None
         version_result = run_command(["apk", "info", "-v", package_name], 5)
@@ -213,9 +214,9 @@ def collect_apk_packages(
 
 def collect_pacman_packages(
     *,
-    candidates: Mapping[str, Sequence[str]] | None = None,
-    which: Callable[[str], str | None] | None = None,
-    run_command: Callable[[list[str], int], dict] | None = None,
+    candidates: Optional[Mapping[str, Sequence[str]]] = None,
+    which: Optional[Callable[[str], Optional[str]]] = None,
+    run_command: Optional[Callable[[list[str], int], dict]] = None,
 ) -> list[dict[str, str]]:
     return collect_per_candidate(
         "pacman", "pacman",

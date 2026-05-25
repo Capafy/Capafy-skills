@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from packaging.configure.contracts import FieldLocation, SourceKind
 
@@ -13,7 +13,7 @@ class Candidate:
     value: str
     source_kind: SourceKind
     source_relpath: str
-    location: FieldLocation | None = None
+    location: Optional[FieldLocation] = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 

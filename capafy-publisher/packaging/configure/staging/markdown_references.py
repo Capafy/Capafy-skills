@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from dataclasses import dataclass
@@ -9,7 +10,11 @@ from packaging._shared.common.fs import (
     windows_path_parts as _windows_path_parts,
 )
 from packaging.configure.selection.local_ref_confirmation import local_reference_should_be_staged
-from packaging.configure.staging import markdown_reference_paths as reference_paths
+from packaging.configure.staging.markdown_reference_paths import (
+    looks_like_local_destination,
+    resolve_reference,
+    unwrap_destination,
+)
 from packaging.configure.staging.tree_copy import copy_tree_file
 from packaging._shared.contracts.selectable import is_instruction_doc
 from packaging._shared.contracts.stage_plan import StagePlan
@@ -37,18 +42,6 @@ def _is_markdown_reference_entry(path: Path) -> bool:
     return path.is_file() and is_instruction_doc(path.name)
 
 
-def _unwrap_destination(raw_value: str) -> tuple[str, str, str]:
-    return reference_paths.unwrap_destination(raw_value)
-
-
-def _strip_fragment_and_query(value: str) -> tuple[str, str]:
-    return reference_paths.strip_fragment_and_query(value)
-
-
-def _looks_like_local_destination(value: str) -> bool:
-    return reference_paths.looks_like_local_destination(value)
-
-
 def _iter_reference_candidates(text: str) -> list[_Reference]:
     candidates: list[_Reference] = []
 
@@ -58,7 +51,7 @@ def _iter_reference_candidates(text: str) -> list[_Reference]:
 
     for match in _PLAIN_PATH_PATTERN.finditer(text):
         value = match.group("dest")
-        if not _looks_like_local_destination(value):
+        if not looks_like_local_destination(value):
             continue
         candidates.append(_Reference(match.start("dest"), match.end("dest"), value))
 
@@ -71,50 +64,6 @@ def _iter_reference_candidates(text: str) -> list[_Reference]:
         deduped.append(item)
         occupied.append((item.start, item.end))
     return deduped
-
-
-def _normalize_path_text(value: str) -> str:
-    return reference_paths.normalize_path_text(value)
-
-
-def _current_home_roots() -> list[Path]:
-    return reference_paths.current_home_roots()
-
-
-def _home_alias_texts(home_root: Path) -> list[str]:
-    return reference_paths.home_alias_texts(home_root)
-
-
-def _current_home_aliases() -> list[tuple[str, Path]]:
-    return reference_paths.current_home_aliases()
-
-
-def _current_home_alias_candidates(path_part: str) -> list[Path]:
-    return reference_paths.current_home_alias_candidates(path_part, home_aliases=_current_home_aliases)
-
-
-def _dedupe_path_candidates(candidates: list[Path]) -> list[Path]:
-    return reference_paths.dedupe_path_candidates(candidates)
-
-
-def _path_candidates(source_doc: Path, path_part: str) -> list[Path]:
-    return reference_paths.path_candidates(
-        source_doc,
-        path_part,
-        home_aliases=_current_home_aliases,
-        windows_drive_mount_candidates=_windows_drive_mount_candidates,
-        windows_path_parts=_windows_path_parts,
-    )
-
-
-def _resolve_reference(source_doc: Path, raw_value: str) -> tuple[Path, str, str] | None:
-    return reference_paths.resolve_reference(
-        source_doc,
-        raw_value,
-        home_aliases=_current_home_aliases,
-        windows_drive_mount_candidates=_windows_drive_mount_candidates,
-        windows_path_parts=_windows_path_parts,
-    )
 
 
 def _relative_reference(from_doc: Path, target_file: Path) -> str:
@@ -132,7 +81,7 @@ def stage_direct_markdown_file_references(
     source_doc: Path,
     target_doc: Path,
     *,
-    stage_plan: StagePlan | None = None,
+    stage_plan: Optional[StagePlan] = None,
 ) -> int:
     if not _is_markdown_reference_entry(source_doc) or not target_doc.is_file():
         return 0
@@ -145,7 +94,12 @@ def stage_direct_markdown_file_references(
     copied_targets: set[str] = set()
     copied_count = 0
     for reference in _iter_reference_candidates(text):
-        resolved = _resolve_reference(source_doc, reference.value)
+        resolved = resolve_reference(
+            source_doc,
+            reference.value,
+            windows_drive_mount_candidates=_windows_drive_mount_candidates,
+            windows_path_parts=_windows_path_parts,
+        )
         if resolved is None:
             continue
         source_file, relative_source, suffix = resolved
@@ -160,7 +114,7 @@ def stage_direct_markdown_file_references(
             copied_targets.add(target_key)
             copied_count += 1
         relative_target = _relative_reference(target_doc, target_file)
-        leading, _value, trailing = _unwrap_destination(reference.value)
+        leading, _value, trailing = unwrap_destination(reference.value)
         replacement = f"{leading}{relative_target}{suffix}{trailing}"
         replacements.append((reference.start, reference.end, replacement))
 

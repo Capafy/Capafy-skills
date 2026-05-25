@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 from packaging.configure.staging.review import refresh_reviewed_scan_metadata
 from packaging.configure.staging.review_confirmation import reconcile_reviewed_scan_with_platform_confirmation
@@ -48,7 +48,7 @@ def _apply_confirmed_platform_configuration(
     env_id: str,
     agent_type: str,
     reviewed_scan: dict[str, Any],
-    required_credentials_payload: dict[str, Any] | object,
+    required_credentials_payload: Union[dict[str, Any], object],
     developer_work_dir_path: Path,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(reviewed_scan, dict) or not isinstance(required_credentials_payload, dict):
@@ -97,9 +97,9 @@ def prune_cloud_hosted_reviewed_scan(
     agent_type: str,
     reviewed_scan: dict[str, Any],
     staging_root: str = "",
-    required_credentials_payload: dict[str, Any] | object = None,
-    developer_work_dir_path: Path | None = None,
-) -> tuple[ShipPruneResult | dict[str, Any], int]:
+    required_credentials_payload: Union[dict[str, Any], object] = None,
+    developer_work_dir_path: Optional[Path] = None,
+) -> tuple[Union[ShipPruneResult, dict[str, Any]], int]:
     provider_summary: dict[str, Any] = {}
 
 

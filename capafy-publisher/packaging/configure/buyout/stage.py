@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
@@ -16,7 +17,6 @@ from packaging.configure.staging.tree_copy import copy_tree
 from packaging._shared.contracts.bundle_context import write_bundle_context
 from packaging._shared.contracts.stage_manifest import write_stage_manifest
 from packaging.configure.staging.review import compute_scan_only_digest, compute_staging_digest
-from packaging._shared.contracts.path_shapes import unit_type_from_path
 from packaging._shared.contracts.selection_groups import (
     is_selected_selection_group_item,
     normalize_documented_selection_groups,
@@ -24,7 +24,7 @@ from packaging._shared.contracts.selection_groups import (
 from packaging._shared.contracts.selectable import candidate_path_for_logical_path
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging.configure.contexts import StageContext
-from packaging._shared.runtimes.contracts import call_optional_target_hook
+from packaging.configure.selection.unit_types import infer_selection_unit_type
 
 
 def _should_skip_buyout_relpath(relpath: str, *, is_dir: bool) -> bool:
@@ -88,15 +88,7 @@ def normalize_selected_units(
         path = str(item.get("path", "")).strip()
         if not path:
             continue
-        unit_type = str(
-            call_optional_target_hook(
-                target,
-                "infer_unit_type_from_path",
-                path,
-                default=unit_type_from_path(path, allow_bundle_units=True),
-            )
-            or ""
-        ).strip()
+        unit_type = infer_selection_unit_type(path, target=target)
         normalized_units.append(
             {
                 "name": str(item.get("name", "")).strip() or PurePosixPath(path).name,
@@ -120,7 +112,7 @@ def normalize_selected_units(
 
 
 def resolve_unit_source_path(unit_path: str, stage_plan: StagePlan) -> Path:
-    matched_source: tuple[int, Path, str] | None = None
+    matched_source: Optional[tuple[int, Path, str]] = None
     for tree_source in stage_plan.tree_sources:
         candidate = candidate_path_for_logical_path(
             tree_source.source_root.expanduser(),

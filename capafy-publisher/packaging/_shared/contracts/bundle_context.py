@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict
 
 from packaging._shared.policies.path_refs import public_source_path_item
 
@@ -41,8 +41,8 @@ def _load_json_object(raw_text: str, *, label: str) -> dict:
 
 def load_bundle_context_from_payload(
     *,
-    skills_plan_json: str | None = None,
-) -> BundleContext | None:
+    skills_plan_json: Optional[str] = None,
+) -> Optional[BundleContext]:
     if not skills_plan_json:
         return None
     payload = _load_json_object(skills_plan_json, label="skills_plan")
@@ -54,7 +54,7 @@ def load_bundle_context_from_payload(
     return {"selection_groups": selection_groups}
 
 
-def validate_agent_type(agent_type: str | None) -> str:
+def validate_agent_type(agent_type: Optional[str]) -> str:
     normalized = str(agent_type or "").strip()
     if not normalized:
         raise ValueError("agent_type must not be empty")

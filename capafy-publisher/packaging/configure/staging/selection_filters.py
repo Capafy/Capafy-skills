@@ -1,15 +1,12 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import PurePosixPath
 
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
-from packaging._shared.contracts.path_shapes import (
-    basic_owning_plugin_paths,
-    basic_owning_selectable_paths,
-    is_plugin_unit_type,
-    unit_type_from_path,
-)
+from packaging._shared.contracts.path_shapes import is_plugin_unit_type
+from packaging.configure.selection.unit_types import infer_selection_unit_type, owning_selectable_paths
 
 
 def looks_like_plugin_related_display_path(display_path: str, *, target=None) -> bool:
@@ -29,14 +26,7 @@ def _normalized_display_path(display_path: str) -> str:
 
 
 def _selectable_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
-    return tuple(
-        call_optional_target_hook(
-            target,
-            "owning_selectable_paths",
-            display_path,
-            default=basic_owning_selectable_paths(display_path),
-        )
-    )
+    return owning_selectable_paths(display_path, target=target)
 
 
 def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
@@ -45,7 +35,7 @@ def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
             target,
             "owning_plugin_paths",
             display_path,
-            default=basic_owning_plugin_paths(display_path),
+            default=(),
         )
     )
     selectable_paths = tuple(
@@ -61,16 +51,7 @@ def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
     return tuple(
         path
         for path in selectable_paths
-        if is_plugin_unit_type(
-            str(
-                call_optional_target_hook(
-                    target,
-                    "infer_unit_type_from_path",
-                    path,
-                    default=unit_type_from_path(path),
-                )
-            ).strip()
-        )
+        if is_plugin_unit_type(infer_selection_unit_type(path, target=target))
     )
 
 
@@ -79,7 +60,7 @@ def _matches_selected_paths(
     selected_paths: set[str],
     owning_paths: tuple[str, ...],
     *,
-    is_dir: bool | None = None,
+    is_dir: Optional[bool] = None,
     selected_path_filter=None,
     match_descendants_for_files: bool = False,
 ) -> bool:
@@ -104,9 +85,9 @@ def _matches_selected_paths(
 
 def matches_selected_skill_paths(
     display_path: str,
-    selected_skill_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
     *,
-    is_dir: bool | None = None,
+    is_dir: Optional[bool] = None,
     target=None,
 ) -> bool:
     if selected_skill_paths is None:
@@ -121,10 +102,10 @@ def matches_selected_skill_paths(
 
 def matches_selected_plugin_paths(
     display_path: str,
-    selected_plugin_paths: set[str] | None,
+    selected_plugin_paths: Optional[set[str]],
     *,
-    selected_skill_paths: set[str] | None = None,
-    is_dir: bool | None = None,
+    selected_skill_paths: Optional[set[str]] = None,
+    is_dir: Optional[bool] = None,
     target=None,
 ) -> bool:
     if selected_plugin_paths is None:
@@ -155,9 +136,9 @@ def matches_selected_plugin_paths(
 
 def _matches_selected_non_plugin_unit_paths(
     display_path: str,
-    selected_skill_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
     *,
-    is_dir: bool | None = None,
+    is_dir: Optional[bool] = None,
     target=None,
 ) -> bool:
     if not selected_skill_paths:
@@ -172,14 +153,7 @@ def _matches_selected_non_plugin_unit_paths(
 
 
 def _is_non_plugin_unit_path(path: str, *, target=None) -> bool:
-    unit_type = str(
-        call_optional_target_hook(
-            target,
-            "infer_unit_type_from_path",
-            path,
-            default=unit_type_from_path(path),
-        )
-    ).strip()
+    unit_type = infer_selection_unit_type(path, target=target)
     return not is_plugin_unit_type(unit_type)
 
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -15,14 +16,14 @@ from packaging.configure.runtimes.openclaw.workspace_common import (
 )
 
 
-def _cron_job_path_token(job_name: str | None, job_id: str) -> str:
+def _cron_job_path_token(job_name: Optional[str], job_id: str) -> str:
     base = str(job_name or "").strip() or job_id
     sanitized = CRON_PATH_NAME_SANITIZE_PATTERN.sub("-", base)
     sanitized = CRON_PATH_SPACE_PATTERN.sub("-", sanitized).strip("-._ ")
     return sanitized or job_id
 
 
-def build_openclaw_cron_unit_path(job_id: str, *, job_name: str | None = None) -> str:
+def build_openclaw_cron_unit_path(job_id: str, *, job_name: Optional[str] = None) -> str:
     normalized = str(job_id or "").strip()
     if not normalized:
         return ""
@@ -32,7 +33,7 @@ def build_openclaw_cron_unit_path(job_id: str, *, job_name: str | None = None) -
     return f"{OPENCLAW_CRON_UNIT_PREFIX}{token}#{normalized}"
 
 
-def selected_openclaw_cron_ids(selected_paths: set[str] | None) -> set[str]:
+def selected_openclaw_cron_ids(selected_paths: Optional[set[str]]) -> set[str]:
     if not selected_paths:
         return set()
     selected_ids: set[str] = set()
@@ -54,7 +55,7 @@ def _openclaw_cron_file(openclaw_root: Path) -> Path:
     return safe_expanduser_path(openclaw_root / OPENCLAW_CRON_FILE)
 
 
-def _load_openclaw_cron_payload(openclaw_root: Path) -> tuple[Path, dict | None]:
+def _load_openclaw_cron_payload(openclaw_root: Path) -> tuple[Path, Optional[dict]]:
     cron_path = _openclaw_cron_file(openclaw_root)
     if not cron_path.is_file():
         return cron_path, None
@@ -175,7 +176,7 @@ def _with_selected_cron_metadata(metadata: dict[str, object], selected_ids: set[
 def augment_stage_plan_with_selected_cron_jobs(
     stage_plan: StagePlan,
     *,
-    selected_paths: set[str] | None,
+    selected_paths: Optional[set[str]],
     openclaw_root: Path = OPENCLAW_ROOT,
 ) -> StagePlan:
     selected_ids = selected_openclaw_cron_ids(selected_paths)

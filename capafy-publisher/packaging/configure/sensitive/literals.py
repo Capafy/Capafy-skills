@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 
@@ -43,7 +44,7 @@ _PASSWORD_SAMPLE_VALUES = {
 }
 
 
-def extract_secret_value(key: str, value: str) -> str | None:
+def extract_secret_value(key: str, value: str) -> Optional[str]:
     stripped = value.strip()
     if not stripped:
         return None
@@ -251,7 +252,7 @@ def infer_managed_value_type(key: str, value: str) -> str:
     return "value"
 
 
-def extract_assignment_value(key: str, value: str) -> str | None:
+def extract_assignment_value(key: str, value: str) -> Optional[str]:
     normalized_key = normalize_key_name(key)
     stripped = strip_literal_value(value)
     if not stripped or looks_like_placeholder_value(stripped):

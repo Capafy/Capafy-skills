@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Any
+from typing import Any, Optional
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
@@ -16,7 +16,7 @@ PLATFORM_BASE_URL_ENV = "CAPAFY_PLATFORM_BASE_URL"
 PLATFORM_ACCESS_TOKEN_ENV = "CAPAFY_ACCESS_TOKEN"
 EXPLICIT_AUTH_HEADER_KEYS = {"authorization", "x-access-token"}
 SKILL_VERSION_STATUS_HEADER = "X-Skill-Version-Status"
-_LAST_SKILL_VERSION_STATUS: str | None = None
+_LAST_SKILL_VERSION_STATUS: Optional[str] = None
 
 
 def platform_context_headers() -> dict[str, str]:
@@ -27,7 +27,7 @@ def _maybe_inject_platform_context_headers(
     url: str,
     headers: dict[str, Any],
     *,
-    platform_base_url: str | None = None,
+    platform_base_url: Optional[str] = None,
 ) -> None:
     if not _is_platform_request(url, platform_base_url=platform_base_url):
         return
@@ -45,7 +45,7 @@ def _origin_parts(url: str) -> tuple[str, str, int]:
     return scheme, host, port
 
 
-def _is_platform_request(url: str, *, platform_base_url: str | None = None) -> bool:
+def _is_platform_request(url: str, *, platform_base_url: Optional[str] = None) -> bool:
     try:
         normalized_base_url = normalize_platform_base_url(platform_base_url)
     except ValueError:
@@ -57,7 +57,7 @@ def _has_explicit_auth_header(headers: dict[str, Any]) -> bool:
     return any(str(key).strip().lower() in EXPLICIT_AUTH_HEADER_KEYS for key in headers)
 
 
-def _resolve_platform_access_token(access_token: str | None = None) -> str | None:
+def _resolve_platform_access_token(access_token: Optional[str] = None) -> Optional[str]:
     explicit_token = str(access_token or "").strip()
     if explicit_token:
         return explicit_token
@@ -82,8 +82,8 @@ def _maybe_inject_platform_auth_header(
     headers: dict[str, Any],
     *,
     auto_platform_auth: bool = False,
-    access_token: str | None = None,
-    platform_base_url: str | None = None,
+    access_token: Optional[str] = None,
+    platform_base_url: Optional[str] = None,
 ) -> None:
     if not auto_platform_auth:
         return
@@ -97,7 +97,7 @@ def _maybe_inject_platform_auth_header(
     headers["Authorization"] = f"Bearer {token}"
 
 
-def get_last_skill_version_status() -> str | None:
+def get_last_skill_version_status() -> Optional[str]:
     return _LAST_SKILL_VERSION_STATUS
 
 
@@ -122,13 +122,13 @@ def _maybe_log_skill_version_status(headers: Any) -> None:
 def request(
     method: str,
     url: str,
-    json_body: dict[str, Any] | None = None,
-    headers: dict[str, Any] | None = None,
-    out_file: str | None = None,
+    json_body: Optional[dict[str, Any]] = None,
+    headers: Optional[dict[str, Any]] = None,
+    out_file: Optional[str] = None,
     *,
     auto_platform_auth: bool = False,
-    access_token: str | None = None,
-    platform_base_url: str | None = None,
+    access_token: Optional[str] = None,
+    platform_base_url: Optional[str] = None,
     timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
 ) -> tuple[Any, int]:
     global _LAST_SKILL_VERSION_STATUS
@@ -194,7 +194,7 @@ def request(
         return None, 0
 
 
-def normalize_platform_base_url(base_url: str | None) -> str:
+def normalize_platform_base_url(base_url: Optional[str]) -> str:
     candidate = str(
         base_url
         or os.environ.get(PLATFORM_BASE_URL_ENV)
@@ -207,7 +207,7 @@ def normalize_platform_base_url(base_url: str | None) -> str:
     return candidate.rstrip("/")
 
 
-def build_platform_auth_headers(access_token: str | None = None) -> dict[str, str]:
+def build_platform_auth_headers(access_token: Optional[str] = None) -> dict[str, str]:
     token = str(_resolve_platform_access_token(access_token) or "").strip()
     if not token:
         raise ValueError("access_token must not be empty")
@@ -247,11 +247,11 @@ def _request_platform_json(
     method: str,
     path: str,
     *,
-    payload: dict[str, Any] | None = None,
-    base_url: str | None = None,
-    access_token: str | None = None,
+    payload: Optional[dict[str, Any]] = None,
+    base_url: Optional[str] = None,
+    access_token: Optional[str] = None,
     require_auth: bool = False,
-    unauthorized_message: str | None = None,
+    unauthorized_message: Optional[str] = None,
     allow_raw_dict_without_code: bool = False,
 ) -> dict:
     headers = None
@@ -283,10 +283,10 @@ def post_platform_json(
     path: str,
     payload: dict[str, Any],
     *,
-    base_url: str | None = None,
-    access_token: str | None = None,
+    base_url: Optional[str] = None,
+    access_token: Optional[str] = None,
     require_auth: bool = False,
-    unauthorized_message: str | None = None,
+    unauthorized_message: Optional[str] = None,
 ) -> dict:
     return _request_platform_json(
         "POST",
@@ -302,10 +302,10 @@ def post_platform_json(
 def get_platform_json(
     path: str,
     *,
-    base_url: str | None = None,
-    access_token: str | None = None,
+    base_url: Optional[str] = None,
+    access_token: Optional[str] = None,
     require_auth: bool = False,
-    unauthorized_message: str | None = None,
+    unauthorized_message: Optional[str] = None,
     allow_raw_dict_without_code: bool = False,
 ) -> dict:
     return _request_platform_json(

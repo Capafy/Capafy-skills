@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,7 +34,7 @@ def _resolve_target_path(symlink_path: Path, *, logical_path: str) -> Path:
 
 def selected_symlink_tree_sources(
     tree_sources: list[StageTreeSource],
-    selected_skill_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
 ) -> list[SelectedSymlinkTreeSource]:
     if not selected_skill_paths:
         return []
@@ -41,7 +42,7 @@ def selected_symlink_tree_sources(
     resolved_sources: list[SelectedSymlinkTreeSource] = []
     seen: set[str] = set()
     for logical_path in sorted(selected_skill_paths):
-        matched_source: SelectedSymlinkTreeSource | None = None
+        matched_source: Optional[SelectedSymlinkTreeSource] = None
         matched_prefix_length = -1
         for tree_source in tree_sources:
             source_root = tree_source.source_root.expanduser()
@@ -76,7 +77,7 @@ def selected_symlink_tree_sources(
 
 def augment_stage_plan_with_selected_symlinks(
     stage_plan: StagePlan,
-    selected_skill_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
 ) -> StagePlan:
     symlink_sources = selected_symlink_tree_sources(stage_plan.tree_sources, selected_skill_paths)
     if not symlink_sources:

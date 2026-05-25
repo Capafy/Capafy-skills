@@ -1,9 +1,10 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
 
-from packaging._shared.common.fs import path_basename as _path_basename
+from packaging._shared.common.fs import path_basename
 from packaging._shared.common.home import safe_expanduser_path
 from packaging._shared.contracts.selectable import normalize_text
 from packaging._shared.common.json_io import load_json_object
@@ -50,12 +51,12 @@ def _collect_local_plugin_descriptors(extensions_root: Path) -> dict[str, set[st
     return descriptors
 
 
-def _maybe_rewrite_packaged_load_path(value: str, packaged_plugin_ids: set[str]) -> str | None:
+def _maybe_rewrite_packaged_load_path(value: str, packaged_plugin_ids: set[str]) -> Optional[str]:
     stripped = value.strip()
     if not stripped:
         return None
     normalized_check = stripped.replace("\\", "/").rstrip("/")
-    basename = _path_basename(stripped.rstrip("/\\"))
+    basename = path_basename(stripped.rstrip("/\\"))
     if normalized_check == "~/.openclaw/extensions" or normalized_check.startswith("~/.openclaw/extensions/"):
         if basename and basename in packaged_plugin_ids:
             return f"~/.openclaw/extensions/{basename}"
@@ -100,7 +101,7 @@ def _filter_plugin_load_paths(payload: dict, *, packaged_plugin_ids: set[str]) -
 def prune_unbundled_local_plugin_config(
     runtime_root: Path,
     *,
-    source_extensions_root: Path | None = None,
+    source_extensions_root: Optional[Path] = None,
 ) -> int:
     config_path = runtime_root / ".openclaw" / "openclaw.json"
     if not config_path.is_file():

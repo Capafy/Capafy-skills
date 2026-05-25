@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path, PurePosixPath
-from typing import Iterable
+from typing import Iterable, Optional
 
 from .constants import (
     DEVELOPER_FALLBACK_DIR_PATH,
@@ -179,9 +179,9 @@ def is_credential_excluded_dir(name: str) -> bool:
 
 def matches_workspace_allowlist(
     display_path: str,
-    workspace_allowlist: set[str] | None,
+    workspace_allowlist: Optional[set[str]],
     *,
-    is_dir: bool | None = None,
+    is_dir: Optional[bool] = None,
 ) -> bool:
     if workspace_allowlist is None:
         return True

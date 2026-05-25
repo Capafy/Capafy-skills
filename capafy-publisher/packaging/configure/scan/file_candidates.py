@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
@@ -11,9 +12,9 @@ from packaging._shared.common.packaged_files import iter_packaged_files
 from packaging._shared.policies.content_scan import should_skip_content_scan_for_file
 from packaging.configure.exclusion import build_exclude_entry, looks_like_high_risk_file
 from packaging.configure.generic_keys import collect_generic_key_candidates
-from packaging._shared.contracts.path_shapes import basic_owning_selectable_paths, unit_type_from_path
 from packaging.runtimes import get_default_target, get_target
 from packaging._shared.runtimes.contracts import call_optional_target_hook
+from packaging.configure.selection.unit_types import has_skill_owning_path
 
 from .candidate_annotation import annotate_candidate
 from .env_reference_scan import collect_env_url_hints, collect_referenced_env_names
@@ -26,7 +27,7 @@ from .scan_only_paths import is_scan_only_source_path, normalize_scan_only_relpa
 from .special_files import collect_special_file_candidates
 
 
-def _is_runtime_required_env_file(relpath: str, *, target_name: str | None = None) -> bool:
+def _is_runtime_required_env_file(relpath: str, *, target_name: Optional[str] = None) -> bool:
     if not relpath:
         return False
     target = get_target(target_name) if target_name else get_default_target()
@@ -48,42 +49,21 @@ def _is_runtime_required_env_file(relpath: str, *, target_name: str | None = Non
     return normalized in fixed_stage_paths and (basename == ".env" or basename.startswith(".env."))
 
 
-def _is_selected_skill_env_file(relpath: str, *, target_name: str | None = None) -> bool:
+def _is_selected_skill_env_file(relpath: str, *, target_name: Optional[str] = None) -> bool:
     normalized = str(relpath or "").strip().rstrip("/")
     if not normalized or not normalized.endswith("/.env"):
         return False
 
     target = get_target(target_name) if target_name else get_default_target()
-    owning_paths = tuple(
-        str(path).strip().rstrip("/")
-        for path in call_optional_target_hook(
-            target,
-            "owning_selectable_paths",
-            normalized,
-            default=basic_owning_selectable_paths(normalized),
-        )
-    )
-    return any(
-        path
-        and str(
-            call_optional_target_hook(
-                target,
-                "infer_unit_type_from_path",
-                path,
-                default=unit_type_from_path(path),
-            )
-        ).strip()
-        == "skill"
-        for path in owning_paths
-    )
+    return has_skill_owning_path(normalized, target=target)
 
 
 def collect_api_key_candidates_from_file(
     path: Path,
     relpath: str,
-    physical_relpath: str | None = None,
-    process_env_names: set[str] | None = None,
-    target_name: str | None = None,
+    physical_relpath: Optional[str] = None,
+    process_env_names: Optional[set[str]] = None,
+    target_name: Optional[str] = None,
     require_referenced_platform_envs: bool = False,
 ) -> tuple[list[dict], list[dict], dict[str, str], dict[str, str], dict[str, str], set[str]]:
     target = get_target(target_name) if target_name else get_default_target()
@@ -210,8 +190,8 @@ def collect_api_key_candidates(
     root: Path,
     display_prefix: str = "",
     *,
-    process_env_names: set[str] | None = None,
-    target_name: str | None = None,
+    process_env_names: Optional[set[str]] = None,
+    target_name: Optional[str] = None,
     require_referenced_platform_envs: bool = False,
     include_stage_excluded_files: bool = False,
     excluded_relpath_prefixes: tuple[str, ...] = (),

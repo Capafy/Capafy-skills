@@ -44,7 +44,12 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
         if spec is None and url_c is None:
             continue
         model = _candidate_metadata(keys, urls, "model")
-        api_format = _candidate_metadata(keys, urls, "api_format")
+        api_format = _candidate_metadata(keys, urls, "api_format") or (spec.api if spec else "")
+        if not api_format:
+            raise ValueError(
+                f"OpenClaw provider {provider_name} is missing api; "
+                f"set models.providers.{provider_name}.api before publishing"
+            )
 
         for idx, key_c in enumerate(keys):
             key_index = _candidate_key_index(key_c, idx)

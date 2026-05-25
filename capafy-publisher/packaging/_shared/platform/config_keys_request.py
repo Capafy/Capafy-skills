@@ -11,14 +11,20 @@ from packaging.configure.scan.scan_only_paths import is_scan_only_source_path
 
 
 def _strip_tracking_source(item: dict, *, label: str) -> str:
-    source = str(item.get("source", "") or "").strip()
+    raw_source = item.get("source")
+    if not isinstance(raw_source, str):
+        raise ValueError(f"{label}.source must be a string")
+    source = raw_source.strip()
     if not source:
         raise ValueError(f"{label}.source must not be empty")
     return source
 
 
 def _require_reviewed_use(entry: dict, *, label: str) -> str:
-    use = str(entry.get("use", "")).strip()
+    raw_use = entry.get("use")
+    if not isinstance(raw_use, str):
+        raise ValueError(f"{label}.use must be a string")
+    use = raw_use.strip()
     if not use:
         raise ValueError(f"{label}.use must not be empty for reviewed_scan")
     return use
@@ -97,7 +103,10 @@ def _strip_tracking_env_var_entry(entry: dict, *, index: int) -> dict[str, Any]:
 def _strip_tracking_exclude_entry(entry: dict, *, index: int) -> dict[str, Any]:
     if not isinstance(entry, dict):
         raise ValueError("reviewed_scan_payload.excludes items must be objects")
-    source = str(entry.get("source", "")).strip()
+    raw_source = entry.get("source")
+    if not isinstance(raw_source, str):
+        raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must be a string")
+    source = raw_source.strip()
     if not source:
         raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must not be empty")
     return {

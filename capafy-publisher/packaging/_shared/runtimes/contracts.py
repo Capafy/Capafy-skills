@@ -11,10 +11,9 @@ from packaging._shared.contracts.stage_plan import StagePlan
 class TargetDescriptor:
     target_id: str
     canonical_name: str
-    profile_env_id: str | None = None
-    runtime_generation: str | None = None
-    runtime_variant: str | None = None
-    aliases: tuple[str, ...] = ()
+    profile_env_id: Optional[str] = None
+    runtime_generation: Optional[str] = None
+    runtime_variant: Optional[str] = None
     feature_tags: tuple[str, ...] = ()
 
 
@@ -26,7 +25,7 @@ SpecialScanResult = Tuple[Dict[str, str], Dict[str, str], Dict[str, str], List[d
 
 @runtime_checkable
 class PackagingTarget(Protocol):
-    def profile_env_id(self) -> str | None:
+    def profile_env_id(self) -> Optional[str]:
         ...
 
     def build_stage_plan(
@@ -48,13 +47,13 @@ class PackagingTarget(Protocol):
         self,
         runtime_root: Path,
         *,
-        expected_version: str | None = None,
+        expected_version: Optional[str] = None,
     ) -> dict:
         ...
 
 
 def call_optional_target_hook(
-    target: object | None,
+    target: Optional[object],
     method_name: str,
     *args: Any,
     default: Any = None,

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import hashlib
 import json
@@ -40,7 +41,7 @@ def _merge_json_values(base: object, overlay: object) -> object:
 
 
 def _merge_json_files(paths: list[Path], archive_path: str) -> bytes:
-    merged: object | None = None
+    merged: Optional[object] = None
     for path in paths:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -102,7 +103,7 @@ def build_bundle_archive(
     staging_root: Path,
     output_path: Path,
     *,
-    exclude_paths: set[str] | None = None,
+    exclude_paths: Optional[set[str]] = None,
     exclude_prefixes: tuple[str, ...] = (),
 ) -> dict:
     if output_path.suffix.lower() != ".zip":

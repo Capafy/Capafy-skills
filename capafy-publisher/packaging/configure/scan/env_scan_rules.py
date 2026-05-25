@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
@@ -23,7 +24,7 @@ ENDPOINT_CONFIG_KEYS = {
     "url", "endpoint", "api_base",
 }
 _NORMALIZED_ENDPOINT_CONFIG_KEYS = {normalize_key_name(key) for key in ENDPOINT_CONFIG_KEYS}
-_NORMALIZED_ENDPOINT_SUFFIX_KEYS = ("baseurl", "apibase", "endpoint")
+NORMALIZED_ENDPOINT_SUFFIX_KEYS = ("baseurl", "apibase", "endpoint")
 
 def is_endpoint_config_key(key: str) -> bool:
     normalized = normalize_key_name(key)
@@ -32,10 +33,10 @@ def is_endpoint_config_key(key: str) -> bool:
     tokens = set(key_tokens(key))
     if {"base", "url"} <= tokens or {"api", "base"} <= tokens or "endpoint" in tokens:
         return True
-    return any(normalized.endswith(suffix) for suffix in _NORMALIZED_ENDPOINT_SUFFIX_KEYS)
+    return any(normalized.endswith(suffix) for suffix in NORMALIZED_ENDPOINT_SUFFIX_KEYS)
 
 
-def config_literal_candidate_kind(key: str, value: str) -> tuple[str, str | None, str] | None:
+def config_literal_candidate_kind(key: str, value: str) -> Optional[tuple[str, Optional[str], str]]:
     normalized = normalize_key_name(key)
     if contains_explicit_secret_keyword(key):
         extracted = extract_assignment_value(key, value)
@@ -92,4 +93,5 @@ __all__ = [
     "config_literal_candidate_kind",
     "is_endpoint_config_key",
     "logical_env_source_path",
+    "NORMALIZED_ENDPOINT_SUFFIX_KEYS",
 ]

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -99,7 +100,7 @@ def validate_env_runtime(
     runtime_root: Path,
     *,
     env_id: str,
-    expected_version: str | None = None,
+    expected_version: Optional[str] = None,
 ) -> dict:
     checks: list[dict] = []
     errors: list[str] = []
@@ -174,7 +175,7 @@ def validate_env_runtime(
         }
 
     runtime_manifest_path = runtime_root / "agent.runtime_environment.json"
-    runtime_manifest: dict[str, object] | None = None
+    runtime_manifest: Optional[dict[str, object]] = None
     manifest_ok = runtime_manifest_path.is_file()
     manifest_summary = "missing agent.runtime_environment.json"
     version_field = ""

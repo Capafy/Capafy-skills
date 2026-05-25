@@ -3,22 +3,21 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
-from typing import Iterable
+from typing import Iterable, Union
 
 from packaging._shared.common.final_zip_files import final_zip_staging_file_relpaths
-from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME
+from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME, VALID_AGENT_TYPES
 from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME, load_stage_manifest
 from packaging.configure.contracts import GenericValue, PROCESS_ENV_SOURCE
 from packaging.configure.sensitive.placeholders import split_source
 
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:/")
 _DEFAULT_SCAN_ONLY_PREFIXES = ("_scan_only",)
-_FINAL_ZIP_AGENT_TYPES = frozenset({"run_online", "download"})
 
 
 def _normalize_agent_type(agent_type: object) -> str:
     normalized = str(agent_type or "").strip()
-    if normalized not in _FINAL_ZIP_AGENT_TYPES:
+    if normalized not in VALID_AGENT_TYPES:
         raise ValueError("agent_type must be one of: run_online, download")
     return normalized
 
@@ -79,7 +78,7 @@ def _final_zip_exclude_paths(excluded_relpaths: Iterable[object], *, agent_type:
     return excluded
 
 
-def _staging_path(staging_root: str | Path) -> Path:
+def _staging_path(staging_root: Union[str, Path]) -> Path:
     if isinstance(staging_root, str) and not staging_root.strip():
         raise ValueError("staging_root is required for source boundary checks")
     staging_path = Path(staging_root)
@@ -90,7 +89,7 @@ def _staging_path(staging_root: str | Path) -> Path:
 
 def final_zip_source_relpaths(
     *,
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     excluded_relpaths: Iterable[object],
     agent_type: str,
 ) -> frozenset[str]:
@@ -106,7 +105,7 @@ def final_zip_source_relpaths(
 def is_packaged_source_path(
     source: object,
     *,
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> bool:
@@ -123,7 +122,7 @@ def is_packaged_source_path(
 def filter_generic_payload_items(
     items: Iterable[object],
     *,
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> list[dict]:
@@ -148,7 +147,7 @@ def filter_generic_payload_items(
 def filter_generic_values_for_packaged_sources(
     generic_values: Iterable[GenericValue],
     *,
-    staging_root: str | Path,
+    staging_root: Union[str, Path],
     excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> tuple[GenericValue, ...]:

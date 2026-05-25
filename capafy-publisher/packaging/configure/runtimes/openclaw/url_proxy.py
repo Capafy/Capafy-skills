@@ -5,11 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from packaging._shared.openclaw.official_providers import (
-    OPENCLAW_OFFICIAL_PROVIDER_SPECS,
-    OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
-)
-from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import (
     SourceKind,
@@ -20,15 +15,8 @@ from packaging.configure.runtimes.openclaw.auth_profile_materialize import (
     ensure_auth_profile_providers,
 )
 from packaging.configure.runtimes.openclaw.auth_profiles import load_auth_profile_keys
-from packaging.configure.runtimes.openclaw.provider_keys import (
-    collect_provider_api_key_items,
-    resolve_api_key_config_value,
-)
 from packaging.configure.runtimes.openclaw.provider_pairs import pair_openclaw_provider_candidates
-from packaging.configure.runtimes.openclaw.provider_scan import (
-    get_openclaw_providers,
-    scan_openclaw_provider_candidates,
-)
+from packaging.configure.runtimes.openclaw.provider_scan import scan_openclaw_provider_candidates
 from packaging.configure.runtimes.openclaw.provider_confirmation import (
     rewrite_openclaw_confirmed_providers,
 )
@@ -36,101 +24,19 @@ from packaging.configure.runtimes.openclaw.provider_rewrite import (
     collect_openclaw_staged_dotenv_env,
     rewrite_openclaw_builtin_models_as_explicit_providers,
 )
+from packaging.configure.runtimes.openclaw.provider_state import (
+    ensure_official_provider_skeletons,
+    ensure_openclaw_provider_api_formats,
+    materialize_official_provider_values,
+    official_provider_names_from_login_state,
+    prune_openclaw_login_state,
+)
+from packaging.configure.runtimes.openclaw.provider_usage import get_openclaw_providers
 
 
 logger = logging.getLogger(__name__)
 
 _CONFIG_REL = ".openclaw/openclaw.json"
-_LOGIN_PLUGIN_STATE_KEYS = frozenset({
-    "accessToken",
-    "access_token",
-    "apiKey",
-    "api_key",
-    "auth",
-    "credential",
-    "credentials",
-    "idToken",
-    "id_token",
-    "login",
-    "refreshToken",
-    "refresh_token",
-    "session",
-    "token",
-})
-_KNOWN_LOGIN_PLUGIN_ENTRIES = frozenset({
-    "github-copilot",
-    "openai",
-})
-
-
-def _looks_like_login_plugin_entry(plugin_name: object, payload: object) -> bool:
-    normalized_name = str(plugin_name or "").strip().lower()
-    if not normalized_name:
-        return False
-    if normalized_name in _KNOWN_LOGIN_PLUGIN_ENTRIES or normalized_name.endswith("login"):
-        return True
-    if isinstance(payload, dict):
-        if any(str(key) in _LOGIN_PLUGIN_STATE_KEYS for key in payload):
-            return True
-    return False
-
-
-def _prune_login_state(config: dict[str, Any]) -> bool:
-    changed = False
-    if "auth" in config:
-        config.pop("auth", None)
-        changed = True
-
-    plugins = config.get("plugins")
-    if not isinstance(plugins, dict):
-        return changed
-    entries = plugins.get("entries")
-    if not isinstance(entries, dict):
-        return changed
-
-    for plugin_name in list(entries):
-        if _looks_like_login_plugin_entry(plugin_name, entries.get(plugin_name)):
-            entries.pop(plugin_name, None)
-            changed = True
-    return changed
-
-
-def _ensure_default_openai_provider_skeleton(config: dict[str, Any]) -> bool:
-    spec = OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME["publisher_openai_official"]
-    changed = False
-
-    models = config.get("models")
-    if isinstance(models, dict):
-        providers = models.get("providers")
-        if isinstance(providers, dict) and providers:
-            return False
-    else:
-        models = {}
-        config["models"] = models
-        changed = True
-    if str(models.get("mode", "") or "").strip() != "merge":
-        models["mode"] = "merge"
-        changed = True
-
-    providers = models.get("providers")
-    if not isinstance(providers, dict):
-        providers = {}
-        models["providers"] = providers
-        changed = True
-
-    provider = providers.get(spec.provider_name)
-    if not isinstance(provider, dict):
-        provider = {}
-        providers[spec.provider_name] = provider
-        changed = True
-
-    if not str(provider.get("api", "") or "").strip():
-        provider["api"] = spec.api
-        changed = True
-    if not normalize_http_url_candidate(str(provider.get("baseUrl", "")).strip()):
-        provider["baseUrl"] = spec.base_url
-        changed = True
-    return changed
 
 
 class OpenClawRuntime(RuntimeContract):
@@ -163,42 +69,29 @@ class OpenClawRuntime(RuntimeContract):
         if auth_keys:
             auth_changed = ensure_auth_profile_providers(config, auth_keys)
 
-        login_state_changed = _prune_login_state(config)
-        skeleton_changed = _ensure_default_openai_provider_skeleton(config)
+        login_provider_names = official_provider_names_from_login_state(config)
+        login_provider_changed = ensure_official_provider_skeletons(config, login_provider_names)
+        login_state_changed = prune_openclaw_login_state(config)
+        providers = get_openclaw_providers(config)
+        skeleton_changed = False
+        if not providers:
+            skeleton_changed = ensure_official_provider_skeletons(config, ["publisher_openai_official"])
+        api_format_changed = ensure_openclaw_provider_api_formats(config)
         providers = get_openclaw_providers(config)
 
-        changed = updated_text != text or auth_changed or login_state_changed or skeleton_changed
-        for spec in OPENCLAW_OFFICIAL_PROVIDER_SPECS:
-            provider_name = spec.provider_name
-            provider = providers.get(provider_name)
-            if not isinstance(provider, dict):
-                continue
-            api_key_val = str(provider.get("apiKey", "")).strip()
-            if str(provider.get("api", "")).strip() != spec.api:
-                continue
-
-            key_items = collect_provider_api_key_items(spec, ctx.process_env)
-            if not key_items:
-                profile_items = auth_keys.get(provider_name, [])
-                if profile_items:
-                    key_items = [
-                        {"value": value, "env_name": "", "field_aliases": []}
-                        for value in profile_items
-                    ]
-
-            real_key = ""
-            if key_items:
-                real_key = str(key_items[0].get("value", "")).strip()
-            if not real_key:
-                real_key = resolve_api_key_config_value(api_key_val, ctx.process_env)
-
-            if real_key and provider.get("apiKey") != real_key:
-                provider["apiKey"] = real_key
-                changed = True
-            base_url = normalize_http_url_candidate(str(provider.get("baseUrl", "")).strip())
-            if not base_url:
-                provider["baseUrl"] = spec.base_url
-                changed = True
+        changed = (
+            updated_text != text
+            or auth_changed
+            or login_provider_changed
+            or login_state_changed
+            or skeleton_changed
+            or api_format_changed
+        )
+        changed = materialize_official_provider_values(
+            providers,
+            auth_keys=auth_keys,
+            process_env=ctx.process_env,
+        ) or changed
 
         if changed:
             config_path.write_text(

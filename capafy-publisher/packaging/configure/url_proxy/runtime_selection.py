@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
+from packaging.configure.runtimes.claude_code.url_proxy_candidates import SETTINGS_SCAN_RELPATHS
 from packaging.configure.url_proxy.base import RuntimeContract
 
 if TYPE_CHECKING:
@@ -31,7 +32,6 @@ def _target_match_names(env_id: str) -> frozenset[str]:
         descriptor.canonical_name,
         descriptor.profile_env_id,
         descriptor.runtime_generation,
-        *descriptor.aliases,
     ):
         name = str(value or "").strip()
         if name:
@@ -39,7 +39,7 @@ def _target_match_names(env_id: str) -> frozenset[str]:
     return frozenset(names)
 
 
-def is_runtime_applicable(runtime: RuntimeContract, env_id: str | None) -> bool:
+def is_runtime_applicable(runtime: RuntimeContract, env_id: Optional[str]) -> bool:
     if env_id is None:
         return True
     targets = runtime.applicable_targets
@@ -48,7 +48,7 @@ def is_runtime_applicable(runtime: RuntimeContract, env_id: str | None) -> bool:
     return bool(_target_match_names(env_id) & set(targets))
 
 
-def runtime_context_target_id(env_id: str | None) -> str | None:
+def runtime_context_target_id(env_id: Optional[str]) -> Optional[str]:
     if env_id is None:
         return None
     match_names = _target_match_names(env_id)
@@ -56,14 +56,10 @@ def runtime_context_target_id(env_id: str | None) -> str | None:
     return resolved_target_id if resolved_target_id in match_names else str(env_id or "").strip()
 
 
-_CLAUDE_SETTINGS_RELPATHS = frozenset({
-    ".claude/managed-settings.json",
-    ".claude/settings.local.json",
-    ".claude/settings.json",
-})
+_CLAUDE_SETTINGS_RELPATHS = frozenset(SETTINGS_SCAN_RELPATHS)
 
 
-def runtime_owned_structured_pair(pair: "UrlProxyPair", *, target_id: str | None) -> bool:
+def runtime_owned_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
     if target_id != "claude_code":
         return False
     key_source = str(getattr(pair.key, "source_relpath", "") or "").strip()

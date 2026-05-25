@@ -160,7 +160,7 @@ SYSTEM_PACKAGE_CANDIDATES = {
 }
 TEXT_ENCODINGS = ("utf-8", "utf-8-sig", "latin-1")
 
-DSN_VALUE_PATTERN = re.compile(r"^(?:jdbc:)?(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\\+srv)?|redis|amqp|kafka|sqlserver|oracle)://.+", re.IGNORECASE)
+DSN_VALUE_PATTERN = re.compile(r"^(?:jdbc:)?(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|amqp|kafka|sqlserver|oracle)://.+", re.IGNORECASE)
 APP_IDENTIFIER_PATTERNS = [
     re.compile(r"^cli_[A-Za-z0-9]{8,}$"),
     re.compile(r"^[0-9]{8,32}$"),

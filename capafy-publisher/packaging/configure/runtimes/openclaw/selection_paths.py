@@ -24,10 +24,6 @@ def _normalize_posix_path(value: object) -> str:
     return PurePosixPath(text.rstrip("/")).as_posix()
 
 
-def _join_workspace(parts: tuple[str, ...]) -> str:
-    return (_OPENCLAW_WORKSPACE_PREFIX / PurePosixPath(*parts)).as_posix()
-
-
 def canonicalize_openclaw_selection_path(path: object) -> str:
     normalized = _normalize_posix_path(path)
     if not normalized:
@@ -43,9 +39,9 @@ def canonicalize_openclaw_selection_path(path: object) -> str:
     if parts[0] == _OPENCLAW_ROOT_PREFIX:
         return normalized
     if parts[0] == "workspace" and len(parts) > 1:
-        return _join_workspace(tuple(str(part) for part in parts[1:]))
+        return (_OPENCLAW_WORKSPACE_PREFIX / PurePosixPath(*(str(part) for part in parts[1:]))).as_posix()
     if parts[0] == "skills" and len(parts) > 1:
-        return _join_workspace(tuple(str(part) for part in parts))
+        return (_OPENCLAW_WORKSPACE_PREFIX / PurePosixPath(*(str(part) for part in parts))).as_posix()
     if parts[0] == "extensions" and len(parts) > 1:
         return (PurePosixPath(_OPENCLAW_ROOT_PREFIX) / PurePosixPath(*parts)).as_posix()
     if parts[0] == "cron" and len(parts) > 1:

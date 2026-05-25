@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -6,10 +7,10 @@ from pathlib import Path, PurePosixPath
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 
-from packaging._shared.contracts.path_shapes import unit_type_from_path
 from packaging._shared.contracts.selectable import (
     candidate_path_for_logical_path as _candidate_path_for_logical_path,
 )
+from packaging.configure.selection.unit_types import infer_selection_unit_type
 from packaging.configure.selection.external_skill_payload import load_external_skill_sources_payload
 from packaging.configure.selection.external_skill_snapshot import compute_skill_snapshot_digest
 
@@ -47,19 +48,11 @@ def _is_skill_dir(path: Path) -> bool:
 
 def _infer_unit_type(path: str, *, target=None) -> str:
     normalized = PurePosixPath(path.rstrip("/")).as_posix()
-    return str(
-        call_optional_target_hook(
-            target,
-            "infer_unit_type_from_path",
-            normalized,
-            default=unit_type_from_path(normalized),
-        )
-        or ""
-    ).strip()
+    return infer_selection_unit_type(normalized, target=target)
 
 
 def _selected_skill_logical_paths(
-    selected_skill_paths: set[str] | None,
+    selected_skill_paths: Optional[set[str]],
     *,
     target=None,
 ) -> list[str]:
@@ -110,8 +103,8 @@ def _invalid_external_skill_source_message(logical_path: str, detail: str) -> st
 def selected_external_skill_bindings(
     tree_sources: list[StageTreeSource],
     *,
-    selected_skill_paths: set[str] | None,
-    skills_plan_json: str | None,
+    selected_skill_paths: Optional[set[str]],
+    skills_plan_json: Optional[str],
     target=None,
 ) -> list[SelectedExternalSkillBinding]:
     selected_logical_paths = _selected_skill_logical_paths(
@@ -195,8 +188,8 @@ def selected_external_skill_bindings(
 def augment_stage_plan_with_selected_external_skill_bindings(
     stage_plan: StagePlan,
     *,
-    selected_skill_paths: set[str] | None,
-    skills_plan_json: str | None,
+    selected_skill_paths: Optional[set[str]],
+    skills_plan_json: Optional[str],
     target=None,
 ) -> StagePlan:
     selected_sources = selected_external_skill_bindings(

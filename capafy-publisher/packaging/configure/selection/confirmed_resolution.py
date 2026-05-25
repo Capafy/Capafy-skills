@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
@@ -19,8 +20,8 @@ ROOT_PREFIXES = (
 def resolve_logical_source_path(
     logical_path: str,
     *,
-    workspace_root: Path | None,
-    target_name: str | None,
+    workspace_root: Optional[Path],
+    target_name: Optional[str],
 ) -> Path:
     from packaging.runtimes import DEFAULT_TARGET, get_target, resolve_target_request
 
@@ -35,7 +36,7 @@ def resolve_logical_source_path(
 
     resolved_target = resolve_target_request(target_name or DEFAULT_TARGET).resolved_name
     target = get_target(resolved_target)
-    prefix_map: dict[str, Path | None] = {
+    prefix_map: dict[str, Optional[Path]] = {
         "workspace": workspace_root,
         ".agents": (Path.home() / ".agents").expanduser(),
         ".claude": (Path.home() / ".claude").expanduser(),
@@ -66,7 +67,7 @@ def resolve_logical_source_path(
     return candidate.resolve(strict=True)
 
 
-def target_relative_packaged_path(logical_path: str, *, target_name: str | None) -> tuple[str, bool]:
+def target_relative_packaged_path(logical_path: str, *, target_name: Optional[str]) -> tuple[str, bool]:
     from packaging.runtimes import DEFAULT_TARGET, get_target, resolve_target_request
 
     normalized = PurePosixPath(logical_path.rstrip("/")).as_posix()
@@ -85,7 +86,7 @@ def target_relative_packaged_path(logical_path: str, *, target_name: str | None)
     return rewritten, rewritten != normalized
 
 
-def preserved_logical_root_prefixes(*, target_name: str | None) -> set[str]:
+def preserved_logical_root_prefixes(*, target_name: Optional[str]) -> set[str]:
     from packaging.runtimes import DEFAULT_TARGET, get_target, resolve_target_request
 
     roots = set(ROOT_PREFIXES)
@@ -105,7 +106,7 @@ def packaged_path_for_entry(
     logical_path: str,
     source_path: Path,
     *,
-    target_name: str | None,
+    target_name: Optional[str],
     agent_type: str,
     used_paths: set[str],
 ) -> str:

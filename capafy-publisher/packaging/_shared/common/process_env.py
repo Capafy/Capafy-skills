@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from contextlib import suppress
 import os
 import platform
 import re
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Optional, Union
 
 from packaging._shared.common.home import current_home_from_env, safe_expanduser_path
 
@@ -54,11 +55,11 @@ _URL_PROXY_OS_FALLBACK_NAMES_BY_TARGET = {
 
 def collect_publish_process_env(
     *,
-    environ: Mapping[str, str] | None = None,
-    user_home: Path | None = None,
-    names: set[str] | frozenset[str] | None = None,
-    os_fallback_names: set[str] | frozenset[str] | None = None,
-    platform_system: str | None = None,
+    environ: Optional[Mapping[str, str]] = None,
+    user_home: Optional[Path] = None,
+    names: Optional[Union[set[str], frozenset[str]]] = None,
+    os_fallback_names: Optional[Union[set[str], frozenset[str]]] = None,
+    platform_system: Optional[str] = None,
 ) -> dict[str, str]:
     wanted = _normalize_names(names)
     env = _filter_env(environ if environ is not None else os.environ, wanted)
@@ -76,7 +77,7 @@ def collect_publish_process_env(
     return env
 
 
-def url_proxy_os_fallback_names(env_id: str | None) -> frozenset[str]:
+def url_proxy_os_fallback_names(env_id: Optional[str]) -> frozenset[str]:
     target_id = str(env_id or "").strip()
     if target_id in _URL_PROXY_OS_FALLBACK_NAMES_BY_TARGET:
         return _URL_PROXY_OS_FALLBACK_NAMES_BY_TARGET[target_id]
@@ -86,17 +87,17 @@ def url_proxy_os_fallback_names(env_id: str | None) -> frozenset[str]:
     return frozenset(names)
 
 
-def _normalize_names(names: set[str] | frozenset[str] | None) -> set[str] | None:
+def _normalize_names(names: Optional[Union[set[str], frozenset[str]]]) -> Optional[set[str]]:
     if names is None:
         return None
     return {name for name in (str(item).strip() for item in names) if _ENV_NAME_PATTERN.fullmatch(name)}
 
 
-def _wanted(name: str, names: set[str] | None) -> bool:
+def _wanted(name: str, names: Optional[set[str]]) -> bool:
     return bool(name and _ENV_NAME_PATTERN.fullmatch(name) and (names is None or name in names))
 
 
-def _filter_env(environ: Mapping[str, str], names: set[str] | None) -> dict[str, str]:
+def _filter_env(environ: Mapping[str, str], names: Optional[set[str]]) -> dict[str, str]:
     env: dict[str, str] = {}
     for key, value in environ.items():
         name = str(key).strip()
@@ -106,13 +107,13 @@ def _filter_env(environ: Mapping[str, str], names: set[str] | None) -> dict[str,
     return env
 
 
-def _resolve_home(user_home: Path | None, env: Mapping[str, str]) -> Path | None:
+def _resolve_home(user_home: Optional[Path], env: Mapping[str, str]) -> Optional[Path]:
     if user_home is not None:
         return safe_expanduser_path(user_home, environ=env)
     return current_home_from_env(env)
 
 
-def _collect_platform_env(system_name: str, home: Path | None, names: set[str] | None) -> dict[str, str]:
+def _collect_platform_env(system_name: str, home: Optional[Path], names: Optional[set[str]]) -> dict[str, str]:
     normalized = str(system_name or "").strip()
     if normalized == "Windows":
         return _collect_windows_env(names)
@@ -127,13 +128,13 @@ def _collect_platform_env(system_name: str, home: Path | None, names: set[str] |
     return _collect_posix_shell_env(home, names)
 
 
-def _fill_missing(target: dict[str, str], source: Mapping[str, str], names: set[str] | None) -> None:
+def _fill_missing(target: dict[str, str], source: Mapping[str, str], names: Optional[set[str]]) -> None:
     for name, value in source.items():
         if _wanted(name, names) and name not in target:
             target[name] = value
 
 
-def _collect_posix_shell_env(home: Path | None, names: set[str] | None) -> dict[str, str]:
+def _collect_posix_shell_env(home: Optional[Path], names: Optional[set[str]]) -> dict[str, str]:
     if home is None:
         return {}
     env: dict[str, str] = {}
@@ -142,11 +143,11 @@ def _collect_posix_shell_env(home: Path | None, names: set[str] | None) -> dict[
     return env
 
 
-def _collect_etc_environment(names: set[str] | None) -> dict[str, str]:
+def _collect_etc_environment(names: Optional[set[str]]) -> dict[str, str]:
     return _parse_shell_env_file(Path("/etc/environment"), names)
 
 
-def _parse_shell_env_file(path: Path, names: set[str] | None) -> dict[str, str]:
+def _parse_shell_env_file(path: Path, names: Optional[set[str]]) -> dict[str, str]:
     if not path.is_file():
         return {}
     try:
@@ -201,7 +202,7 @@ def _parse_simple_env_assignment(line: str) -> dict[str, str]:
     return {name: value}
 
 
-def _collect_macos_launchctl_env(names: set[str] | None) -> dict[str, str]:
+def _collect_macos_launchctl_env(names: Optional[set[str]]) -> dict[str, str]:
     try:
         completed = subprocess.run(
             ["launchctl", "export"],
@@ -225,7 +226,7 @@ def _collect_macos_launchctl_env(names: set[str] | None) -> dict[str, str]:
     return env
 
 
-def _collect_windows_env(names: set[str] | None) -> dict[str, str]:
+def _collect_windows_env(names: Optional[set[str]]) -> dict[str, str]:
     try:
         import winreg  # type: ignore[import-not-found]
     except ImportError:
@@ -254,10 +255,8 @@ def _collect_windows_env(names: set[str] | None) -> dict[str, str]:
         finally:
             close_key = getattr(winreg, "CloseKey", None)
             if key is not None and callable(close_key):
-                try:
+                with suppress(OSError):
                     close_key(key)
-                except OSError:
-                    pass
     return env
 
 

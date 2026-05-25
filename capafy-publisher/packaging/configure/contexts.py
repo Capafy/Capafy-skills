@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Set
 
@@ -29,4 +29,4 @@ class ConfigureContext:
     manifest: Any
     deep_scan: bool = False
     overrides: Optional[Dict[str, str]] = None
-    deep_scan_findings: DeepScanFindingsInput = DeepScanFindingsInput()
+    deep_scan_findings: DeepScanFindingsInput = field(default_factory=DeepScanFindingsInput)

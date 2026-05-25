@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -10,6 +11,7 @@ from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME
 from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME
 from packaging._shared.policies.content_scan import should_skip_local_path_cleanup_for_file
 from packaging._shared.policies.local_path_sanitizer import rewrite_local_path_text
+from packaging._shared.policies.text_files import TEXT_FILE_BASENAMES, TEXT_FILE_SUFFIXES
 from packaging.configure.scan.platform_contracts import is_platform_contract_file
 
 
@@ -22,35 +24,6 @@ _STRUCTURED_STAGE_MANIFESTS = frozenset({
 })
 
 
-_MAIN_TREE_TEXT_SUFFIXES = frozenset({
-    ".cfg",
-    ".conf",
-    ".env",
-    ".ini",
-    ".json",
-    ".json5",
-    ".jsonc",
-    ".md",
-    ".markdown",
-    ".mdx",
-    ".rst",
-    ".toml",
-    ".txt",
-    ".xml",
-    ".yaml",
-    ".yml",
-})
-_MAIN_TREE_TEXT_BASENAMES = frozenset({
-    "AGENTS.md",
-    "CHANGELOG.md",
-    "CLAUDE.md",
-    "LICENSE",
-    "LICENSE.md",
-    "README",
-    "README.md",
-    "SKILL.md",
-    "TODO.md",
-})
 def _redact_manifest_value(value: str, *, packaged_path_refs: dict[str, str]) -> tuple[str, int]:
     normalized = str(value or "").strip()
     if not normalized:
@@ -59,7 +32,7 @@ def _redact_manifest_value(value: str, *, packaged_path_refs: dict[str, str]) ->
 
 
 def _redact_manifest_node(node: object, *, packaged_path_refs: dict[str, str]) -> tuple[object, int]:
-    def redact_value(value: str, _key_name: str | None) -> tuple[str, int]:
+    def redact_value(value: str, _key_name: Optional[str]) -> tuple[str, int]:
         return _redact_manifest_value(value, packaged_path_refs=packaged_path_refs)
 
     return walk_json_strings(node, redact_value)
@@ -80,15 +53,15 @@ def _should_redact_main_tree_file(path: Path) -> bool:
     basename = path.name
     if should_skip_local_path_cleanup_for_file(basename):
         return False
-    if basename in _MAIN_TREE_TEXT_BASENAMES or basename.startswith(".env"):
+    if basename in TEXT_FILE_BASENAMES or basename.startswith(".env"):
         return True
-    return path.suffix.lower() in _MAIN_TREE_TEXT_SUFFIXES
+    return path.suffix.lower() in TEXT_FILE_SUFFIXES
 
 
 def redact_main_tree_local_paths(
     staging_root: Path,
     *,
-    target_name: str | None = None,
+    target_name: Optional[str] = None,
     packaged_path_refs: dict[str, str],
 ) -> dict[str, int]:
     processed_files = 0

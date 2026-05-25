@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import json
 import re
@@ -13,7 +14,8 @@ from packaging.configure.scan.env_scan_rules import (
     config_literal_candidate_kind,
     is_endpoint_config_key,
 )
-from packaging.configure.scan.support import append_candidate as _append_candidate
+from packaging.configure.scan.secret_context import CONTEXTUAL_KEY_SECRET_MARKERS
+from packaging.configure.scan.support import append_candidate
 from packaging.configure.sensitive.keywords import (
     contains_explicit_secret_keyword,
     key_tokens,
@@ -28,7 +30,12 @@ from packaging.configure.sensitive.literals import (
     looks_like_secret_literal,
     looks_like_url_or_dsn,
 )
-from packaging.configure.runtimes.claude_code.auth import should_skip_claude_login_structured_scan
+from packaging.configure.runtimes.claude_code.auth import (
+    CLAUDE_AUTH_ENV_KEY,
+    CLAUDE_AUTH_TOKEN_ENV_KEY,
+    CLAUDE_BASE_URL_ENV_KEY,
+    should_skip_claude_login_structured_scan,
+)
 
 
 CLAUDE_NATIVE_CONFIG_BASENAMES = {
@@ -40,11 +47,10 @@ CLAUDE_NATIVE_CONFIG_BASENAMES = {
 CLAUDE_NATIVE_GENERIC_SECRET_KEYS = {"apiKey", "api_key", "authToken", "auth_token"}
 CLAUDE_NATIVE_GENERIC_URL_KEYS = {"baseUrl", "baseURL", "base_url"}
 CLAUDE_SETTINGS_ENV_TOKEN_KEYS = (
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_API_KEY",
+    CLAUDE_AUTH_TOKEN_ENV_KEY,
+    CLAUDE_AUTH_ENV_KEY,
 )
-CLAUDE_SETTINGS_ENV_BASE_URL_KEY = "ANTHROPIC_BASE_URL"
-CLAUDE_SETTINGS_ENV_KEYS = set(CLAUDE_SETTINGS_ENV_TOKEN_KEYS) | {CLAUDE_SETTINGS_ENV_BASE_URL_KEY}
+CLAUDE_SETTINGS_ENV_KEYS = set(CLAUDE_SETTINGS_ENV_TOKEN_KEYS) | {CLAUDE_BASE_URL_ENV_KEY}
 CLAUDE_LOGIN_STATE_PARENT_MARKERS = {
     "oauth",
     "oauthaccount",
@@ -60,21 +66,6 @@ CLAUDE_LOGIN_STATE_SECRET_KEYS = {
     "sessionsecret",
     "authorization",
 }
-CONTEXTUAL_KEY_SECRET_MARKERS = {
-    "api",
-    "auth",
-    "credential",
-    "credentials",
-    "proactor",
-    "provider",
-    "providers",
-    "secret",
-    "secrets",
-    "token",
-    "tokens",
-}
-
-
 def should_scan_claude_structured_values(relpath: str) -> bool:
     if should_skip_claude_login_structured_scan(relpath):
         return False
@@ -125,8 +116,8 @@ def collect_claude_native_generic_value(
     value: str,
     source_display_path: str,
     display_path: str,
-    annotate_candidate: Callable[[dict, str], dict | None],
-) -> dict | None:
+    annotate_candidate: Callable[[dict, str], Optional[dict]],
+) -> Optional[dict]:
     if path_name not in CLAUDE_NATIVE_CONFIG_BASENAMES:
         return None
     if path_parts and path_parts[0] in {"hooks", "provider", "providers"}:
@@ -162,12 +153,15 @@ def collect_claude_native_generic_value(
                     },
                     display_path,
                 )
-        if (
-            not extracted
-            or looks_like_placeholder_value(extracted)
-            or looks_like_platform_managed_placeholder_value(extracted)
-        ):
-            return None
+        if extracted is None:
+            stripped = value.strip()
+            if (
+                not stripped
+                or looks_like_placeholder_value(stripped)
+                or looks_like_platform_managed_placeholder_value(stripped)
+            ):
+                return None
+            extracted = stripped
         entry_type = "api_key" if contains_explicit_secret_keyword(key) or contextual_secret else "managed_value"
         metadata_url = extracted.strip() if looks_like_url_or_dsn(extracted) else "unknown"
         return annotate_candidate(
@@ -269,7 +263,7 @@ def collect_claude_json_config_hints(
     text: str,
     display_path: str,
     source_display_path: str,
-    annotate_candidate: Callable[[dict, str], dict | None],
+    annotate_candidate: Callable[[dict, str], Optional[dict]],
 ) -> tuple[dict[str, str], dict[str, str], list[dict]]:
     try:
         data = json.loads(text)
@@ -288,7 +282,16 @@ def collect_claude_json_config_hints(
         if not isinstance(env_payload, dict):
             return
 
-        base_url = str(env_payload.get(CLAUDE_SETTINGS_ENV_BASE_URL_KEY, "") or "").strip()
+        for key, value in env_payload.items():
+            if key in CLAUDE_SETTINGS_ENV_KEYS:
+                continue
+            if not isinstance(value, str) or not value.strip():
+                continue
+            if looks_like_placeholder_value(value) or looks_like_platform_managed_placeholder_value(value):
+                continue
+            env_url_hints.setdefault(str(key), "unknown")
+
+        base_url = str(env_payload.get(CLAUDE_BASE_URL_ENV_KEY, "") or "").strip()
         explicit_base_url = bool(base_url) and not looks_like_platform_managed_placeholder_value(base_url)
         if not base_url:
             base_url = ANTHROPIC_OFFICIAL_URL
@@ -304,18 +307,18 @@ def collect_claude_json_config_hints(
 
         if explicit_base_url and (has_real_token or not has_token_field):
             env_group = build_config_url_proxy_group(source_display_path, "env")
-            _append_candidate(
+            append_candidate(
                 candidates,
                 annotate_candidate(
                     {
                         "entry_type": "managed_value",
-                        "field": CLAUDE_SETTINGS_ENV_BASE_URL_KEY,
+                        "field": CLAUDE_BASE_URL_ENV_KEY,
                         "value_type": "url",
                         "value": base_url,
                         "service": "Anthropic",
                         "default_url": base_url,
                         "local_url": base_url,
-                        **candidate_source(source_display_path, f"env.{CLAUDE_SETTINGS_ENV_BASE_URL_KEY}"),
+                        **candidate_source(source_display_path, f"env.{CLAUDE_BASE_URL_ENV_KEY}"),
                         "env_name": None,
                         "url_proxy_group": env_group,
                     },
@@ -344,7 +347,7 @@ def collect_claude_json_config_hints(
                 },
                 display_path,
             )
-            _append_candidate(candidates, candidate)
+            append_candidate(candidates, candidate)
 
     _collect_claude_settings_env_hints()
 
@@ -376,7 +379,7 @@ def collect_claude_json_config_hints(
                 service = path_parts[-2] if len(path_parts) >= 2 else "unknown"
                 env_url_hints[json_path] = value
                 value_url_hints[value] = value
-                _append_candidate(
+                append_candidate(
                     candidates,
                     annotate_candidate(
                         {
@@ -434,7 +437,7 @@ def collect_claude_json_config_hints(
             },
             display_path,
         )
-        _append_candidate(candidates, candidate)
+        append_candidate(candidates, candidate)
 
     for path_parts, key, value in iter_json_string_leaves(data):
         _on_leaf(path_parts, key, value)
@@ -447,7 +450,6 @@ __all__ = [
     "CLAUDE_NATIVE_CONFIG_BASENAMES",
     "CLAUDE_NATIVE_GENERIC_SECRET_KEYS",
     "CLAUDE_NATIVE_GENERIC_URL_KEYS",
-    "CLAUDE_SETTINGS_ENV_BASE_URL_KEY",
     "CLAUDE_SETTINGS_ENV_KEYS",
     "CLAUDE_SETTINGS_ENV_TOKEN_KEYS",
     "CONTEXTUAL_KEY_SECRET_MARKERS",

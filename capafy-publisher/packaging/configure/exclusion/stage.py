@@ -1,10 +1,10 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
 from packaging._shared.common.exclusion_rules import exclude_reason_code_for_path, looks_like_high_risk_file
-from packaging._shared.contracts.path_shapes import basic_owning_selectable_paths, unit_type_from_path
-from packaging._shared.runtimes.contracts import call_optional_target_hook
+from packaging.configure.selection.unit_types import has_skill_owning_path
 
 
 def is_redacted_runtime_env_file(target, logical_path: str) -> bool:
@@ -29,28 +29,7 @@ def is_selected_skill_env_file(target, logical_path: str) -> bool:
     if target is None or not normalized or not normalized.endswith("/.env"):
         return False
 
-    owning_paths = tuple(
-        str(path).strip().rstrip("/")
-        for path in call_optional_target_hook(
-            target,
-            "owning_selectable_paths",
-            normalized,
-            default=basic_owning_selectable_paths(normalized),
-        )
-    )
-    return any(
-        path
-        and str(
-            call_optional_target_hook(
-                target,
-                "infer_unit_type_from_path",
-                path,
-                default=unit_type_from_path(path),
-            )
-        ).strip()
-        == "skill"
-        for path in owning_paths
-    )
+    return has_skill_owning_path(normalized, target=target)
 
 
 def should_skip_high_risk_stage_file(target, logical_path: str) -> bool:
@@ -64,7 +43,7 @@ def should_skip_high_risk_stage_file(target, logical_path: str) -> bool:
     return looks_like_high_risk_file(normalized) is not None
 
 
-def scan_only_excluded_credential_relpath(target_relpath: str, *, target) -> str | None:
+def scan_only_excluded_credential_relpath(target_relpath: str, *, target) -> Optional[str]:
     normalized = str(target_relpath or "").strip().rstrip("/")
     prefix = "_scan_only/"
     if not normalized.startswith(prefix):

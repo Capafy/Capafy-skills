@@ -59,6 +59,9 @@ def parse_frontmatter_block(raw: str) -> FrontmatterMetadata:
         if not stripped or stripped.startswith("#"):
             index += 1
             continue
+        if line[:1].isspace():
+            index += 1
+            continue
         if ":" not in line:
             index += 1
             continue

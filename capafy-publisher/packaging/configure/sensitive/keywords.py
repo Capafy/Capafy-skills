@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 
@@ -137,7 +138,7 @@ _SECRET_NORMALIZED_EXACT = {
 }
 
 
-_SECRET_TOKEN_RULES: list[tuple[frozenset[str], frozenset[str] | None]] = [
+_SECRET_TOKEN_RULES: list[tuple[frozenset[str], Optional[frozenset[str]]]] = [
     (frozenset({"password"}), None),
     (frozenset({"passwd"}),   None),
     (frozenset({"pwd"}),      None),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.cli import build_publish_error
 from packaging._shared.contracts.selection_groups import (
@@ -80,8 +80,8 @@ def _selection_groups_with_discovered_context(
 def _parse_publish_init_selections(
     selections_json: str,
     *,
-    explicit_skill: dict[str, Any] | None,
-) -> tuple[dict[str, Any] | None, tuple[dict[str, Any], int] | None]:
+    explicit_skill: Optional[dict[str, Any]],
+) -> tuple[Optional[dict[str, Any]], Optional[tuple[dict[str, Any], int]]]:
     try:
         selections = json.loads(selections_json)
     except json.JSONDecodeError as exc:
@@ -119,7 +119,7 @@ def _parse_publish_init_selections(
 
 def _normalize_runtime_selection_groups(
     selections: dict[str, Any],
-) -> tuple[dict[str, list[dict[str, Any]]] | None, tuple[dict[str, Any], int] | None]:
+) -> tuple[Optional[dict[str, list[dict[str, Any]]]], Optional[tuple[dict[str, Any], int]]]:
     if "workflow_intent" in selections:
         return None, _invalid_publish_init_input("workflow_intent is not accepted in publish-init selections")
     context_keys = [key for key in ("workspace_documents",) if key in selections]
@@ -163,8 +163,8 @@ def publish_init_submit(
     env: dict[str, Any],
     resolved_env_id: str,
     selections_json: str,
-    explicit_skill: dict[str, Any] | None = None,
-    agent_id: str | None = None,
+    explicit_skill: Optional[dict[str, Any]] = None,
+    agent_id: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     selections, error = _parse_publish_init_selections(
         selections_json,

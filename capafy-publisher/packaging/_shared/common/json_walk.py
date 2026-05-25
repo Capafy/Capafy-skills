@@ -10,7 +10,7 @@ JsonStringLeaf = Tuple[List[str], str, str]
 def walk_json_strings(payload: object, handler: JsonStringHandler) -> tuple[object, int]:
     replacements = 0
 
-    def walk(node: object, key_name: str | None = None) -> object:
+    def walk(node: object, key_name: Optional[str] = None) -> object:
         nonlocal replacements
         if isinstance(node, dict):
             return {key: walk(value, str(key)) for key, value in node.items()}
@@ -25,7 +25,7 @@ def walk_json_strings(payload: object, handler: JsonStringHandler) -> tuple[obje
     return walk(payload), replacements
 
 
-def iter_json_string_leaves(payload: object, path_parts: list[str] | None = None) -> list[JsonStringLeaf]:
+def iter_json_string_leaves(payload: object, path_parts: Optional[list[str]] = None) -> list[JsonStringLeaf]:
     current_path = list(path_parts or [])
     leaves: list[JsonStringLeaf] = []
     if isinstance(payload, dict):

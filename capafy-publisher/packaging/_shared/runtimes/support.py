@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import shutil
 import subprocess
@@ -18,7 +19,7 @@ def unique_non_empty_strings(values: object) -> list[str]:
     return normalized
 
 
-def collect_optional_command_first_line(args: list[str], timeout: int = 10) -> str | None:
+def collect_optional_command_first_line(args: list[str], timeout: int = 10) -> Optional[str]:
     if not args or shutil.which(args[0]) is None:
         return None
     try:

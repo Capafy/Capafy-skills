@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from capafy_platform.api import review_url_warnings
 from packaging._shared.platform.runtime_mapping import (
@@ -185,8 +185,8 @@ def normalize_edit_link_response(
     request_body: dict,
     response_data: dict,
     *,
-    base_url: str | None = None,
-    agent_id: str | None = None,
+    base_url: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> dict[str, Any]:
     _reject_null_string_fields(response_data, _EDIT_LINK_NULL_STRING_FIELDS, label="edit-link response")
     result = dict(response_data)
@@ -207,7 +207,7 @@ def attach_platform_status(
     response: dict[str, Any],
     data: dict[str, Any],
     *,
-    workflow_status: str | None = None,
+    workflow_status: Optional[str] = None,
 ) -> dict[str, Any]:
     enriched = dict(response)
     if "status" in data:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import PurePosixPath
 
@@ -51,8 +52,21 @@ def _normalize_relpath(relpath: str) -> str:
     return PurePosixPath(str(relpath or "").strip() or ".").as_posix().lstrip("./")
 
 
-def _match_platform_contract_file(target_name: str | None, relpath: str) -> bool:
-    target_contract = PLATFORM_LLM_CONFIG_SOURCES.get(str(target_name or "").strip(), {})
+def _contract_key_for_target(target_name: Optional[str]) -> str:
+    normalized = str(target_name or "").strip()
+    if not normalized or normalized in PLATFORM_LLM_CONFIG_SOURCES:
+        return normalized
+    try:
+        from packaging.runtimes.registry import get_target_descriptor
+
+        canonical_name = str(get_target_descriptor(normalized).canonical_name or "").strip()
+    except ValueError:
+        return normalized
+    return canonical_name if canonical_name in PLATFORM_LLM_CONFIG_SOURCES else normalized
+
+
+def is_platform_contract_file(relpath: str, *, target_name: Optional[str]) -> bool:
+    target_contract = PLATFORM_LLM_CONFIG_SOURCES.get(_contract_key_for_target(target_name), {})
     if not isinstance(target_contract, dict):
         return False
     normalized_relpath = _normalize_relpath(relpath)
@@ -65,11 +79,11 @@ def _match_platform_contract_file(target_name: str | None, relpath: str) -> bool
 
 def collect_platform_env_url_hints(
     *,
-    target_name: str | None,
-    referenced_env_names: set[str] | None = None,
+    target_name: Optional[str],
+    referenced_env_names: Optional[set[str]] = None,
     require_referenced_env_names: bool = False,
 ) -> dict[str, str]:
-    target_contract = PLATFORM_LLM_CONFIG_SOURCES.get(str(target_name or "").strip(), {})
+    target_contract = PLATFORM_LLM_CONFIG_SOURCES.get(_contract_key_for_target(target_name), {})
     if not isinstance(target_contract, dict):
         return {}
     known_names = {
@@ -89,10 +103,6 @@ def collect_platform_env_url_hints(
         if canonical_url:
             hints[env_name] = canonical_url
     return hints
-
-
-def is_platform_contract_file(relpath: str, *, target_name: str | None) -> bool:
-    return _match_platform_contract_file(target_name, relpath)
 
 
 __all__ = [

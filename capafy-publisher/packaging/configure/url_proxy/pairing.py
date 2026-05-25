@@ -8,7 +8,6 @@ from packaging.configure.url_proxy.entry_converters import (
 from packaging.configure.url_proxy.group_hints import apply_url_proxy_group_hints
 from packaging.configure.url_proxy.pairing_entries import (
     normalized_url_entry_for_pairing,
-    url_proxy_group_of,
 )
 from packaging.configure.url_proxy.predicates import is_url_proxy_candidate
 
@@ -28,7 +27,7 @@ def pair_url_proxy_entries(
 
     for value, entry in entries.items():
         role = entry.get("role", "config_value")
-        group = url_proxy_group_of(entry)
+        group = str(entry.get("url_proxy_group", "") or "").strip()
         if group and role == "key":
             grouped_keys.setdefault(group, []).append((value, entry))
             continue

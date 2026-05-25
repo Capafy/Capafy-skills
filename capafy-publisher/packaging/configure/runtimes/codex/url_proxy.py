@@ -12,14 +12,11 @@ from packaging.configure.runtimes.codex.dotenv import (
     upsert_dotenv_key_text,
 )
 from packaging.configure.runtimes.codex.provider_scan import (
-    codex_config_metadata,
     scan_toml_providers,
 )
 from packaging.configure.runtimes.codex.url_proxy_candidates import (
-    annotate_candidates_with_config_metadata,
     codex_login_state_candidates,
     codex_platform_key_mode_candidate,
-    has_non_openai_selected_provider,
     official_process_env_fallback_candidates,
     should_build_codex_platform_key_mode,
     usable_process_env_value,
@@ -40,7 +37,6 @@ logger = logging.getLogger(__name__)
 _API_KEY_FIELDS = frozenset({"OPENAI_API_KEY"})
 _BASE_URL_FIELDS = frozenset({"base_url", "OPENAI_BASE_URL", "openai_base_url"})
 _ID = "codex"
-_OFFICIAL_PROVIDER_NAME = CODEX_AUTH_PROVIDER_NAME
 
 
 class CodexRuntime(RuntimeContract):
@@ -54,11 +50,14 @@ class CodexRuntime(RuntimeContract):
 
 
         candidates.extend(scan_toml_providers(ctx, toml_env_keys))
-        selected_provider_blocked = has_non_openai_selected_provider(candidates)
+        selected_provider_blocked = _selected_provider_blocks_official_fallback(candidates)
 
 
         all_key_fields = _API_KEY_FIELDS | toml_env_keys
-        field_set = UrlProxyFieldSet(api_key_fields=all_key_fields, base_url_fields=_BASE_URL_FIELDS)
+        field_set = UrlProxyFieldSet(
+            api_key_fields=all_key_fields,
+            base_url_fields=_BASE_URL_FIELDS,
+        )
         self._inject_auth_json_key_if_no_local_key(
             ctx,
             all_key_fields,
@@ -78,7 +77,13 @@ class CodexRuntime(RuntimeContract):
             fields=field_set,
         ))
         existing = {c.field for c in candidates if c.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}}
-        candidates.extend(self._scan_official_process_env_fallback(ctx, existing))
+        if not selected_provider_blocked:
+            candidates.extend(official_process_env_fallback_candidates(
+                config_exists=(ctx.staging_root / ".codex" / "config.toml").is_file(),
+                process_env=ctx.process_env,
+                existing_fields=existing,
+                auth_override_env_key=CODEX_AUTH_OVERRIDE_ENV_KEY,
+            ))
 
 
         candidates.extend(self._detect_login_state(
@@ -91,27 +96,11 @@ class CodexRuntime(RuntimeContract):
             candidates,
             selected_provider_blocked=selected_provider_blocked,
         ):
-            candidates.append(self._platform_key_mode_candidate())
-        return self._with_config_metadata(ctx, candidates)
+            candidates.append(codex_platform_key_mode_candidate())
+        return candidates
 
     def pair(self, candidates: list[Candidate]) -> list[UrlProxyPair]:
         return build_codex_url_proxy_pairs(candidates)
-
-    def _scan_official_process_env_fallback(
-        self,
-        ctx: ScanContext,
-        existing_fields: set[str],
-    ) -> list[Candidate]:
-        return official_process_env_fallback_candidates(
-            config_exists=(ctx.staging_root / ".codex" / "config.toml").is_file(),
-            process_env=ctx.process_env,
-            existing_fields=existing_fields,
-            auth_override_env_key=CODEX_AUTH_OVERRIDE_ENV_KEY,
-        )
-
-    @staticmethod
-    def _usable_process_env_value(ctx: ScanContext, field: str) -> str:
-        return usable_process_env_value(ctx.process_env, field)
 
     def _inject_auth_json_key_if_no_local_key(
         self,
@@ -126,7 +115,7 @@ class CodexRuntime(RuntimeContract):
             return
         if self._has_local_key_value(ctx, key_fields):
             return
-        if self._usable_process_env_value(ctx, CODEX_AUTH_OVERRIDE_ENV_KEY):
+        if usable_process_env_value(ctx.process_env, CODEX_AUTH_OVERRIDE_ENV_KEY):
             return
 
         from packaging.configure.runtimes.codex.auth import codex_auth_api_key_value, codex_auth_oauth_detected
@@ -148,7 +137,7 @@ class CodexRuntime(RuntimeContract):
 
     def _has_local_key_value(self, ctx: ScanContext, key_fields: frozenset[str]) -> bool:
         for key in key_fields:
-            value = self._usable_process_env_value(ctx, key)
+            value = usable_process_env_value(ctx.process_env, key)
             if value:
                 return True
         for relpath in (".codex/.env", ".env"):
@@ -160,14 +149,6 @@ class CodexRuntime(RuntimeContract):
         return (
             dotenv_has_any_value(ctx.staging_root / ".codex" / ".env", expected_value)
             or dotenv_has_any_value(ctx.staging_root / ".env", expected_value)
-        )
-
-    def _with_config_metadata(self, ctx: ScanContext, candidates: list[Candidate]) -> list[Candidate]:
-        metadata = codex_config_metadata(ctx)
-        return annotate_candidates_with_config_metadata(
-            candidates,
-            metadata,
-            official_provider_name=_OFFICIAL_PROVIDER_NAME,
         )
 
     def rewrite(self, staging_root: Path, pairs: list[UrlProxyPair]) -> None:
@@ -196,7 +177,7 @@ class CodexRuntime(RuntimeContract):
             codex_auth_oauth_detected,
         )
 
-        codex_api_key = self._usable_process_env_value(ctx, CODEX_AUTH_OVERRIDE_ENV_KEY)
+        codex_api_key = usable_process_env_value(ctx.process_env, CODEX_AUTH_OVERRIDE_ENV_KEY)
         auth_key = codex_auth_api_key_value(
             ctx.staging_root,
             ctx.stage_plan,
@@ -224,7 +205,7 @@ class CodexRuntime(RuntimeContract):
     ) -> bool:
         if ctx.target_id != _ID:
             return False
-        if selected_provider_blocked or has_non_openai_selected_provider(existing):
+        if selected_provider_blocked or _selected_provider_blocks_official_fallback(existing):
             return False
         if any(
             candidate.role in {"api_key", "synthesized_api_key"}
@@ -248,15 +229,20 @@ class CodexRuntime(RuntimeContract):
             has_local_auth_dotenv_value=bool(auth_key and self._has_local_dotenv_value(ctx, auth_key)),
         )
 
-    @staticmethod
-    def _platform_key_mode_candidate() -> Candidate:
-        return codex_platform_key_mode_candidate()
-
-
-
     def rewrite_confirmed(self, staging_root: Path, reviewed_scan: dict[str, Any]) -> dict[str, Any]:
         from packaging.configure.runtimes.codex.provider import rewrite_codex_confirmed_providers
         return rewrite_codex_confirmed_providers(staging_root, reviewed_scan)
 
 
 __all__ = ["CodexRuntime"]
+
+
+def _selected_provider_blocks_official_fallback(candidates: list[Candidate]) -> bool:
+    provider_candidates = [
+        candidate for candidate in candidates
+        if candidate.extra.get("codex_provider_state")
+    ]
+    if not provider_candidates:
+        return False
+    provider = str(provider_candidates[0].extra.get("provider_name", "") or "").strip()
+    return provider != CODEX_AUTH_PROVIDER_NAME

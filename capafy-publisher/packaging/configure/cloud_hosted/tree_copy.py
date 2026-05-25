@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -28,10 +29,10 @@ class StageTreeCopyRequest:
     skip_skill_runtime_outputs: bool = False
     skill_runtime_prefixes: tuple[str, ...] = ()
     excluded_relpath_prefixes: tuple[str, ...] = ()
-    selected_paths: set[str] | None = None
-    selected_skill_paths: set[str] | None = None
-    selected_plugin_paths: set[str] | None = None
-    workspace_allowlist: set[str] | None = None
+    selected_paths: Optional[set[str]] = None
+    selected_skill_paths: Optional[set[str]] = None
+    selected_plugin_paths: Optional[set[str]] = None
+    workspace_allowlist: Optional[set[str]] = None
     apply_selection_filters: bool = True
     skip_high_risk_files: bool = True
     target: object = None
@@ -48,7 +49,7 @@ class StageCopyState:
 
 def _is_exact_allowlisted_file(
     display_path: str,
-    workspace_allowlist: set[str] | None,
+    workspace_allowlist: Optional[set[str]],
     *,
     is_dir: bool,
 ) -> bool:

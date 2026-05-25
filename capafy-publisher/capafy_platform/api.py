@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from capafy_platform.http import (
@@ -10,7 +10,7 @@ from capafy_platform.http import (
 )
 
 
-def review_url_warnings(review_url: str, *, base_url: str | None = None) -> list[str]:
+def review_url_warnings(review_url: str, *, base_url: Optional[str] = None) -> list[str]:
     normalized_review_url = str(review_url or "").strip()
     if not normalized_review_url:
         return []
@@ -27,18 +27,18 @@ def review_url_warnings(review_url: str, *, base_url: str | None = None) -> list
     return []
 
 
-def get_latest_version_raw(agent_id: str, *, access_token: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+def get_latest_version_raw(agent_id: str, *, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:
         raise ValueError("agent_id must not be empty")
     return get_platform_json(f"/agent/agents/{normalized_agent_id}", access_token=access_token, base_url=base_url, require_auth=True)
 
 
-def list_agents_raw(*, access_token: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+def list_agents_raw(*, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
     return get_platform_json("/agent/agents", access_token=access_token, base_url=base_url, require_auth=True)
 
 
-def get_account_me_raw(*, access_token: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+def get_account_me_raw(*, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
     normalized_access_token = str(access_token or "").strip()
     if not normalized_access_token:
         raise ValueError("access_token must not be empty")
@@ -55,8 +55,8 @@ def get_account_me_raw(*, access_token: str | None = None, base_url: str | None 
 def create_agent(
     request_body: dict[str, Any],
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     if not isinstance(request_body, dict):
         raise ValueError("request_body must be an object")
@@ -66,8 +66,8 @@ def create_agent(
 def create_agent_version(
     request_body: dict[str, Any],
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     if not isinstance(request_body, dict):
         raise ValueError("request_body must be an object")
@@ -78,8 +78,8 @@ def save_config_keys_raw(
     agent_id: str,
     request_body: dict[str, Any],
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:
@@ -95,8 +95,8 @@ def report_package_raw(
     agent_id: str,
     request_body: dict[str, Any],
     *,
-    access_token: str | None = None,
-    base_url: str | None = None,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     normalized_agent_id = str(agent_id or "").strip()
     if not normalized_agent_id:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 import re
 from pathlib import PurePosixPath
@@ -85,7 +86,7 @@ def _looks_like_sample_secret_value(value: str) -> bool:
     return False
 
 
-def _should_drop_candidate(relpath: str, candidate: dict, line: str | None = None) -> bool:
+def _should_drop_candidate(relpath: str, candidate: dict, line: Optional[str] = None) -> bool:
     pure = PurePosixPath(relpath)
     basename = pure.name.lower()
     path_parts = {part.lower() for part in pure.parts}
@@ -132,10 +133,10 @@ def annotate_candidate(
     candidate: dict,
     relpath: str,
     *,
-    line: str | None = None,
-    match_start_col: int | None = None,
-    match_end_col: int | None = None,
-) -> dict | None:
+    line: Optional[str] = None,
+    match_start_col: Optional[int] = None,
+    match_end_col: Optional[int] = None,
+) -> Optional[dict]:
     if (
         line is not None
         and match_start_col is not None

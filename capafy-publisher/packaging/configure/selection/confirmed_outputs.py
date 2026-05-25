@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.contracts.stage_plan import StageFileSource, StageTreeSource
 from packaging._shared.contracts.selectable import is_absolute_like_path
 
-def stage_sources_for_entry(entry: Any) -> tuple[StageTreeSource | None, StageFileSource | None]:
+def stage_sources_for_entry(entry: Any) -> tuple[Optional[StageTreeSource], Optional[StageFileSource]]:
     if entry.source_kind == "directory":
         return (
             StageTreeSource(

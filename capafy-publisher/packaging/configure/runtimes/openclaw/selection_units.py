@@ -1,20 +1,15 @@
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
 from packaging._shared.contracts.path_shapes import (
-    extract_bundle_command_display_path,
-    extract_bundle_hook_display_path,
     extract_skill_dir_display_path,
     normalized_parts,
     rootless_skill_path,
-    unit_type_from_path,
 )
-from packaging.configure.selection.unit_docs import selectable_unit_synopsis
+from packaging.configure.selection.unit_docs import selectable_unit_name, selectable_unit_synopsis
 from packaging._shared.contracts.selectable import normalize_text
-from packaging.configure.runtimes.openclaw.selection_validation import (
-    build_openclaw_selection_runtime_validation as _build_openclaw_selection_runtime_validation,
-)
 from packaging.configure.runtimes.openclaw.skill_metadata import (
     openclaw_skill_key_from_skill_dir,
 )
@@ -23,7 +18,7 @@ from packaging.configure.runtimes.openclaw.workspace_common import (
 )
 
 
-def extract_openclaw_plugin_display_path(display_path: str) -> str | None:
+def extract_openclaw_plugin_display_path(display_path: str) -> Optional[str]:
     parts = normalized_parts(display_path)
     if len(parts) >= 3 and parts[:2] == [".openclaw", "extensions"]:
         return PurePosixPath(*parts[:3]).as_posix()
@@ -35,28 +30,15 @@ def is_openclaw_plugin_embedded_skill_path(display_path: str) -> bool:
     return len(parts) >= 5 and parts[:2] == [".openclaw", "extensions"] and parts[3] == "skills"
 
 
-def extract_selectable_unit_display_path(display_path: str, *, allow_bundle_units: bool = False) -> str | None:
-    skill_path = extract_skill_dir_display_path(display_path)
-    if skill_path:
-        return skill_path
-    if not allow_bundle_units:
-        return None
-    hook_path = extract_bundle_hook_display_path(display_path)
-    if hook_path:
-        return hook_path
-    return extract_bundle_command_display_path(display_path)
-
-
-def _openclaw_unit_type_from_path(relative_path: str, *, allow_bundle_units: bool = False) -> str:
+def _openclaw_unit_type_from_path(relative_path: str) -> str:
     normalized = PurePosixPath(relative_path.rstrip("/")).as_posix()
-    if allow_bundle_units:
-        plugin_path = extract_openclaw_plugin_display_path(normalized)
-        if plugin_path == normalized:
-            return "openclaw_plugin"
-    return unit_type_from_path(normalized, allow_bundle_units=allow_bundle_units)
+    plugin_path = extract_openclaw_plugin_display_path(normalized)
+    if plugin_path == normalized:
+        return "openclaw_plugin"
+    return "skill" if extract_skill_dir_display_path(normalized) else "unknown"
 
 
-def build_reference_tokens(relative_path: str, name: str, skill_key: str | None = None) -> list[str]:
+def build_reference_tokens(relative_path: str, name: str, skill_key: Optional[str] = None) -> list[str]:
     tokens: list[str] = []
     for token in (
         relative_path,
@@ -83,7 +65,7 @@ def _plugin_embedded_skill_entries(plugin_root: Path, plugin_display_path: str) 
         child_path = (PurePosixPath(plugin_display_path) / "skills" / child.name).as_posix()
         entries.append(
             {
-                "name": child.name,
+                "name": selectable_unit_name(child, "skill"),
                 "skill_key": openclaw_skill_key_from_skill_dir(child),
                 "path": child_path,
             }
@@ -150,7 +132,7 @@ def finalize_openclaw_selectable_entry(entry: dict, *, unit_path: Path) -> dict:
     return finalized
 
 
-def classify_openclaw_directory_unit(unit_path: Path, display_path: str) -> tuple[str | None, str, bool]:
+def classify_openclaw_directory_unit(unit_path: Path, display_path: str) -> tuple[Optional[str], str, bool]:
     normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
     if not normalized or normalized == ".":
         return None, "unknown", True
@@ -161,9 +143,9 @@ def classify_openclaw_directory_unit(unit_path: Path, display_path: str) -> tupl
     if is_openclaw_plugin_embedded_skill_path(normalized):
         return None, "suppressed", True
 
-    selectable_path = extract_selectable_unit_display_path(normalized, allow_bundle_units=True)
-    unit_type = _openclaw_unit_type_from_path(normalized, allow_bundle_units=True)
-    if selectable_path == normalized and unit_type != "bundle_command":
+    selectable_path = extract_skill_dir_display_path(normalized)
+    unit_type = _openclaw_unit_type_from_path(normalized)
+    if selectable_path == normalized:
         if unit_type == "skill":
             parts = [part for part in PurePosixPath(normalized).parts if part and part != "."]
             depth_after_skills = 0
@@ -181,25 +163,13 @@ def classify_openclaw_directory_unit(unit_path: Path, display_path: str) -> tupl
     return None, "unknown", True
 
 
-def classify_openclaw_file_unit(display_path: str) -> tuple[str | None, str]:
-    normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
-    if not normalized or normalized == ".":
-        return None, "unknown"
-
-    selectable_path = extract_selectable_unit_display_path(normalized, allow_bundle_units=True)
-    unit_type = _openclaw_unit_type_from_path(normalized, allow_bundle_units=True)
-    if selectable_path == normalized and unit_type == "bundle_command":
-        return normalized, unit_type
-    return None, "unknown"
-
-
 def openclaw_owning_selectable_paths(display_path: str) -> tuple[str, ...]:
     normalized = PurePosixPath(display_path.rstrip("/")).as_posix()
     if not normalized or normalized == ".":
         return ()
 
     owning_paths: list[str] = []
-    selectable_path = extract_selectable_unit_display_path(normalized, allow_bundle_units=True)
+    selectable_path = extract_skill_dir_display_path(normalized)
     if selectable_path and selectable_path not in owning_paths:
         owning_paths.append(selectable_path)
     plugin_path = extract_openclaw_plugin_display_path(normalized)
@@ -214,27 +184,13 @@ def infer_openclaw_unit_type_from_path(display_path: str) -> str:
         return "unknown"
     if normalized.startswith(OPENCLAW_CRON_UNIT_PREFIX):
         return "cron"
-    return _openclaw_unit_type_from_path(normalized, allow_bundle_units=True)
-
-
-def build_openclaw_selection_runtime_validation(
-    *,
-    selected_paths: set[str],
-    included_skills: list[dict],
-) -> dict:
-    return _build_openclaw_selection_runtime_validation(
-        selected_paths=selected_paths,
-        included_skills=included_skills,
-    )
+    return _openclaw_unit_type_from_path(normalized)
 
 
 __all__ = [
     "build_reference_tokens",
-    "build_openclaw_selection_runtime_validation",
     "classify_openclaw_directory_unit",
-    "classify_openclaw_file_unit",
     "extract_openclaw_plugin_display_path",
-    "extract_selectable_unit_display_path",
     "finalize_openclaw_selectable_entry",
     "infer_openclaw_unit_type_from_path",
     "is_openclaw_plugin_embedded_skill_path",

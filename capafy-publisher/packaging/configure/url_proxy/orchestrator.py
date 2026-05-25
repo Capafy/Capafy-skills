@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import Any, Mapping, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from packaging.configure.contracts import UrlProxyPair
@@ -35,8 +35,8 @@ class UrlProxyBuildResult:
 def build_url_proxy_phase(
     staging_root,
     *,
-    env_id: str | None = None,
-    process_env: Mapping[str, str] | None = None,
+    env_id: Optional[str] = None,
+    process_env: Optional[Mapping[str, str]] = None,
     stage_plan: Any = None,
     user_home=None,
     platform_agent_type: str = "run_online",
@@ -115,7 +115,7 @@ def build_url_proxy_phase(
 
     deduped_fallback = dedupe_fallback_generic_entries(
         structured_result.fallback_generic_entries,
-        runtime_pairs,
+        all_pairs,
     )
 
     claimed = collect_claimed_process_env_names(all_pairs)
