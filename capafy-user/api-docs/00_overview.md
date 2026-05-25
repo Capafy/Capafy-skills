@@ -6,7 +6,7 @@ This directory describes the latest API surface available to the current User Sk
 
 ## Base URL
 
-- `https://capafy.ai/api`
+- `https://api.capafy.ai`
 
 ## Authentication
 

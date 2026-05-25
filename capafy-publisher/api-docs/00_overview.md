@@ -11,7 +11,7 @@ This document describes the seller-side capability surface that the current Deve
 ### 2.1 Base address
 
 ```
-https://capafy.ai/api
+https://api.capafy.ai
 ```
 
 ### 2.2 Authentication
