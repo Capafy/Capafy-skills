@@ -90,7 +90,7 @@ Pick any Skill on Capafy that fits your task. **Two ways to use it:**
 
 | Mode | User Pays | Where It Runs | Source Code |
 |------|-----------|--------------|-------------|
-| **Run Online — Subscription** | Per cycle (monthly / yearly) | On Capafy's infrastructure | Stays closed |
+| **Run Online — Subscription** | Per cycle (weekly / monthly) | On Capafy's infrastructure | Stays closed |
 | **Run Online — Hourly** | Per hour of usage | On Capafy's infrastructure | Stays closed |
 | **Download** | One-time fee | On the user's machine | User gets the files |
 | **Free** | — | Mirrors whichever paid form it's set as | Same as that form |
