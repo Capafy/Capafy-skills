@@ -4,31 +4,14 @@ import re
 from typing import Mapping
 
 from packaging._shared.openclaw.official_providers import OpenClawOfficialProviderSpec
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
+from packaging.configure.env_values import (
+    env_reference_name,
+    usable_env_value,
+    usable_process_env_value,
+)
 
 
 _KEY_SPLIT = re.compile(r"[\s,;]+")
-_ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-
-
-def is_env_reference(value: str) -> bool:
-    return bool(_ENV_NAME_RE.match(str(value or "").strip()))
-
-
-def real_value(value: object) -> str:
-    normalized = str(value or "").strip()
-    if not normalized or looks_like_platform_managed_placeholder_value(normalized):
-        return ""
-    return normalized
-
-
-def resolve_api_key_config_value(raw_value: str, env: Mapping[str, str]) -> str:
-    value = real_value(raw_value)
-    if not value:
-        return ""
-    if is_env_reference(value):
-        return real_value(env.get(value, ""))
-    return value
 
 
 def _append_provider_api_key_item(
@@ -38,7 +21,7 @@ def _append_provider_api_key_item(
     value: object,
     field_aliases: list[str],
 ) -> None:
-    normalized_value = real_value(value)
+    normalized_value = usable_env_value(value)
     if not normalized_value:
         return
     items.append(
@@ -57,7 +40,7 @@ def collect_provider_api_key_items(
     items: list[dict[str, object]] = []
     live = spec.live_single_env
     if live:
-        value = real_value(env.get(live, ""))
+        value = usable_process_env_value(env, live)
         if value:
             return [{"env_name": live, "value": value, "field_aliases": [live]}]
 
@@ -109,6 +92,36 @@ def collect_provider_api_key_items(
     return dedupe_key_items(items)
 
 
+def collect_provider_api_key_items_by_priority(
+    spec: OpenClawOfficialProviderSpec,
+    *,
+    api_key: object,
+    auth_profile_values: list[str],
+    env: Mapping[str, str],
+) -> list[dict[str, object]]:
+    configured_key = usable_env_value(api_key)
+    if configured_key:
+        env_name = env_reference_name(configured_key)
+        if not env_name:
+            return [{"env_name": "", "value": configured_key, "field_aliases": []}]
+        resolved = usable_env_value(env.get(env_name, ""))
+        if resolved:
+            return [{"env_name": env_name, "value": resolved, "field_aliases": [env_name]}]
+
+    items: list[dict[str, object]] = []
+    for value in auth_profile_values:
+        _append_provider_api_key_item(
+            items,
+            env_name="",
+            value=value,
+            field_aliases=[],
+        )
+    if items:
+        return dedupe_key_items(items)
+
+    return collect_provider_api_key_items(spec, env)
+
+
 def dedupe_key_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
     seen: set[tuple[str, str]] = set()
     result: list[dict[str, object]] = []
@@ -125,8 +138,6 @@ def dedupe_key_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
 
 __all__ = [
     "collect_provider_api_key_items",
+    "collect_provider_api_key_items_by_priority",
     "dedupe_key_items",
-    "is_env_reference",
-    "real_value",
-    "resolve_api_key_config_value",
 ]

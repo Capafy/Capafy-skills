@@ -3,18 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import logging
-import re
 from pathlib import Path
 from typing import Any, Mapping
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, SourceKind
+from packaging.configure.dotenv import iter_dotenv_assignments
+from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
 logger = logging.getLogger(__name__)
-
-_ENV_LINE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 
 
 @dataclass(frozen=True)
@@ -47,17 +46,7 @@ def scan_dotenv(
 
     candidates: list[Candidate] = []
     occurrence_counters: dict[tuple[str, str], int] = {}
-    for line_no, raw_line in enumerate(text.splitlines(), start=1):
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        m = _ENV_LINE.match(line)
-        if not m:
-            continue
-        key, raw_value = m.group(1), m.group(2).strip()
-        if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] and raw_value[0] in ('"', "'"):
-            raw_value = raw_value[1:-1]
-        value = raw_value.strip()
+    for key, value, line_number in iter_dotenv_assignments(text):
         if not value or looks_like_platform_managed_placeholder_value(value):
             continue
 
@@ -70,7 +59,7 @@ def scan_dotenv(
                 location=FieldLocation(
                     fmt="dotenv",
                     occurrence_index=occurrence_counters[occurrence_key],
-                    line_number=line_no,
+                    line_number=line_number,
                 ),
             ))
         elif key in fields.base_url_fields:
@@ -84,7 +73,7 @@ def scan_dotenv(
                     location=FieldLocation(
                         fmt="dotenv",
                         occurrence_index=occurrence_counters[occurrence_key],
-                        line_number=line_no,
+                        line_number=line_number,
                     ),
                 ))
 
@@ -191,9 +180,7 @@ def resolve_process_env_refs(
 
     candidates: list[Candidate] = []
     for env_name in sorted(referenced - existing_fields):
-        actual_value = str(process_env.get(env_name, "")).strip()
-        if looks_like_platform_managed_placeholder_value(actual_value):
-            actual_value = ""
+        actual_value = usable_process_env_value(process_env, env_name)
         role = "base_url" if env_name in fields.base_url_fields else "api_key"
         if role == "base_url":
             if not actual_value or not normalize_http_url_candidate(actual_value):

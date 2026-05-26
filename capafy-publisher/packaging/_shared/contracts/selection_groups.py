@@ -373,7 +373,7 @@ def validate_buyout_skill_count(raw: object) -> SelectionGroups:
     groups = normalize_documented_selection_groups(raw)
     selected_skills = selected_items_for_group(groups, "skills")
     if len(selected_skills) != 1:
-        raise ValueError("buyout only supports exactly one selected skill")
+        raise ValueError("download only supports exactly one selected skill")
     return groups
 
 

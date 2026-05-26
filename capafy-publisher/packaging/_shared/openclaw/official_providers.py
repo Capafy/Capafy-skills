@@ -110,6 +110,10 @@ def match_openclaw_builtin_model_provider(
         for prefix in spec.model_prefixes:
             if lowered.startswith(prefix):
                 return spec, normalized[len(prefix):]
+    if "/" not in normalized:
+        for spec in OPENCLAW_OFFICIAL_PROVIDER_SPECS:
+            if spec.family == "anthropic" and lowered.startswith("claude-"):
+                return spec, normalized
     return None
 
 

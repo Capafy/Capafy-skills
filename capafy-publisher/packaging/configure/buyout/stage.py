@@ -71,8 +71,8 @@ def copy_unit_tree(
 
 def bundle_skill_name(selected_units: list[dict]) -> str:
     if len(selected_units) != 1:
-        raise ValueError("buyout mode requires exactly one selected skill")
-    return str(selected_units[0].get("name", "")).strip() or "buyout-skill"
+        raise ValueError("download mode requires exactly one selected skill")
+    return str(selected_units[0].get("name", "")).strip() or "download-skill"
 
 
 def normalize_selected_units(
@@ -98,7 +98,7 @@ def normalize_selected_units(
         )
 
     if len(normalized_units) != 1:
-        raise ValueError("buyout mode requires exactly one selected skill")
+        raise ValueError("download mode requires exactly one selected skill")
 
     for item in normalized_units:
         unit_type = str(item.get("unit_type", "")).strip()
@@ -106,7 +106,7 @@ def normalize_selected_units(
             continue
 
         raise ValueError(
-            f"buyout only supports skill units, but received {unit_type or 'unknown'}: {item['path']}"
+            f"download only supports skill units, but received {unit_type or 'unknown'}: {item['path']}"
         )
     return normalized_units
 
@@ -125,11 +125,11 @@ def resolve_unit_source_path(unit_path: str, stage_plan: StagePlan) -> Path:
         if matched_source is None or len(display_prefix) > matched_source[0]:
             matched_source = (len(display_prefix), candidate, display_prefix)
     if matched_source is None:
-        raise ValueError(f"Selected buyout unit is not in the declared stage sources: {unit_path}")
+        raise ValueError(f"Selected download unit is not in the declared stage sources: {unit_path}")
 
     source_path = matched_source[1]
     if not source_path.exists():
-        raise ValueError(f"Selected buyout unit source does not exist: {source_path}")
+        raise ValueError(f"Selected download unit source does not exist: {source_path}")
     return source_path
 
 
@@ -155,7 +155,7 @@ def stage_buyout(
     unit = selected_units[0]
     source_path = resolve_unit_source_path(str(unit["path"]), stage_plan)
     if not source_path.is_dir():
-        raise ValueError(f"buyout supports directory units only: {source_path}")
+        raise ValueError(f"download supports directory units only: {source_path}")
     copied_files += copy_unit_tree(
         source_path,
         staging_root,

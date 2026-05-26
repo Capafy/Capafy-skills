@@ -57,7 +57,7 @@ def load_dispose_overrides_json(path: Optional[str]) -> dict[str, str]:
             raise ValueError("dispositions json entries must have non-empty FIELD and DISPOSITION")
         if disposition not in {"replace_with_placeholder", "exclude_value"}:
             raise ValueError(
-                f"unsupported buyout disposition for {field}: {disposition}; expected replace_with_placeholder or exclude_value"
+                f"unsupported download disposition for {field}: {disposition}; expected replace_with_placeholder or exclude_value"
             )
         overrides[field] = disposition
     return overrides
@@ -135,13 +135,13 @@ def run_buyout_configure(ctx: Any) -> tuple[dict[str, Any], int]:
     except ValueError as exc:
         return build_publish_error(
             error=str(exc),
-            failed_step="validate_buyout_skill_count",
-            blocking_category="invalid_buyout_selection",
+            failed_step="validate_download_skill_count",
+            blocking_category="invalid_download_selection",
             developer_next_steps=[
-                "Edit the first webpage selection so buyout has exactly one selected skill.",
+                "Edit the first webpage selection so download has exactly one selected skill.",
                 "Rerun publish-configure after the platform selection is corrected.",
             ],
-            next_step="fix_buyout_selection_then_retry",
+            next_step="fix_download_selection_then_retry",
             agent_id=agent_id,
             agent_version_id=latest_state.agent_version_id,
             env_id=latest_state.env_id,
@@ -190,10 +190,10 @@ def run_buyout_configure(ctx: Any) -> tuple[dict[str, Any], int]:
     except ValueError as exc:
         return build_publish_error(
             error=str(exc),
-            failed_step="apply_buyout_dispositions",
-            blocking_category="invalid_buyout_disposition",
+            failed_step="apply_download_dispositions",
+            blocking_category="invalid_download_disposition",
             developer_next_steps=[
-                "Use only replace_with_placeholder or exclude_value as buyout dispositions.",
+                "Use only replace_with_placeholder or exclude_value as download dispositions.",
             ],
             next_step="fix_dispositions_file_then_retry",
             agent_id=agent_id,
@@ -231,9 +231,9 @@ def run_buyout_configure(ctx: Any) -> tuple[dict[str, Any], int]:
             "disposition_summary": disposition_summary(updated),
         }, 0
     return build_publish_error(
-        error="buyout requires creator to choose replace/exclude for each sensitive item",
-        failed_step="choose_buyout_dispositions",
-        blocking_category="missing_buyout_dispositions",
+        error="download requires creator to choose replace/exclude for each sensitive item",
+        failed_step="choose_download_dispositions",
+        blocking_category="missing_download_dispositions",
         developer_next_steps=[
             "Create a dispositions JSON object mapping each FIELD to replace_with_placeholder or exclude_value.",
             "Rerun publish-configure with --dispositions-file <path>.",

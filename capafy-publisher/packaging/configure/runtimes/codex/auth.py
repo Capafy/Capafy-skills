@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from packaging._shared.common.json_io import load_json_object
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
+from packaging.configure.env_values import usable_env_value, usable_process_env_value
 
 
 CODEX_AUTH_ENV_KEY = "OPENAI_API_KEY"
@@ -27,8 +27,7 @@ _CODEX_OAUTH_AUTH_MODES = {
 def _is_usable_codex_auth_key(value: object) -> bool:
     if not isinstance(value, str):
         return False
-    normalized = value.strip()
-    return bool(normalized and not looks_like_platform_managed_placeholder_value(normalized))
+    return bool(usable_env_value(value))
 
 
 def _codex_auth_mode(payload: dict[str, Any]) -> str:
@@ -45,17 +44,13 @@ def _codex_auth_openai_api_key(payload: dict[str, Any]) -> str:
 def _codex_api_key_env_value(process_env: Optional[Mapping[str, str]]) -> str:
     if process_env is None:
         return ""
-    value = process_env.get(CODEX_AUTH_OVERRIDE_ENV_KEY, "")
-    if _is_usable_codex_auth_key(value):
-        return str(value).strip()
-    return ""
+    return usable_process_env_value(process_env, CODEX_AUTH_OVERRIDE_ENV_KEY)
 
 
 def codex_access_token_env_detected(process_env: Optional[Mapping[str, str]]) -> bool:
     if process_env is None:
         return False
-    value = process_env.get(CODEX_AUTH_ACCESS_TOKEN_ENV_KEY, "")
-    return _is_usable_codex_auth_key(value)
+    return bool(usable_process_env_value(process_env, CODEX_AUTH_ACCESS_TOKEN_ENV_KEY))
 
 
 def codex_auth_uses_oauth(payload: dict[str, Any]) -> bool:

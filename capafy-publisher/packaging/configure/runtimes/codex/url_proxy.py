@@ -6,10 +6,10 @@ from typing import Any
 
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import SourceKind, UrlProxyPair
+from packaging.configure.dotenv import upsert_dotenv_key_text
+from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.runtimes.codex.dotenv import (
     dotenv_has_any_value,
-    dotenv_has_key_value,
-    upsert_dotenv_key_text,
 )
 from packaging.configure.runtimes.codex.provider_scan import (
     scan_toml_providers,
@@ -19,7 +19,6 @@ from packaging.configure.runtimes.codex.url_proxy_candidates import (
     codex_platform_key_mode_candidate,
     official_process_env_fallback_candidates,
     should_build_codex_platform_key_mode,
-    usable_process_env_value,
 )
 from packaging.configure.runtimes.codex.url_proxy_pairs import (
     build_codex_url_proxy_pairs,
@@ -58,9 +57,8 @@ class CodexRuntime(RuntimeContract):
             api_key_fields=all_key_fields,
             base_url_fields=_BASE_URL_FIELDS,
         )
-        self._inject_auth_json_key_if_no_local_key(
+        self._inject_auth_json_key(
             ctx,
-            all_key_fields,
             selected_provider_blocked=selected_provider_blocked,
         )
         for relpath in (".codex/.env", ".env"):
@@ -102,18 +100,13 @@ class CodexRuntime(RuntimeContract):
     def pair(self, candidates: list[Candidate]) -> list[UrlProxyPair]:
         return build_codex_url_proxy_pairs(candidates)
 
-    def _inject_auth_json_key_if_no_local_key(
+    def _inject_auth_json_key(
         self,
         ctx: ScanContext,
-        key_fields: frozenset[str],
         *,
         selected_provider_blocked: bool = False,
     ) -> None:
-        if not key_fields:
-            return
         if selected_provider_blocked:
-            return
-        if self._has_local_key_value(ctx, key_fields):
             return
         if usable_process_env_value(ctx.process_env, CODEX_AUTH_OVERRIDE_ENV_KEY):
             return
@@ -134,16 +127,6 @@ class CodexRuntime(RuntimeContract):
         except OSError:
             text = ""
         env_path.write_text(upsert_dotenv_key_text(text, "OPENAI_API_KEY", auth_key), encoding="utf-8")
-
-    def _has_local_key_value(self, ctx: ScanContext, key_fields: frozenset[str]) -> bool:
-        for key in key_fields:
-            value = usable_process_env_value(ctx.process_env, key)
-            if value:
-                return True
-        for relpath in (".codex/.env", ".env"):
-            if dotenv_has_key_value(ctx.staging_root / relpath, key_fields):
-                return True
-        return False
 
     def _has_local_dotenv_value(self, ctx: ScanContext, expected_value: str) -> bool:
         return (

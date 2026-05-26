@@ -5,14 +5,7 @@ from typing import Mapping
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import SourceKind
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
-
-
-def usable_process_env_value(process_env: Mapping[str, str], field: str) -> str:
-    value = str(process_env.get(field, "")).strip()
-    if looks_like_platform_managed_placeholder_value(value):
-        return ""
-    return value
+from packaging.configure.env_values import usable_process_env_value
 
 
 def official_process_env_fallback_candidates(
@@ -130,5 +123,4 @@ __all__ = [
     "codex_platform_key_mode_candidate",
     "official_process_env_fallback_candidates",
     "should_build_codex_platform_key_mode",
-    "usable_process_env_value",
 ]

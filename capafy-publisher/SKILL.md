@@ -89,7 +89,7 @@ What comes next after `publish-configure` / `publish-ship` is decided entirely b
 | `agent_id` | "Agent ID" |
 | `agent_version_id` | "Version ID" |
 | `agentType` / `agent_type` | "publishing mode" |
-| `agentType: run_online` / `agent_type: run_online` | "Cloud-Hosted mode (Run Online)" |
+| `agentType: run_online` / `agent_type: run_online` | "Run Online mode" |
 | `agentType: download` / `agent_type: download` | "Download mode" |
 | `selections` / `selection_groups` / `workflowInfo.selection_groups` | "the skill selection for this release" |
 | `Phase A` / `discover_units` | "local scan" |
@@ -233,7 +233,7 @@ Two hard rules — break either and stop right away to rerun Phase A or ask the 
 
 ## Sensitive Information Deep Scan
 
-**Consent step before the first entry to `publish-configure` (Cloud-Hosted mode only)**: after the creator completes the first page (confirm the file contents to upload), reconcile per Core Iron Rule #2 with `get_latest_version_raw(agent_id)`; if the platform `agentType` is `run_online`, before running `publish-configure` you must first ask the creator in plain language whether to run a deep scan, e.g.: "This release uses Cloud-Hosted mode; do you want to run a deep scan? I'll re-read the packaged content to look for generic-secret / sensitive-value risks the rules did not catch — it costs more time and tokens. Skipping means only the regular rule scan runs."
+**Consent step before the first entry to `publish-configure` (Run Online mode only)**: after the creator completes the first page (confirm the file contents to upload), reconcile per Core Iron Rule #2 with `get_latest_version_raw(agent_id)`; if the platform `agentType` is `run_online`, before running `publish-configure` you must first ask the creator in plain language whether to run a deep scan, e.g.: "This release uses Run Online mode; do you want to run a deep scan? I'll re-read the packaged content to look for generic-secret / sensitive-value risks the rules did not catch — it costs more time and tokens. Skipping means only the regular rule scan runs."
 
 Send this question as a visible chat message and then pause, per Core Iron Rule #1.
 

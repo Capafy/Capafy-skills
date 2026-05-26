@@ -109,6 +109,8 @@ def api_format_from_openclaw_provider(provider: dict[str, Any], *, provider_name
 
 def path_likely_contains_openclaw_model_ref(path_parts: tuple[str, ...]) -> bool:
     lowered = [part.lower() for part in path_parts]
+    if lowered and lowered[0] == "env":
+        return False
     if "memorysearch" in lowered:
         return False
     return any("model" in part or "fallback" in part for part in lowered)

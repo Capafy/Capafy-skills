@@ -57,14 +57,18 @@ def runtime_context_target_id(env_id: Optional[str]) -> Optional[str]:
 
 
 _CLAUDE_SETTINGS_RELPATHS = frozenset(SETTINGS_SCAN_RELPATHS)
+_OPENCLAW_PROVIDER_GROUP_PREFIX = ".openclaw/openclaw.json#models.providers."
 
 
 def runtime_owned_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
-    if target_id != "claude_code":
-        return False
     key_source = str(getattr(pair.key, "source_relpath", "") or "").strip()
     url_source = str(getattr(pair.url, "source_relpath", "") or "").strip()
-    return key_source in _CLAUDE_SETTINGS_RELPATHS or url_source in _CLAUDE_SETTINGS_RELPATHS
+    if target_id == "claude_code":
+        return key_source in _CLAUDE_SETTINGS_RELPATHS or url_source in _CLAUDE_SETTINGS_RELPATHS
+    if target_id == "openclaw":
+        group = str(getattr(pair, "group", "") or "").strip()
+        return group.startswith(_OPENCLAW_PROVIDER_GROUP_PREFIX)
+    return False
 
 
 __all__ = [

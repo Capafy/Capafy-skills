@@ -4,6 +4,7 @@ from packaging.configure.contracts import GenericValue, ReviewedScanBuildInput, 
 
 
 LocationIdentity = tuple[str, str, str, int, str]
+SimpleFieldIdentity = tuple[str, str, str]
 
 
 def _plan_field_identity(plan_field) -> LocationIdentity:
@@ -42,12 +43,38 @@ def _generic_entry_identity(entry: dict) -> LocationIdentity:
     )
 
 
+def _plan_field_simple_identity(plan_field) -> SimpleFieldIdentity:
+    return (
+        str(plan_field.source_identity() or "").strip(),
+        str(getattr(plan_field, "field", "") or "").strip(),
+        str(getattr(plan_field, "original_value", "") or "").strip(),
+    )
+
+
+def _generic_entry_simple_identity(entry: dict) -> SimpleFieldIdentity:
+    return (
+        str(entry.get("source", "") or "").strip(),
+        str(entry.get("field", "") or "").strip(),
+        str(entry.get("value", "") or "").strip(),
+    )
+
+
 def _claimed_location_identities(pairs: list[UrlProxyPair]) -> set[LocationIdentity]:
     identities: set[LocationIdentity] = set()
     for pair in pairs:
         for plan_field in (pair.key, pair.url):
             identity = _plan_field_identity(plan_field)
             if any(identity):
+                identities.add(identity)
+    return identities
+
+
+def _claimed_simple_identities(pairs: list[UrlProxyPair]) -> set[SimpleFieldIdentity]:
+    identities: set[SimpleFieldIdentity] = set()
+    for pair in pairs:
+        for plan_field in (pair.key, pair.url):
+            identity = _plan_field_simple_identity(plan_field)
+            if all(identity):
                 identities.add(identity)
     return identities
 
@@ -118,11 +145,14 @@ def dedupe_fallback_generic_entries(
     runtime_pairs: list[UrlProxyPair],
 ) -> list[dict]:
     claimed_identities = _claimed_location_identities(runtime_pairs)
+    claimed_simple_identities = _claimed_simple_identities(runtime_pairs)
     deduped: list[dict] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
         if _generic_entry_identity(entry) in claimed_identities:
+            continue
+        if _generic_entry_simple_identity(entry) in claimed_simple_identities:
             continue
         deduped.append(entry)
     return deduped
@@ -154,7 +184,9 @@ def filter_url_proxy_claimed_reviewed_input(reviewed_input: ReviewedScanBuildInp
 def collect_claimed_process_env_names(pairs: list[UrlProxyPair]) -> frozenset[str]:
     claimed: set[str] = set()
     for pair in pairs:
-        for plan_field in (pair.key, pair.url):
+        for plan_field in (pair.key, pair.url, pair.model_field):
+            if plan_field is None:
+                continue
             field_name = str(getattr(plan_field, "field", "") or "").strip()
             if not field_name:
                 continue

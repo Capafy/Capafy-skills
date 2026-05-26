@@ -22,6 +22,7 @@ def _build_buyout_package_payload() -> dict:
         "url_proxy": [],
         "generic": [],
         "env_var": [],
+        "excludes": [],
     }
 
 
@@ -32,7 +33,7 @@ def build_buyout_artifact_package_payload(
     effective_scan_payload = sanitize_reviewed_scan_payload(effective_scan_payload)
     base = _build_buyout_package_payload()
 
-    for key in ("url_proxy", "generic", "env_var"):
+    for key in ("url_proxy", "generic", "env_var", "excludes"):
         items = effective_scan_payload.get(key)
         if isinstance(items, list) and items:
             base[key] = list(items)
@@ -58,7 +59,7 @@ def package_buyout_staging(
     if not isinstance(package_payload, dict):
         raise ValueError("package_json must be an object")
     if not reviewed_scan_has_final_dispositions(package_payload):
-        raise ValueError("buyout package requires reviewed_scan payload with final_disposition for every item")
+        raise ValueError("download package requires reviewed_scan payload with final_disposition for every item")
 
     stage_manifest = load_stage_manifest(staging_root)
     exclude_prefixes = ("_scan_only",)

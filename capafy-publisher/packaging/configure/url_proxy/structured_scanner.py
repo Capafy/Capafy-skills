@@ -11,7 +11,6 @@ class StructuredUrlProxyScanResult:
 
     pairs: list[UrlProxyPair]
     fallback_generic_entries: list[dict]
-    claimed_field_names: frozenset[str]
 
 
 def run_structured_url_proxy_scan(
@@ -21,7 +20,6 @@ def run_structured_url_proxy_scan(
     platform_agent_type: str = "run_online",
     default_contract_id: str = "STRUCTURED",
 ) -> StructuredUrlProxyScanResult:
-    from packaging.configure.contracts import SourceKind
     from packaging.configure.scan.staging_scan import collect_staging_scan_candidates
     from packaging.configure.url_proxy.group_hints import UrlProxyPairingHints
     from packaging.configure.url_proxy.scan_groups import (
@@ -51,19 +49,9 @@ def run_structured_url_proxy_scan(
         default_contract_id=default_contract_id,
     )
 
-    claimed: set[str] = set()
-    for pair in pairs:
-        for plan_field in (pair.key, pair.url):
-            field = str(getattr(plan_field, "field", "") or "").strip()
-            if not field:
-                continue
-            if getattr(plan_field, "source_kind", None) == SourceKind.PROCESS_ENV:
-                claimed.add(field)
-
     return StructuredUrlProxyScanResult(
         pairs=pairs,
         fallback_generic_entries=fallback_generic,
-        claimed_field_names=frozenset(claimed),
     )
 
 

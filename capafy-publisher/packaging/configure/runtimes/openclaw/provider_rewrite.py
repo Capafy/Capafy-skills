@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Mapping, Optional, TYPE_CHECKING
 
 import json
+import re
 from pathlib import Path
 
 from packaging._shared.openclaw.official_providers import (
@@ -13,9 +14,10 @@ from packaging._shared.openclaw.official_providers import (
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.runtimes.openclaw.provider_keys import (
     collect_provider_api_key_items,
-    is_env_reference,
-    real_value,
-    resolve_api_key_config_value,
+)
+from packaging.configure.env_values import (
+    env_reference_name,
+    usable_env_value,
 )
 from packaging.configure.runtimes.openclaw.provider_usage import (
     openclaw_model_id_from_entry,
@@ -24,11 +26,14 @@ from packaging.configure.runtimes.openclaw.provider_usage import (
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 from packaging.configure.sensitive.placeholders import build_placeholder
 from packaging._shared.common.json_io import clone_json_value
-from packaging.configure.url_proxy.scanner_utils import UrlProxyFieldSet, scan_dotenv
+
+if TYPE_CHECKING:
+    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
 
 
 _DEFAULT_MODELS_MODE = "merge"
 _OPENCLAW_CONFIG_REL_SOURCE = ".openclaw/openclaw.json"
+_OPENCLAW_ENV_TEMPLATE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _DEFAULT_MODEL_TEMPLATE = {
     "reasoning": True,
     "input": ["text", "image"],
@@ -303,11 +308,63 @@ def _openclaw_config_env(payload: dict[str, object]) -> dict[str, str]:
     return result
 
 
-def _provider_has_inline_api_key(provider: dict[str, object]) -> bool:
-    api_key = str(provider.get("apiKey", "") or "").strip()
-    if not api_key:
-        return False
-    return bool(resolve_api_key_config_value(api_key, {}))
+def _resolve_openclaw_config_env(
+    *,
+    payload: dict[str, object],
+    dotenv_env: Optional[dict[str, str]] = None,
+    process_env: Optional[Mapping[str, str]] = None,
+) -> dict[str, str]:
+    merged = _openclaw_config_env(payload)
+    merged.update(dotenv_env or {})
+    merged.update(
+        {
+            str(name).strip(): value
+            for name, value in (process_env or {}).items()
+            if str(name).strip() and isinstance(value, str)
+        }
+    )
+    return merged
+
+
+def _resolve_openclaw_env_template_value(
+    value: str,
+    config_env: Mapping[str, str],
+    consumed_env_names: set[str],
+) -> str:
+    def _replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        replacement = usable_env_value(config_env.get(name, ""))
+        if not replacement:
+            return match.group(0)
+        consumed_env_names.add(name)
+        return replacement
+
+    return _OPENCLAW_ENV_TEMPLATE_RE.sub(_replace, value)
+
+
+def _resolve_openclaw_env_templates(
+    node: object,
+    config_env: Mapping[str, str],
+    consumed_env_names: set[str],
+) -> int:
+    rewrites = 0
+    if isinstance(node, dict):
+        items = node.items()
+    elif isinstance(node, list):
+        items = enumerate(node)
+    else:
+        return 0
+
+    for key, value in items:
+        if isinstance(value, str):
+            updated_value = _resolve_openclaw_env_template_value(value, config_env, consumed_env_names)
+            if updated_value == value:
+                continue
+            node[key] = updated_value
+            rewrites += 1
+            continue
+        rewrites += _resolve_openclaw_env_templates(value, config_env, consumed_env_names)
+    return rewrites
 
 
 def _materialize_official_provider_env_keys(
@@ -327,7 +384,7 @@ def _materialize_official_provider_env_keys(
         key_items = collect_provider_api_key_items(spec, config_env)
         env_item = key_items[0] if key_items else None
         env_key = str(env_item.get("value", "") or "").strip() if env_item else ""
-        if not env_key or _provider_has_inline_api_key(provider):
+        if not env_key or usable_env_value(provider.get("apiKey", "")):
             continue
         provider["apiKey"] = env_key
         env_name = str(env_item.get("env_name", "") or "").strip() if env_item else ""
@@ -348,12 +405,14 @@ def _materialize_provider_env_references(
     for provider in providers.values():
         if not isinstance(provider, dict):
             continue
-        api_key = str(provider.get("apiKey", "") or "").strip()
-        env_value = str(config_env.get(api_key, "") or "").strip()
+        env_name = env_reference_name(provider.get("apiKey", ""))
+        if not env_name:
+            continue
+        env_value = usable_env_value(config_env.get(env_name, ""))
         if not env_value:
             continue
         provider["apiKey"] = env_value
-        consumed_env_names.add(api_key)
+        consumed_env_names.add(env_name)
         rewrites += 1
     return rewrites, consumed_env_names
 
@@ -380,8 +439,9 @@ def _provider_env_names(providers: dict[str, object]) -> set[str]:
         if not isinstance(provider, dict):
             continue
         api_key = str(provider.get("apiKey", "") or "").strip()
-        if is_env_reference(api_key):
-            names.add(api_key)
+        env_name = env_reference_name(api_key)
+        if env_name:
+            names.add(env_name)
         spec = OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME.get(provider_name)
         if spec is None:
             continue
@@ -416,7 +476,7 @@ def _builtin_model_env_names(
     return set(spec.exact_env_keys)
 
 
-def _dotenv_env_names_for_payload(payload: dict[str, object]) -> set[str]:
+def _dotenv_env_names_for_payload(payload: dict[str, object], config_text: str = "") -> set[str]:
     names: set[str] = set()
     models = payload.get("models")
     if isinstance(models, dict):
@@ -424,7 +484,8 @@ def _dotenv_env_names_for_payload(payload: dict[str, object]) -> set[str]:
         if isinstance(providers, dict):
             names.update(_provider_env_names(providers))
     names.update(_builtin_model_env_names(payload))
-    return {name for name in names if is_env_reference(name)}
+    names.update(_OPENCLAW_ENV_TEMPLATE_RE.findall(config_text))
+    return {name for name in names if env_reference_name(name)}
 
 
 def _iter_staged_dotenv_files(staging_root: Path) -> list[Path]:
@@ -445,7 +506,23 @@ def _iter_staged_dotenv_files(staging_root: Path) -> list[Path]:
     return sorted(result, key=lambda item: item.as_posix())
 
 
-def collect_openclaw_staged_dotenv_env(staging_root: Path, config_text: str) -> dict[str, str]:
+def _openclaw_staged_dotenv_relpaths(staging_root: Path) -> tuple[str, ...]:
+    root = Path(staging_root)
+    relpaths: list[str] = []
+    for file_path in _iter_staged_dotenv_files(root):
+        try:
+            relpaths.append(file_path.relative_to(root).as_posix())
+        except ValueError:
+            continue
+    return tuple(relpaths)
+
+
+def _collect_openclaw_staged_dotenv_env(
+    staging_root: Path,
+    config_text: str,
+    *,
+    env_context: "RuntimeEnvContext",
+) -> dict[str, str]:
     try:
         payload = json.loads(config_text)
     except json.JSONDecodeError:
@@ -453,24 +530,58 @@ def collect_openclaw_staged_dotenv_env(staging_root: Path, config_text: str) -> 
     if not isinstance(payload, dict):
         return {}
 
-    names = _dotenv_env_names_for_payload(payload)
+    names = _dotenv_env_names_for_payload(payload, config_text)
     if not names:
         return {}
 
-    fields = UrlProxyFieldSet(api_key_fields=frozenset(names), base_url_fields=frozenset())
-    result: dict[str, str] = {}
+    return env_context.staged_dotenv_values(
+        Path(staging_root),
+        relpaths=_openclaw_staged_dotenv_relpaths(staging_root),
+        names=frozenset(names),
+    )
+
+
+def resolve_openclaw_staged_env_templates(
+    staging_root: Path,
+    *,
+    env_context: "RuntimeEnvContext",
+) -> frozenset[str]:
     root = Path(staging_root)
-    for file_path in _iter_staged_dotenv_files(root):
-        try:
-            relpath = file_path.relative_to(root).as_posix()
-        except ValueError:
-            continue
-        for candidate in scan_dotenv(file_path, relpath, fields=fields):
-            if candidate.field not in result:
-                value = real_value(candidate.value)
-                if value:
-                    result[candidate.field] = value
-    return result
+    config_path = root / _OPENCLAW_CONFIG_REL_SOURCE
+    try:
+        config_text = config_path.read_text(encoding="utf-8")
+        payload = json.loads(config_text)
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    if not isinstance(payload, dict):
+        return frozenset()
+
+    dotenv_relpaths = _openclaw_staged_dotenv_relpaths(root)
+    dotenv_env = _collect_openclaw_staged_dotenv_env(root, config_text, env_context=env_context)
+    template_env_names = frozenset(_OPENCLAW_ENV_TEMPLATE_RE.findall(config_text))
+    merged_process_env = env_context.env_for_names(template_env_names)
+    config_env = _resolve_openclaw_config_env(
+        payload=payload,
+        dotenv_env=dotenv_env,
+        process_env=merged_process_env,
+    )
+    consumed_env_names: set[str] = set()
+    rewrites = _resolve_openclaw_env_templates(
+        payload,
+        config_env,
+        consumed_env_names,
+    )
+    if rewrites <= 0:
+        return frozenset()
+
+    _drop_consumed_config_env(payload, consumed_env_names)
+    env_context.consume_staged_dotenv_names(
+        root,
+        relpaths=dotenv_relpaths,
+        names=frozenset(consumed_env_names),
+    )
+    config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return frozenset(consumed_env_names)
 
 
 def _rewrite_builtin_model_refs(
@@ -539,7 +650,8 @@ def _rewrite_builtin_model_refs(
 def rewrite_openclaw_builtin_models_as_explicit_providers(
     config_text: str,
     *,
-    dotenv_env: Optional[dict[str, str]] = None,
+    staging_root: Path,
+    env_context: "RuntimeEnvContext",
 ) -> tuple[str, int]:
     try:
         payload = json.loads(config_text)
@@ -547,6 +659,13 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
         return config_text, 0
     if not isinstance(payload, dict):
         return config_text, 0
+
+    dotenv_env = _collect_openclaw_staged_dotenv_env(staging_root, config_text, env_context=env_context)
+    config_env = _resolve_openclaw_config_env(
+        payload=payload,
+        dotenv_env=dotenv_env,
+    )
+    consumed_env_names: set[str] = set()
 
     model_template = _discover_model_template(payload)
     models = payload.get("models")
@@ -558,8 +677,6 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
         providers = {}
         models["providers"] = providers
     alias_rewrites = _canonicalize_official_provider_aliases(providers)
-    config_env = dict(dotenv_env or {})
-    config_env.update(_openclaw_config_env(payload))
 
     assigned_names: dict[str, str] = {}
     rewritten_payload, rewrite_count = _rewrite_builtin_model_refs(
@@ -569,25 +686,35 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
         assigned_names=assigned_names,
         model_template=model_template,
     )
-    official_key_rewrites, consumed_env_names = _materialize_official_provider_env_keys(providers, config_env)
+    official_key_rewrites, provider_key_consumed_env_names = _materialize_official_provider_env_keys(providers, config_env)
     provider_ref_rewrites, provider_ref_consumed_env_names = _materialize_provider_env_references(providers, config_env)
+    consumed_env_names.update(provider_key_consumed_env_names)
     consumed_env_names.update(provider_ref_consumed_env_names)
     provider_key_rewrites = official_key_rewrites + provider_ref_rewrites
+    if consumed_env_names:
+        env_context.consume_staged_dotenv_names(
+            staging_root,
+            relpaths=_openclaw_staged_dotenv_relpaths(staging_root),
+            names=frozenset(consumed_env_names),
+        )
     if provider_key_rewrites or alias_rewrites:
         rewritten_payload["models"] = clone_json_value(models)
-    if provider_key_rewrites:
+    if consumed_env_names:
         _drop_consumed_config_env(rewritten_payload, consumed_env_names)
     if rewrite_count <= 0:
-        if provider_key_rewrites + alias_rewrites <= 0:
+        total_rewrites = provider_key_rewrites + alias_rewrites
+        if total_rewrites <= 0:
             return config_text, 0
-        return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", provider_key_rewrites + alias_rewrites
+        return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", total_rewrites
     if not str(models.get("mode", "")).strip():
         models["mode"] = _DEFAULT_MODELS_MODE
     rewritten_payload["models"] = clone_json_value(models)
-    return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", rewrite_count + provider_key_rewrites + alias_rewrites
+    return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", (
+        rewrite_count + provider_key_rewrites + alias_rewrites
+    )
 
 
 __all__ = [
-    "collect_openclaw_staged_dotenv_env",
+    "resolve_openclaw_staged_env_templates",
     "rewrite_openclaw_builtin_models_as_explicit_providers",
 ]

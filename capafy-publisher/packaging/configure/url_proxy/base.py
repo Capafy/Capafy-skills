@@ -8,6 +8,7 @@ from typing import Any, ClassVar, Mapping, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from packaging.configure.candidate import Candidate
     from packaging.configure.contracts import UrlProxyPair
+    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class ScanContext:
     stage_plan: Any = None
     user_home: Optional[Path] = None
     target_id: Optional[str] = None
+    env_context: Optional["RuntimeEnvContext"] = None
 
     @property
     def scan_only_root(self) -> Path:

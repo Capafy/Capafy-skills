@@ -26,7 +26,7 @@ def run_general_scan(
     raw_scan: dict[str, Any],
     *,
     process_env: dict[str, str],
-    claimed_process_env_names: frozenset[str],
+    excluded_process_env_names: frozenset[str],
     referenced_env_names: Union[frozenset[str], set[str]] = frozenset(),
     env_url_hints: Optional[dict[str, str]] = None,
 ) -> GeneralScanResult:
@@ -53,7 +53,7 @@ def run_general_scan(
     )
     env_var_items = build_env_vars_output(
         process_env_candidates,
-        excluded_fields=set(claimed_process_env_names),
+        excluded_fields=set(excluded_process_env_names),
     )
     env_vars = tuple(
         EnvVar(

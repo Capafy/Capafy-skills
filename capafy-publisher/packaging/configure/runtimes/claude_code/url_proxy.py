@@ -7,6 +7,7 @@ from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, PlanField, SourceKind, UrlProxyPair
+from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.sensitive.placeholders import build_placeholder
 from packaging.configure.sensitive.literals import (
     looks_like_platform_managed_placeholder_value,
@@ -27,7 +28,7 @@ from packaging.configure.runtimes.claude_code.url_proxy_candidates import (
 from packaging.configure.runtimes.claude_code.settings_json import (
     SETTINGS_RELPATH,
     write_settings_env_placeholders,
-    write_settings_model,
+    write_settings_model_and_prune_env_models,
 )
 from packaging.configure.url_proxy.base import RuntimeContract, ScanContext
 from packaging.configure.url_proxy.scanner_utils import (
@@ -86,7 +87,7 @@ class ClaudeCodeRuntime(RuntimeContract):
                 source_kind=SourceKind.SYNTHESIZED,
                 source_relpath="",
             ))
-        return annotate_candidates_with_settings_model(candidates, ctx.staging_root)
+        return annotate_candidates_with_settings_model(candidates, ctx.staging_root, ctx.process_env)
 
     @staticmethod
     def _scan_canonical_process_env_fallback(
@@ -98,7 +99,7 @@ class ClaudeCodeRuntime(RuntimeContract):
 
         candidates: list[Candidate] = []
         for field in (CLAUDE_AUTH_TOKEN_ENV_KEY, CLAUDE_AUTH_ENV_KEY):
-            value = ClaudeCodeRuntime._usable_process_env_value(ctx, field)
+            value = usable_process_env_value(ctx.process_env, field)
             if value and field not in existing_fields:
                 candidates.append(Candidate(
                     role="api_key",
@@ -110,7 +111,7 @@ class ClaudeCodeRuntime(RuntimeContract):
                     extra={"canonical_process_env_fallback": True},
                 ))
 
-        base_url = ClaudeCodeRuntime._usable_process_env_value(ctx, CLAUDE_BASE_URL_ENV_KEY)
+        base_url = usable_process_env_value(ctx.process_env, CLAUDE_BASE_URL_ENV_KEY)
         normalized_url = normalize_http_url_candidate(base_url) if base_url else ""
         if normalized_url and CLAUDE_BASE_URL_ENV_KEY not in existing_fields:
             candidates.append(Candidate(
@@ -123,13 +124,6 @@ class ClaudeCodeRuntime(RuntimeContract):
                 extra={"canonical_process_env_fallback": True},
             ))
         return candidates
-
-    @staticmethod
-    def _usable_process_env_value(ctx: ScanContext, field: str) -> str:
-        value = str(ctx.process_env.get(field, "")).strip()
-        if looks_like_platform_managed_placeholder_value(value):
-            return ""
-        return value
 
     def pair(self, candidates: list[Candidate]) -> list[UrlProxyPair]:
         key_candidate = select_preferred_candidate(
@@ -169,6 +163,20 @@ class ClaudeCodeRuntime(RuntimeContract):
                 value_type="url",
             )
 
+        model_source = key_candidate.extra.get("model_source")
+        model_plan_field: PlanField | None = None
+        if isinstance(model_source, dict) and model_source.get("kind") == "process_env":
+            model_env_field = str(model_source.get("field", "") or "").strip()
+            model_value = str(key_candidate.extra.get("model", "") or "").strip()
+            if model_env_field and model_value:
+                model_plan_field = self._settings_plan_field(
+                    field=model_env_field,
+                    value=model_value,
+                    source_kind=SourceKind.PROCESS_ENV,
+                    locator=model_value,
+                    value_type="model",
+                )
+
         return [
             UrlProxyPair(
                 contract_id=_ID,
@@ -178,6 +186,7 @@ class ClaudeCodeRuntime(RuntimeContract):
                 url=url_field,
                 is_synthesized=key_field.source_kind == SourceKind.SYNTHESIZED,
                 model=str(key_candidate.extra.get("model", "") or "").strip(),
+                model_field=model_plan_field,
                 api_format=_API_FORMAT,
             )
         ]
@@ -214,6 +223,8 @@ class ClaudeCodeRuntime(RuntimeContract):
         file_candidates = self._file_candidates_for_rewrite(staging_root)
         for pair in pairs:
             self._write_settings_env_placeholders(staging_root, pair)
+            if pair.model:
+                write_settings_model_and_prune_env_models(staging_root, pair.model)
             self._strip_candidate_file_values(staging_root, pair, file_candidates)
 
     @staticmethod
@@ -268,7 +279,10 @@ class ClaudeCodeRuntime(RuntimeContract):
                 value=value,
                 source_kind=SourceKind.SYNTHESIZED,
                 source_relpath="",
-                extra={"official_url": base_url or ANTHROPIC_OFFICIAL_URL},
+                extra={
+                    "configured_auth_key": True,
+                    "official_url": base_url or ANTHROPIC_OFFICIAL_URL,
+                },
             )]
 
         if not (
@@ -287,7 +301,7 @@ class ClaudeCodeRuntime(RuntimeContract):
         confirmed, model = self._confirmed_url_proxy_summary(url_proxy)
         model_rewritten = False
         if model:
-            model_rewritten = write_settings_model(staging_root, model)
+            model_rewritten = write_settings_model_and_prune_env_models(staging_root, model)
         summary: dict[str, Any] = {}
         if confirmed:
             summary["claude_code_confirmed_entries"] = confirmed

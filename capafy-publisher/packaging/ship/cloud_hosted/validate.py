@@ -50,7 +50,7 @@ def _load_validation_inputs(
     if reviewed_scan_payload is not None:
         return reviewed_scan_payload
 
-    raise ValueError("cloud_hosted validate-runtime requires --reviewed-scan-file or --reviewed-scan-json")
+    raise ValueError("run_online validate-runtime requires --reviewed-scan-file or --reviewed-scan-json")
 
 
 def validate_cloud_hosted_runtime(

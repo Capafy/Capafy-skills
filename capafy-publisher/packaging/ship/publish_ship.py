@@ -121,7 +121,7 @@ def run_publish_ship(
                 ctx,
                 agent_id=agent_id,
                 error=str(exc),
-                failed_step="cloud_hosted_url_proxy_gate",
+                failed_step="run_online_url_proxy_gate",
                 blocking_category="missing_required_url_proxy",
                 developer_next_steps=[
                     "Re-run publish-configure with at least one configured LLM provider, or re-confirm at least one provider on the platform page.",

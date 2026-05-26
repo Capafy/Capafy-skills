@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from packaging.configure.contracts import DeepScanFindingsInput, ReviewedScanBuildInput
 from packaging._shared.common.process_env import collect_publish_process_env, url_proxy_os_fallback_names
+from packaging.configure.staging.env_preprocess import RuntimeEnvContext, preprocess_runtime_env_sources
 from packaging.configure.staging.review import build_review_binding
 from packaging.configure.staging.source_boundary import filter_generic_values_for_packaged_sources
 
@@ -29,8 +30,14 @@ def build_cloud_hosted_reviewed_scan(
 
     deep_scan_findings = deep_scan_findings or DeepScanFindingsInput()
     process_env = collect_publish_process_env()
+    env_context = RuntimeEnvContext(process_env=process_env)
     url_proxy_process_env = collect_publish_process_env(
         os_fallback_names=url_proxy_os_fallback_names(env_id),
+    )
+    preprocessed_env_names = preprocess_runtime_env_sources(
+        staging_root_p,
+        env_id=env_id,
+        env_context=env_context,
     )
 
     url_proxy_result = build_url_proxy_phase(
@@ -39,9 +46,14 @@ def build_cloud_hosted_reviewed_scan(
         process_env=url_proxy_process_env,
         stage_plan=stage_plan,
         platform_agent_type=agent_type,
+        env_context=env_context,
     )
+    env_context.apply_staged_dotenv_consumption(staging_root_p)
     url_proxy_pairs = url_proxy_result.url_proxy_pairs
-    claimed_process_env_names = url_proxy_result.claimed_field_names
+    excluded_process_env_names = frozenset({
+        *url_proxy_result.claimed_field_names,
+        *preprocessed_env_names,
+    })
 
     staging_scan_result = scan_staging_full(
         staging_root_p,
@@ -59,7 +71,7 @@ def build_cloud_hosted_reviewed_scan(
     general_result = run_general_scan(
         raw_scan,
         process_env=process_env,
-        claimed_process_env_names=claimed_process_env_names,
+        excluded_process_env_names=excluded_process_env_names,
         referenced_env_names=staging_scan_result.referenced_env_names,
         env_url_hints=staging_scan_result.env_url_hints,
     )

@@ -14,8 +14,8 @@ REVIEW_BINDING_FIELDS = (
     "agent_type",
 )
 CLOUD_HOSTED_URL_PROXY_REQUIRED_MESSAGE = (
-    "cloud_hosted requires at least 1 url_proxy; "
-    "platform cloud hosting requires the creator to provide an LLM provider endpoint plus API key"
+    "run_online requires at least 1 url_proxy; "
+    "Run Online mode requires the creator to provide an LLM provider endpoint plus API key"
 )
 
 

@@ -12,11 +12,12 @@ from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, SourceKind
 from packaging.configure.runtimes.openclaw.auth_profiles import load_auth_profile_keys
 from packaging.configure.runtimes.openclaw.provider_keys import (
-    collect_provider_api_key_items,
+    collect_provider_api_key_items_by_priority,
     dedupe_key_items,
-    is_env_reference,
-    real_value,
-    resolve_api_key_config_value,
+)
+from packaging.configure.env_values import (
+    env_reference_name,
+    resolve_env_reference_or_value,
 )
 from packaging.configure.runtimes.openclaw.provider_usage import (
     api_format_from_openclaw_provider,
@@ -102,7 +103,7 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
         normalized_url = normalize_http_url_candidate(base_url)
 
         api_key = str(provider.get("apiKey", "")).strip()
-        resolved_api_key = resolve_api_key_config_value(api_key, ctx.process_env)
+        resolved_api_key = resolve_env_reference_or_value(api_key, ctx.process_env)
         if resolved_api_key:
             candidates.append(_api_key_candidate(
                 provider_name=provider_name,
@@ -206,7 +207,7 @@ def _placeholder_provider_key_candidate(
         value="",
         model=model,
         api_format=api_format,
-        env_name=api_key if is_env_reference(api_key) else "",
+        env_name=env_reference_name(api_key),
         extra={"placeholder_provider": True},
     )
 
@@ -244,18 +245,12 @@ def _official_provider_key_candidates(
     model: str,
     api_format: str,
 ) -> list[Candidate]:
-    key_items = collect_provider_api_key_items(spec, ctx.process_env)
-    if not key_items:
-        profile_values = load_auth_profile_keys(ctx).get(provider_name, [])
-        key_items = [
-            {"env_name": "", "value": value, "field_aliases": []}
-            for value in profile_values
-            if real_value(value)
-        ]
-    if not key_items:
-        resolved = resolve_api_key_config_value(api_key, ctx.process_env)
-        if resolved:
-            key_items = [{"env_name": api_key if is_env_reference(api_key) else "", "value": resolved, "field_aliases": []}]
+    key_items = collect_provider_api_key_items_by_priority(
+        spec,
+        api_key=api_key,
+        auth_profile_values=load_auth_profile_keys(ctx).get(provider_name, []),
+        env=ctx.process_env,
+    )
 
     result: list[Candidate] = []
     for index, item in enumerate(dedupe_key_items(key_items)):

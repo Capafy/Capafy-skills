@@ -16,11 +16,13 @@ CONFIGURE_RESET_EXTRA_FIELDS = (
     "package_url",
     "cleanup_summary",
     "configure_redaction_summary",
+    "buyout_reviewed_scan_ready",
+    "buyout_disposition_status",
 )
 
 CLOUD_HOSTED_CONFIGURE_RESET_EXTRA_FIELDS = (
-    "buyout_reviewed_scan_ready",
-    "buyout_disposition_status",
+    "download_reviewed_scan_ready",
+    "download_disposition_status",
     "disposition_summary",
     "reviewed_scan_digest",
 )
@@ -133,8 +135,8 @@ def write_buyout_bundle_prepared_manifest(
         staging_path=staging_path,
         reviewed_scan_path=reviewed_scan_path,
     )
-    extra["buyout_reviewed_scan_ready"] = True
-    extra["buyout_disposition_status"] = disposition_status
+    extra["download_reviewed_scan_ready"] = True
+    extra["download_disposition_status"] = disposition_status
     extra["reviewed_scan_digest"] = reviewed_scan_digest
     extra["disposition_summary"] = disposition_summary
     if redaction_summary:

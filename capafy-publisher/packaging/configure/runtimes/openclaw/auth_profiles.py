@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
+from packaging.configure.env_values import usable_env_value
 
 
 OPENCLAW_AUTH_PROFILE_REL = ".openclaw/agents/main/agent/auth-profiles.json"
@@ -37,10 +37,11 @@ def load_auth_profile_keys(ctx: Any) -> dict[str, list[str]]:
     def extract_key(node: dict) -> Optional[str]:
         for field in ("key", "apiKey", "api_key", "apikey"):
             value = node.get(field)
-            if isinstance(value, str) and value.strip():
-                normalized = value.strip()
-                if not looks_like_platform_managed_placeholder_value(normalized):
-                    return normalized
+            if not isinstance(value, str):
+                continue
+            normalized = usable_env_value(value)
+            if normalized:
+                return normalized
         return None
 
     def walk(node: Any, parts: list[str]) -> None:

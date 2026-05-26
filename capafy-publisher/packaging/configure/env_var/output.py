@@ -27,7 +27,7 @@ def build_env_vars_output(
         for field in (excluded_fields or set())
         if str(field or "").strip()
     }
-    seen: dict[tuple[str, str], dict] = {}
+    seen: dict[tuple[str, str, str], dict] = {}
     for candidate in process_env_candidates:
         env_name = candidate.get("env_name", "")
         field = str(candidate.get("field") or env_name).strip()
@@ -37,7 +37,6 @@ def build_env_vars_output(
             continue
         value = candidate["value"]
         source = str(candidate.get("source", "") or "").strip()
-        source_detail = str(candidate.get("source_detail", "") or "").strip()
         referenced_in = [
             str(item).strip()
             for item in candidate.get("referenced_in", [])
@@ -45,8 +44,13 @@ def build_env_vars_output(
         ] if isinstance(candidate.get("referenced_in"), list) else []
         if source and source != PROCESS_ENV_SOURCE and source not in referenced_in:
             referenced_in.append(source)
-        identity = (field, value, source, source_detail, tuple(referenced_in))
+        identity = (field, value, source)
         if identity in seen:
+            existing_references = seen[identity].setdefault("referenced_in", [])
+            if isinstance(existing_references, list):
+                for reference in referenced_in:
+                    if reference not in existing_references:
+                        existing_references.append(reference)
             continue
         seen[identity] = build_reviewed_env_var_item(
             field=field,

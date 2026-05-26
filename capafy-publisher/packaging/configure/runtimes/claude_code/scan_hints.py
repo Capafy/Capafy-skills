@@ -36,6 +36,7 @@ from packaging.configure.runtimes.claude_code.auth import (
     CLAUDE_BASE_URL_ENV_KEY,
     should_skip_claude_login_structured_scan,
 )
+from packaging.configure.runtimes.claude_code.url_proxy_candidates import MODEL_ENV_FIELDS
 
 
 CLAUDE_NATIVE_CONFIG_BASENAMES = {
@@ -51,6 +52,7 @@ CLAUDE_SETTINGS_ENV_TOKEN_KEYS = (
     CLAUDE_AUTH_ENV_KEY,
 )
 CLAUDE_SETTINGS_ENV_KEYS = set(CLAUDE_SETTINGS_ENV_TOKEN_KEYS) | {CLAUDE_BASE_URL_ENV_KEY}
+CLAUDE_SETTINGS_MODEL_ENV_KEYS = set(MODEL_ENV_FIELDS)
 CLAUDE_LOGIN_STATE_PARENT_MARKERS = {
     "oauth",
     "oauthaccount",
@@ -124,7 +126,7 @@ def collect_claude_native_generic_value(
         return None
     if should_skip_claude_login_state_leaf(path_name, path_parts, key):
         return None
-    if len(path_parts) >= 2 and path_parts[0] == "env" and key in CLAUDE_SETTINGS_ENV_KEYS:
+    if len(path_parts) >= 2 and path_parts[0] == "env" and key in CLAUDE_SETTINGS_ENV_KEYS | CLAUDE_SETTINGS_MODEL_ENV_KEYS:
         return None
     if len(path_parts) >= 2 and path_parts[0] == "env":
         contextual_secret = is_contextual_secret_key(path_parts, key)
@@ -283,7 +285,7 @@ def collect_claude_json_config_hints(
             return
 
         for key, value in env_payload.items():
-            if key in CLAUDE_SETTINGS_ENV_KEYS:
+            if key in CLAUDE_SETTINGS_ENV_KEYS or key in CLAUDE_SETTINGS_MODEL_ENV_KEYS:
                 continue
             if not isinstance(value, str) or not value.strip():
                 continue
@@ -368,7 +370,7 @@ def collect_claude_json_config_hints(
                 candidates.append(generic_candidate)
             return
 
-        if len(path_parts) >= 2 and path_parts[0] == "env" and key in CLAUDE_SETTINGS_ENV_KEYS:
+        if len(path_parts) >= 2 and path_parts[0] == "env" and key in CLAUDE_SETTINGS_ENV_KEYS | CLAUDE_SETTINGS_MODEL_ENV_KEYS:
             return
 
         if should_skip_claude_login_state_leaf(path_name, path_parts, key):
@@ -452,6 +454,7 @@ __all__ = [
     "CLAUDE_NATIVE_GENERIC_URL_KEYS",
     "CLAUDE_SETTINGS_ENV_KEYS",
     "CLAUDE_SETTINGS_ENV_TOKEN_KEYS",
+    "CLAUDE_SETTINGS_MODEL_ENV_KEYS",
     "CONTEXTUAL_KEY_SECRET_MARKERS",
     "claude_env_service_from_key",
     "collect_claude_json_config_hints",

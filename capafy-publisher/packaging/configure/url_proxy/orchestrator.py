@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
     from packaging.configure.contracts import UrlProxyPair
 
 from packaging._shared.common.process_env import collect_publish_process_env, url_proxy_os_fallback_names
@@ -40,6 +41,7 @@ def build_url_proxy_phase(
     stage_plan: Any = None,
     user_home=None,
     platform_agent_type: str = "run_online",
+    env_context: Optional["RuntimeEnvContext"] = None,
 ) -> UrlProxyBuildResult:
     from packaging.configure.url_proxy.structured_scanner import (
         rewrite_structured_pairs,
@@ -61,6 +63,7 @@ def build_url_proxy_phase(
         stage_plan=stage_plan,
         user_home=user_home,
         target_id=context_target_id,
+        env_context=env_context,
     )
 
     runtime_collected: list[tuple[RuntimeContract, list[UrlProxyPair]]] = []
@@ -92,7 +95,6 @@ def build_url_proxy_phase(
         structured_result = StructuredUrlProxyScanResult(
             pairs=[],
             fallback_generic_entries=[],
-            claimed_field_names=frozenset(),
         )
 
     runtime_pairs: list[UrlProxyPair] = []

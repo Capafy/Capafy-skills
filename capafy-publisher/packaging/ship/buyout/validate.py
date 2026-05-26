@@ -22,15 +22,15 @@ def load_buyout_reviewed_scan_payload(
     if reviewed_scan_json:
         payload = json.loads(reviewed_scan_json)
         if not isinstance(payload, dict):
-            raise ValueError("buyout reviewed_scan_json must be an object")
+            raise ValueError("download reviewed_scan_json must be an object")
         return payload
     if reviewed_scan_file:
         reviewed_scan_path = Path(reviewed_scan_file)
         if not reviewed_scan_path.is_file():
-            raise ValueError(f"buyout reviewed_scan_file does not exist: {reviewed_scan_path}")
+            raise ValueError(f"download reviewed_scan_file does not exist: {reviewed_scan_path}")
         payload = json.loads(reviewed_scan_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
-            raise ValueError("buyout reviewed_scan_file must contain a JSON object")
+            raise ValueError("download reviewed_scan_file must contain a JSON object")
         return payload
     return None
 
@@ -181,47 +181,47 @@ def validate_buyout_runtime(
     skill_md_exists = (runtime_root / "SKILL.md").is_file()
     checks.append(
         {
-            "id": "buyout_skill_entry",
+            "id": "download_skill_entry",
             "kind": "blocking",
             "ok": skill_md_exists,
             "summary": "Top-level SKILL.md found" if skill_md_exists else "Missing top-level SKILL.md",
         }
     )
     if not skill_md_exists:
-        errors.append("buyout packages must include a top-level SKILL.md")
+        errors.append("download packages must include a top-level SKILL.md")
 
     structure_check = _validate_structure_check(runtime_root)
     layout_ok = structure_check["ok"]
     checks.append(
         {
-            "id": "buyout_layout",
+            "id": "download_layout",
             "kind": "blocking",
             "ok": layout_ok,
-            "summary": "Buyout directory layout is valid" if layout_ok else "Buyout directory layout is invalid",
+            "summary": "Download directory layout is valid" if layout_ok else "Download directory layout is invalid",
             "top_level_entries": structure_check["top_level_entries"],
             "forbidden_dirs": structure_check["forbidden_dirs"],
         }
     )
     if structure_check["forbidden_dirs"]:
-        errors.append(f"Unexpected top-level directory in buyout package: {structure_check['forbidden_dirs'][0]}")
+        errors.append(f"Unexpected top-level directory in download package: {structure_check['forbidden_dirs'][0]}")
 
     forbidden_ok = not structure_check["forbidden_paths"]
     checks.append(
         {
-            "id": "buyout_forbidden_runtime_files",
+            "id": "download_forbidden_runtime_files",
             "kind": "blocking",
             "ok": forbidden_ok,
-            "summary": "No cloud-runtime-only files found" if forbidden_ok else "Cloud-runtime-only files are still present",
+            "summary": "No run-online-only files found" if forbidden_ok else "Run-online-only files are still present",
             "forbidden_paths": structure_check["forbidden_paths"],
         }
     )
     if structure_check["forbidden_paths"]:
-        errors.append(f"Unexpected runtime file in buyout package: {structure_check['forbidden_paths'][0]}")
+        errors.append(f"Unexpected runtime file in download package: {structure_check['forbidden_paths'][0]}")
 
     dependency_files = structure_check["dependency_files"]
     checks.append(
         {
-            "id": "buyout_dependency_files",
+            "id": "download_dependency_files",
             "kind": "non_blocking",
             "ok": True,
             "summary": f"Found {len(dependency_files)} dependency file(s)",
@@ -234,7 +234,7 @@ def validate_buyout_runtime(
 
     consistency_check = _validate_disposition_consistency(runtime_root, reviewed_scan_payload)
     if not consistency_check.get("ok", False):
-        errors.append("buyout runtime content is inconsistent with reviewed_scan dispositions")
+        errors.append("download runtime content is inconsistent with reviewed_scan dispositions")
 
     return {
         "supported": True,
@@ -243,7 +243,7 @@ def validate_buyout_runtime(
         "checks": checks,
         "errors": errors,
         "warnings": warnings,
-        "validation_mode": "buyout_skill_package_contract",
+        "validation_mode": "download_skill_package_contract",
         "validation_target": target_name,
         "structure_check": structure_check,
         "consistency_check": consistency_check,

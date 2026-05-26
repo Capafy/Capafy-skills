@@ -7,7 +7,7 @@ from packaging._shared.openclaw.official_providers import (
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
     find_openclaw_official_provider_by_marker,
 )
-from packaging.configure.runtimes.openclaw.provider_keys import resolve_api_key_config_value
+from packaging.configure.env_values import usable_env_value
 
 
 def ensure_auth_profile_providers(config: dict[str, Any], auth_keys: dict[str, list[str]]) -> bool:
@@ -39,7 +39,7 @@ def ensure_auth_profile_providers(config: dict[str, Any], auth_keys: dict[str, l
             provider = providers.get(matched_provider_name)
             if not isinstance(provider, dict):
                 continue
-            if not resolve_api_key_config_value(str(provider.get("apiKey", "") or ""), {}):
+            if not usable_env_value(provider.get("apiKey", "")):
                 provider["apiKey"] = values[0]
                 changed = True
                 models = config.get("models")
@@ -60,7 +60,7 @@ def ensure_auth_profile_providers(config: dict[str, Any], auth_keys: dict[str, l
             if provider.get("api") != spec.api:
                 provider["api"] = spec.api
                 changed = True
-            if not resolve_api_key_config_value(str(provider.get("apiKey", "") or ""), {}):
+            if not usable_env_value(provider.get("apiKey", "")):
                 provider["apiKey"] = values[0]
                 changed = True
             if not normalize_http_url_candidate(str(provider.get("baseUrl", "") or "")):

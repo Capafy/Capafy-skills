@@ -4,11 +4,11 @@ from typing import Optional
 
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, SourceKind
+from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.runtimes.codex.config_state import (
     CONFIG_RELPATH,
     load_codex_config_state,
 )
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 from packaging.configure.url_proxy.base import ScanContext
 
 
@@ -40,9 +40,7 @@ def scan_toml_providers(ctx: ScanContext, out_env_keys: set[str]) -> list[Candid
         ))
         return candidates
     if state.env_key:
-        value = str(ctx.process_env.get(state.env_key, "")).strip()
-        if looks_like_platform_managed_placeholder_value(value):
-            value = ""
+        value = usable_process_env_value(ctx.process_env, state.env_key)
         candidates.append(Candidate(
             role="api_key",
             field=state.env_key,

@@ -10,8 +10,7 @@ from packaging._shared.openclaw.official_providers import (
     find_openclaw_official_provider_in_text,
 )
 from packaging.configure.runtimes.openclaw.provider_keys import (
-    collect_provider_api_key_items,
-    resolve_api_key_config_value,
+    collect_provider_api_key_items_by_priority,
 )
 from packaging.configure.runtimes.openclaw.provider_usage import (
     api_format_from_openclaw_provider,
@@ -210,20 +209,13 @@ def materialize_official_provider_values(
         if str(provider.get("api", "")).strip() != spec.api:
             continue
 
-        key_items = collect_provider_api_key_items(spec, process_env)
-        if not key_items:
-            profile_items = auth_keys.get(provider_name, [])
-            if profile_items:
-                key_items = [
-                    {"value": value, "env_name": "", "field_aliases": []}
-                    for value in profile_items
-                ]
-
-        real_key = ""
-        if key_items:
-            real_key = str(key_items[0].get("value", "")).strip()
-        if not real_key:
-            real_key = resolve_api_key_config_value(api_key_val, process_env)
+        key_items = collect_provider_api_key_items_by_priority(
+            spec,
+            api_key=api_key_val,
+            auth_profile_values=auth_keys.get(provider_name, []),
+            env=process_env,
+        )
+        real_key = str(key_items[0].get("value", "") or "").strip() if key_items else ""
 
         if real_key and provider.get("apiKey") != real_key:
             provider["apiKey"] = real_key

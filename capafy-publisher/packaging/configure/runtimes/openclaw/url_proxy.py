@@ -21,7 +21,6 @@ from packaging.configure.runtimes.openclaw.provider_confirmation import (
     rewrite_openclaw_confirmed_providers,
 )
 from packaging.configure.runtimes.openclaw.provider_rewrite import (
-    collect_openclaw_staged_dotenv_env,
     rewrite_openclaw_builtin_models_as_explicit_providers,
 )
 from packaging.configure.runtimes.openclaw.provider_state import (
@@ -32,7 +31,7 @@ from packaging.configure.runtimes.openclaw.provider_state import (
     prune_openclaw_login_state,
 )
 from packaging.configure.runtimes.openclaw.provider_usage import get_openclaw_providers
-
+from packaging.configure.staging.env_preprocess import RuntimeEnvContext
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +52,11 @@ class OpenClawRuntime(RuntimeContract):
 
         try:
             text = config_path.read_text(encoding="utf-8")
-            dotenv_env = collect_openclaw_staged_dotenv_env(ctx.staging_root, text)
+            env_context = ctx.env_context or RuntimeEnvContext(process_env=ctx.process_env)
             updated_text, _rewrite_count = rewrite_openclaw_builtin_models_as_explicit_providers(
                 text,
-                dotenv_env=dotenv_env,
+                staging_root=ctx.staging_root,
+                env_context=env_context,
             )
             config = json.loads(updated_text)
         except (OSError, json.JSONDecodeError):

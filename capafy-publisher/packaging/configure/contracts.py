@@ -113,6 +113,7 @@ class UrlProxyPair:
     url: PlanField
     is_synthesized: bool
     model: str = ""
+    model_field: Optional[PlanField] = None
     api_format: str = ""
 
 

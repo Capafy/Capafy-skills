@@ -5,8 +5,8 @@ from typing import Any, Mapping, Union
 
 from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
 from packaging._shared.common.json_io import load_json_object
+from packaging.configure.env_values import usable_env_value, usable_process_env_value
 from packaging.configure.sensitive.keywords import normalize_key_name
-from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
 
 CLAUDE_AUTH_ENV_KEY = "ANTHROPIC_API_KEY"
@@ -103,14 +103,12 @@ def _stage_plan_credentials_payload(stage_plan) -> dict[str, Any]:
 def _claude_json_explicit_base_url(payload: dict[str, Any]) -> str:
     env_payload = payload.get("env")
     if isinstance(env_payload, dict):
-        value = str(env_payload.get(CLAUDE_BASE_URL_ENV_KEY, "") or "").strip()
-        if value and not looks_like_platform_managed_placeholder_value(value):
-            return value
+        return usable_env_value(env_payload.get(CLAUDE_BASE_URL_ENV_KEY, ""))
     return ""
 
 
 def _is_usable_claude_json_configured_key(value: str, explicit_base_url: str) -> bool:
-    if not value or looks_like_platform_managed_placeholder_value(value):
+    if not usable_env_value(value):
         return False
 
     if not explicit_base_url or explicit_base_url == ANTHROPIC_OFFICIAL_URL:
@@ -161,9 +159,7 @@ def claude_auth_login_detected(staging_root: Path, stage_plan=None) -> bool:
 
 
 def claude_oauth_token_env_detected(process_env: Union[Mapping[str, str], Any]) -> bool:
-    get_value = getattr(process_env, "get", lambda _key, _default=None: _default)
-    value = str(get_value(CLAUDE_CODE_OAUTH_TOKEN_ENV_KEY, "") or "").strip()
-    return bool(value and not looks_like_platform_managed_placeholder_value(value))
+    return bool(usable_process_env_value(process_env, CLAUDE_CODE_OAUTH_TOKEN_ENV_KEY))
 
 
 def should_skip_claude_login_structured_scan(relpath: str) -> bool:

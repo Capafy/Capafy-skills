@@ -14,9 +14,9 @@ from packaging._shared.openclaw.config import (
     validate_packaged_workspace_document_refs,
 )
 from packaging.configure.runtimes.openclaw.provider_rewrite import (
-    collect_openclaw_staged_dotenv_env,
     rewrite_openclaw_builtin_models_as_explicit_providers,
 )
+from packaging.configure.staging.env_preprocess import RuntimeEnvContext
 from packaging.configure.runtimes.openclaw.cron_postprocess import clean_cron_jobs, filter_selected_cron_jobs
 from .plugin_config import prune_unbundled_local_plugin_config
 from .redaction import redact_openclaw_local_configs
@@ -40,11 +40,13 @@ def postprocess_stage(
         redactions = redact_openclaw_local_configs(openclaw_config)
         if agent_type == "run_online":
             original_text = openclaw_config.read_text(encoding="utf-8")
-            dotenv_env = collect_openclaw_staged_dotenv_env(staging_root, original_text)
+            env_context = RuntimeEnvContext(process_env={})
             updated_text, builtin_provider_rewrites = rewrite_openclaw_builtin_models_as_explicit_providers(
                 original_text,
-                dotenv_env=dotenv_env,
+                staging_root=staging_root,
+                env_context=env_context,
             )
+            env_context.apply_staged_dotenv_consumption(staging_root)
             if builtin_provider_rewrites:
                 openclaw_config.write_text(updated_text, encoding="utf-8")
     for tree_source in stage_plan.tree_sources:
