@@ -90,7 +90,7 @@ Pick any Skill on Capafy that fits your task. **Two ways to use it:**
 
 | Mode | User Pays | Where It Runs | Source Code |
 |------|-----------|--------------|-------------|
-| **Run Online — Subscription** | Per cycle (monthly / yearly) | On Capafy's infrastructure | Stays closed |
+| **Run Online — Subscription** | Per cycle (weekly / monthly) | On Capafy's infrastructure | Stays closed |
 | **Run Online — Hourly** | Per hour of usage | On Capafy's infrastructure | Stays closed |
 | **Download** | One-time fee | On the user's machine | User gets the files |
 | **Free** | — | Mirrors whichever paid form it's set as | Same as that form |
@@ -334,7 +334,13 @@ The Thin Skill may not have installed. From the `capafy-user/` directory, run `p
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=capafy-ai/market-skill&type=Date)](https://www.star-history.com/#capafy-ai/market-skill&Date)
+<a href="https://www.star-history.com/?repos=capafy%2Fcapafy-skills&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 
