@@ -334,7 +334,7 @@ The Thin Skill may not have installed. From the `capafy-user/` directory, run `p
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=capafy-ai/market-skill&type=Date)](https://www.star-history.com/#capafy-ai/market-skill&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=capafy/capafy-skills&type=Date)](https://www.star-history.com/#capafy/capafy-skills&Date)
 
 ---
 
