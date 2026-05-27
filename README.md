@@ -334,7 +334,13 @@ The Thin Skill may not have installed. From the `capafy-user/` directory, run `p
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=capafy/capafy-skills&type=Date)](https://www.star-history.com/#capafy/capafy-skills&Date)
+<a href="https://www.star-history.com/?repos=capafy%2Fcapafy-skills&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=capafy/capafy-skills&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 
