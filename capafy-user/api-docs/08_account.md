@@ -1,6 +1,6 @@
 # User Skill API Account
 
-## A25 `GET /agent/account`
+## A26 `GET /agent/account`
 
 View the current account's aggregate information. Also the preferred token verification endpoint for the User Skill.
 
@@ -47,7 +47,7 @@ Response fields:
 | data.autoConsume.currency | string/null | Currency for auto-consumption amounts. |
 | data.developerVerified | boolean | Whether this account has completed developer verification. |
 
-## A26 `GET /agent/account/profile`
+## A27 `GET /agent/account/profile`
 
 View the current user's Profile.
 
@@ -74,7 +74,7 @@ Response fields:
 | data.userId | string | Current user ID. |
 | data.profile | string/null | Current profile text. `null` means the user has not saved a profile yet. |
 
-## A27 `PUT /agent/account/profile`
+## A28 `PUT /agent/account/profile`
 
 Update the current user's Profile.
 

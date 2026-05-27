@@ -93,7 +93,94 @@ Rules:
 - Length: `1–100` characters
 - This endpoint only updates the instance name; no other fields are modified
 
-## A18 `POST /agent/orders/instance-storage/renew`
+## A18 `GET /agent/instance/{instanceId}/agent-version-billing`
+
+Query the Agent version and the exact billing plan originally purchased for an instance.
+
+```http
+GET /agent/instance/{instanceId}/agent-version-billing
+Authorization: Bearer {token}
+```
+
+```json
+{
+  "code": 0,
+  "msg": "ok",
+  "data": {
+    "instanceId": "inst_xxx",
+    "agentId": "agent_xxx",
+    "agentVersionId": "ver_xxx",
+    "versionNo": 1,
+    "versionName": "v1.0.0",
+    "status": 4,
+    "billing": {
+      "lineNo": 0,
+      "billingMode": "subscription",
+      "isMain": 1,
+      "minPurchaseHours": null,
+      "hourlyPrice": null,
+      "hourlyMaxMessageCount": null,
+      "oneTimeFee": null,
+      "cycleType": "month",
+      "cyclePrice": 19.90,
+      "currency": "usd",
+      "cycleMaxMessageCount": 500,
+      "containerMode": "on_demand",
+      "runFrequencyValue": null,
+      "runFrequencyUnit": null,
+      "dailyRunAt": null,
+      "patrolPrompt": null
+    }
+  }
+}
+```
+
+Path parameters:
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| instanceId | string | Yes | Instance ID to inspect. |
+
+Response fields:
+
+| Field | Type | Description |
+|---|---|---|
+| data.instanceId | string | Instance ID. |
+| data.agentId | string | Agent ID. |
+| data.agentVersionId | string | Agent version ID bound to this instance. |
+| data.versionNo | int/null | Agent version number. |
+| data.versionName | string/null | Agent version label. |
+| data.status | int/null | Agent version status: `0` draft, `1` under review, `2` review failed, `3` approved / pending listing, `4` listed, `5` expired, `6` delisted. |
+| data.billing | object/null | The single billing plan actually used when this instance was purchased. |
+
+`data.billing` fields:
+
+| Field | Type | Description |
+|---|---|---|
+| lineNo | int/null | Billing line number in the purchased version. |
+| billingMode | string | Billing mode: `download`, `hourly`, or `subscription`. |
+| isMain | int/null | Main plan flag: `0` no, `1` yes. |
+| minPurchaseHours | int/null | Minimum hours per purchase. Hourly plans only. |
+| hourlyPrice | number/null | Hourly price. Hourly plans only. |
+| hourlyMaxMessageCount | int/null | Message cap per hour; `null` means unlimited. |
+| oneTimeFee | number/null | One-time download price. Download plans only. |
+| cycleType | string/null | Subscription cycle: `week` or `month`. |
+| cyclePrice | number/null | Price per subscription cycle. Subscription plans only. |
+| currency | string | Currency, currently usually `usd`. |
+| cycleMaxMessageCount | int/null | Message cap per cycle; `null` means unlimited. |
+| containerMode | string/null | Container mode: `on_demand` or `scheduled`. |
+| runFrequencyValue | int/null | Scheduled run frequency value. |
+| runFrequencyUnit | string/null | Scheduled run frequency unit: `minutes`, `hours`, or `days`. |
+| dailyRunAt | string/null | Daily scheduled run time in `HH:mm` format. |
+| patrolPrompt | string/null | Scheduled patrol prompt. |
+
+Rules:
+
+- This endpoint returns only the billing plan tied to the instance's `agentCardBillingId`, not all current billing plans for the Agent.
+- Use this endpoint before time-based renewal or expired subscription renewal when the cost or minimum purchase quantity is not already known from trusted context.
+- If the instance does not exist or does not belong to the current user, the platform returns `INSTANCE_NOT_FOUND`.
+
+## A19 `POST /agent/orders/instance-storage/renew`
 
 Pay the storage renewal fee for an instance in temporary storage, extending its retention period.
 

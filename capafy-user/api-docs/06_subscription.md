@@ -1,6 +1,6 @@
 # User Skill API Subscription
 
-## A19 `GET /agent/subscriptions/list`
+## A20 `GET /agent/subscriptions/list`
 
 View the current user's subscription list.
 
@@ -47,7 +47,7 @@ Response fields:
 | data.subscriptions[].agentVersionId | string/null | Agent version ID bound to the subscription. |
 | data.subscriptions[].agentTitle | string/null | Agent title, when the related version is still available. |
 | data.subscriptions[].status | string | Display status: `active`, `retrying`, `canceled`, or `expired`. |
-| data.subscriptions[].cycle | string/null | Display cycle, commonly `daily`, `weekly`, or `monthly`; unknown backend values may pass through. |
+| data.subscriptions[].cycle | string/null | Display cycle, commonly `weekly` or `monthly`; unknown backend values may pass through. |
 | data.subscriptions[].pricePerCycle | number/null | Price for each billing cycle. |
 | data.subscriptions[].nextBillingDate | string/null | Next billing date or current-cycle end date in `yyyy-MM-dd`. |
 | data.subscriptions[].paymentMethod | string/null | Payment method, commonly `credit` or `stripe`. |
@@ -59,7 +59,7 @@ Response fields:
 - `canceled`
 - `expired`
 
-## A20 `POST /agent/subscriptions/{subscriptionId}/cancel`
+## A21 `POST /agent/subscriptions/{subscriptionId}/cancel`
 
 Cancel auto-renewal; the current cycle remains valid.
 
@@ -84,7 +84,7 @@ Path parameters:
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| subscriptionId | string | Yes | Subscription ID from A19. |
+| subscriptionId | string | Yes | Subscription ID from A20. |
 
 Response fields:
 
@@ -94,7 +94,7 @@ Response fields:
 | data.status | string | Display status after cancellation, normally `canceled`. |
 | data.effectiveDate | string/null | Date when cancellation takes effect. The current cycle remains valid until this date. |
 
-## A21 `POST /agent/subscriptions/{subscriptionId}/resume`
+## A22 `POST /agent/subscriptions/{subscriptionId}/resume`
 
 Resume auto-renewal for a canceled but not yet expired subscription.
 
@@ -119,7 +119,7 @@ Path parameters:
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| subscriptionId | string | Yes | Subscription ID from A19. |
+| subscriptionId | string | Yes | Subscription ID from A20. |
 
 Response fields:
 

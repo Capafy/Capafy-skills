@@ -488,35 +488,6 @@ def _dotenv_env_names_for_payload(payload: dict[str, object], config_text: str =
     return {name for name in names if env_reference_name(name)}
 
 
-def _iter_staged_dotenv_files(staging_root: Path) -> list[Path]:
-    root = Path(staging_root)
-    if not root.is_dir():
-        return []
-    result: list[Path] = []
-    for file_path in root.rglob(".env"):
-        if not file_path.is_file():
-            continue
-        try:
-            rel_parts = file_path.relative_to(root).parts
-        except ValueError:
-            continue
-        if rel_parts and rel_parts[0] in {"_scan_only", ".temp"}:
-            continue
-        result.append(file_path)
-    return sorted(result, key=lambda item: item.as_posix())
-
-
-def _openclaw_staged_dotenv_relpaths(staging_root: Path) -> tuple[str, ...]:
-    root = Path(staging_root)
-    relpaths: list[str] = []
-    for file_path in _iter_staged_dotenv_files(root):
-        try:
-            relpaths.append(file_path.relative_to(root).as_posix())
-        except ValueError:
-            continue
-    return tuple(relpaths)
-
-
 def _collect_openclaw_staged_dotenv_env(
     staging_root: Path,
     config_text: str,
@@ -534,9 +505,9 @@ def _collect_openclaw_staged_dotenv_env(
     if not names:
         return {}
 
-    return env_context.staged_dotenv_values(
+    return env_context.staged_dotenv_values_for_consumer(
         Path(staging_root),
-        relpaths=_openclaw_staged_dotenv_relpaths(staging_root),
+        consumer_relpath=_OPENCLAW_CONFIG_REL_SOURCE,
         names=frozenset(names),
     )
 
@@ -556,7 +527,7 @@ def resolve_openclaw_staged_env_templates(
     if not isinstance(payload, dict):
         return frozenset()
 
-    dotenv_relpaths = _openclaw_staged_dotenv_relpaths(root)
+    dotenv_relpaths = env_context.staged_dotenv_relpaths_for_consumer(_OPENCLAW_CONFIG_REL_SOURCE)
     dotenv_env = _collect_openclaw_staged_dotenv_env(root, config_text, env_context=env_context)
     template_env_names = frozenset(_OPENCLAW_ENV_TEMPLATE_RE.findall(config_text))
     merged_process_env = env_context.env_for_names(template_env_names)
@@ -694,7 +665,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     if consumed_env_names:
         env_context.consume_staged_dotenv_names(
             staging_root,
-            relpaths=_openclaw_staged_dotenv_relpaths(staging_root),
+            relpaths=env_context.staged_dotenv_relpaths_for_consumer(_OPENCLAW_CONFIG_REL_SOURCE),
             names=frozenset(consumed_env_names),
         )
     if provider_key_rewrites or alias_rewrites:

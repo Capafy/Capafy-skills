@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import sys
+from typing import Optional
 import urllib.error
 import urllib.request
 import zipfile
@@ -39,7 +40,7 @@ def verify_sha256(path: Path, expected: str) -> bool:
     return digest == expected
 
 
-def detect_install_root(script_path: Path | None = None) -> Path:
+def detect_install_root(script_path: Optional[Path] = None) -> Path:
     current = Path(script_path) if script_path is not None else Path(__file__).resolve()
     for parent in current.parents:
         if parent.name == "skills":
@@ -88,7 +89,7 @@ def _normalize_skill_dir_name(raw_name: str) -> str:
     return normalized
 
 
-def _read_skill_name(package_root: Path) -> str | None:
+def _read_skill_name(package_root: Path) -> Optional[str]:
     skill_md = package_root / "SKILL.md"
     try:
         text = skill_md.read_text(encoding="utf-8")
@@ -130,7 +131,7 @@ def _read_archive_top_levels(archive_path: Path) -> list[str]:
 def resolve_install_dir_name(
     package_root: Path,
     *,
-    archive_path: Path | None = None,
+    archive_path: Optional[Path] = None,
 ) -> str:
     validate_package_layout(package_root)
 
@@ -154,7 +155,7 @@ def resolve_install_target(
     package_root: Path,
     install_root: Path,
     *,
-    archive_path: Path | None = None,
+    archive_path: Optional[Path] = None,
 ) -> Path:
     install_dir_name = resolve_install_dir_name(package_root, archive_path=archive_path)
     target = install_root / install_dir_name
@@ -163,7 +164,7 @@ def resolve_install_target(
     return target
 
 
-def install_from_file(archive_path: Path, destination_root: Path | None = None) -> Path:
+def install_from_file(archive_path: Path, destination_root: Optional[Path] = None) -> Path:
     install_root = destination_root or detect_install_root()
     install_root.mkdir(parents=True, exist_ok=True)
     staging_dir = Path(tempfile.mkdtemp(prefix="capafy-install-"))
@@ -248,8 +249,8 @@ def inspect_install_target(
     runner=None,
     *,
     execute_installers: bool = True,
-    install_root: Path | None = None,
-    archive_path: Path | None = None,
+    install_root: Optional[Path] = None,
+    archive_path: Optional[Path] = None,
 ) -> dict[str, object]:
     validate_package_layout(package_root)
     install_report = install_dependencies(
@@ -316,7 +317,7 @@ def _ensure_downloaded_archive(path: Path) -> None:
         raise RuntimeError(f"package download returned non-archive payload: {detail}") from None
 
 
-def _build_platform_headers(access_token: str | None = None) -> dict[str, str]:
+def _build_platform_headers(access_token: Optional[str] = None) -> dict[str, str]:
     token = str(access_token or "").strip()
     if not token:
         try:
@@ -334,9 +335,9 @@ def resolve_package_download_metadata(
     order_id: str,
     *,
     base_url: str = "",
-    access_token: str | None = None,
-    app_version_id: str | None = None,
-) -> dict[str, str | None]:
+    access_token: Optional[str] = None,
+    app_version_id: Optional[str] = None,
+) -> dict[str, Optional[str]]:
     """Call GET /agent/orders/buyer/{orderId}/download and return metadata."""
     resolved_base_url = _resolve_base_url(base_url)
     url = f"{resolved_base_url.rstrip('/')}/agent/orders/buyer/{order_id}/download"
@@ -372,7 +373,7 @@ def resolve_package_download_metadata(
     if not isinstance(data, dict):
         raise RuntimeError(f"order download returned unexpected response: {body}")
 
-    metadata: dict[str, str | None] = {"order_id": order_id}
+    metadata: dict[str, Optional[str]] = {"order_id": order_id}
 
     skill_install = data.get("skillInstall")
     if isinstance(skill_install, dict) and skill_install.get("url"):
@@ -396,7 +397,7 @@ def _fetch_platform_json(
     path: str,
     *,
     base_url: str,
-    access_token: str | None = None,
+    access_token: Optional[str] = None,
 ) -> dict:
     """GET a JSON response from the platform. Returns the parsed body (may be empty on error)."""
     url = f"{base_url.rstrip('/')}{path}"
@@ -426,7 +427,7 @@ def _fetch_order_detail(
     order_id: str,
     *,
     base_url: str,
-    access_token: str | None = None,
+    access_token: Optional[str] = None,
 ) -> dict[str, str]:
     """GET /agent/orders/buyer/{orderId}/detail. Returns {agent_id, instance_id, agent_title}."""
     body = _fetch_platform_json(
@@ -448,7 +449,7 @@ def _fetch_agent_instances(
     agent_id: str,
     *,
     base_url: str,
-    access_token: str | None = None,
+    access_token: Optional[str] = None,
     statuses: tuple[str, ...] = ("active", "expired"),
 ) -> list[dict]:
     """Fetch instances across statuses and filter to one agent. Returns [] on network error."""
@@ -485,7 +486,7 @@ def _fetch_agent_instances(
     return collected
 
 
-def _derive_agent_id_from_folder(folder_name: str | None) -> str:
+def _derive_agent_id_from_folder(folder_name: Optional[str]) -> str:
     value = str(folder_name or "").strip()
     prefix = "capafy-agent-"
     if value.startswith(prefix):
@@ -499,7 +500,7 @@ def sync_thin_skill_state_after_install(
     installed_to: Path,
     *,
     base_url: str,
-    access_token: str | None = None,
+    access_token: Optional[str] = None,
 ) -> dict:
     """After installing a thin skill, auto-populate thin_skills_state.json.
 
@@ -594,7 +595,7 @@ def resolve_package_download_url(
     order_id: str,
     *,
     base_url: str = "",
-    access_token: str | None = None,
+    access_token: Optional[str] = None,
 ) -> str:
     metadata = resolve_package_download_metadata(
         order_id,
@@ -621,9 +622,9 @@ def download_package(
     order_id: str,
     *,
     base_url: str = "",
-    access_token: str | None = None,
-    app_version_id: str | None = None,
-) -> tuple[Path, dict[str, str | None]]:
+    access_token: Optional[str] = None,
+    app_version_id: Optional[str] = None,
+) -> tuple[Path, dict[str, Optional[str]]]:
     """Download package for an order. Returns (archive_path, metadata)."""
     resolved_base_url = _resolve_base_url(base_url)
     metadata = resolve_package_download_metadata(
@@ -644,7 +645,7 @@ def download_package(
     return archive_path, metadata
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="User Skill package installer")
     parser.add_argument("--order-id", dest="order_id")
     parser.add_argument("--app-version-id", dest="app_version_id", default=None)

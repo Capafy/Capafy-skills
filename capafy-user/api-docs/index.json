@@ -1,6 +1,6 @@
 {
-  "version": "0.3.8",
-  "endpoint_count": 27,
+  "version": "0.3.10",
+  "endpoint_count": 28,
   "modules": [
     "00_overview.md",
     "01_auth.md",

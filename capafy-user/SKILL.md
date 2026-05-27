@@ -333,8 +333,11 @@ By default, ask every time. Only suppress the prompt if the user explicitly says
 → Confirm instanceId (from context or instance list)
 → Decide which renewal and gather the required quantity BEFORE Payment Preference:
    ├── Storage renewal (extending purgeAt): ASK explicitly: "How many months of storage do you want to add? (range 1–12)." Do NOT default. Compute cost = `renewMonths × 2.00 credits`.
-   ├── Time-based renewal (extending hourly usage): ASK explicitly: "How many additional hours would you like to purchase? Minimum: {minPurchaseHours}." Do NOT guess. Reject values < `minPurchaseHours` and re-ask. Compute cost = `hourlyPrice × hours`.
-   └── Expired subscription renewal: verify the old subscription is `expired`; do NOT ask for `hours`. Use the subscription cycle price as cost when available.
+   └── Time-based or expired subscription renewal:
+       1. Call GET /agent/instance/{instanceId}/agent-version-billing to recover the instance's purchased billing plan.
+       2. If `billing.billingMode` is `hourly`: ASK explicitly: "How many additional hours would you like to purchase? Minimum: {minPurchaseHours}." Do NOT guess. Reject values < `minPurchaseHours` and re-ask. Compute cost = `hourlyPrice × hours`.
+       3. If `billing.billingMode` is `subscription`: verify the old subscription is `expired`; do NOT ask for `hours`. Compute cost = `cyclePrice` for the purchased cycle.
+       4. If the billing data is missing or the mode is not compatible with the requested renewal, explain the mismatch and stop before Payment Preference.
 → Run the Payment Preference prompt with the computed cost (see Payment Preference section). If the user picks Card, stop here and redirect to `{web_base}/my-agents` (renewal target per the Payment Preference Card branch); only proceed to either renewal endpoint below if the user picks Credits and the balance is sufficient.
 → Storage renewal: POST /agent/orders/instance-storage/renew { instanceId, renewMonths }
 → Time-based renewal (new order): POST /agent/orders/buyer/create { instanceId, hours }
@@ -547,6 +550,7 @@ When the user asks for more details about a specific Agent, call `GET /agent/age
 
 ### 5.6 Instance Renewal
 
+- Time-based and expired subscription renewal: first call `GET /agent/instance/{instanceId}/agent-version-billing` to recover the original billing plan tied to the instance
 - Instance storage renewal: `POST /agent/orders/instance-storage/renew`
 - This endpoint extends the retention window for instances still inside their temporary storage period
 

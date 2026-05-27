@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import shutil
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Optional
 
 
 STATE_FILENAME = "thin_skills_state.json"
@@ -12,22 +12,22 @@ LEGACY_STATE_DIRNAME = ".capafy"
 RETAINED_ORDER_STATUSES = {"active", "expired"}
 
 
-def skill_root_path(current_file: Path | None = None) -> Path:
+def skill_root_path(current_file: Optional[Path] = None) -> Path:
     base = Path(current_file) if current_file is not None else Path(__file__).resolve()
     return base.parents[1]
 
 
-def state_file_path(skill_root: Path | None = None) -> Path:
+def state_file_path(skill_root: Optional[Path] = None) -> Path:
     root = skill_root if skill_root is not None else skill_root_path()
     return root / STATE_FILENAME
 
 
-def legacy_state_file_path(skill_root: Path | None = None) -> Path:
+def legacy_state_file_path(skill_root: Optional[Path] = None) -> Path:
     root = skill_root if skill_root is not None else skill_root_path()
     return root / LEGACY_STATE_DIRNAME / STATE_FILENAME
 
 
-def default_thin_skill_dir(agent_id: str, skill_root: Path | None = None) -> str:
+def default_thin_skill_dir(agent_id: str, skill_root: Optional[Path] = None) -> str:
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
         raise ValueError("agent_id cannot be empty")
@@ -39,7 +39,7 @@ def _empty_state() -> dict[str, Any]:
     return {"agents": {}}
 
 
-def load_state(skill_root: Path | None = None) -> dict[str, Any]:
+def load_state(skill_root: Optional[Path] = None) -> dict[str, Any]:
     path = state_file_path(skill_root)
     if not path.is_file():
         legacy_path = legacy_state_file_path(skill_root)
@@ -62,7 +62,7 @@ def load_state(skill_root: Path | None = None) -> dict[str, Any]:
     return payload
 
 
-def get_agent_state(agent_id: str, skill_root: Path | None = None) -> dict[str, Any] | None:
+def get_agent_state(agent_id: str, skill_root: Optional[Path] = None) -> Optional[dict[str, Any]]:
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
         raise ValueError("agent_id cannot be empty")
@@ -75,7 +75,7 @@ def get_agent_state(agent_id: str, skill_root: Path | None = None) -> dict[str, 
     return dict(agent_state)
 
 
-def save_state(payload: Mapping[str, Any], skill_root: Path | None = None) -> Path:
+def save_state(payload: Mapping[str, Any], skill_root: Optional[Path] = None) -> Path:
     path = state_file_path(skill_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(dict(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -90,7 +90,7 @@ def save_state(payload: Mapping[str, Any], skill_root: Path | None = None) -> Pa
     return path
 
 
-def _utc_now(now: datetime | None = None) -> str:
+def _utc_now(now: Optional[datetime] = None) -> str:
     resolved = now.astimezone(timezone.utc) if now is not None else datetime.now(timezone.utc)
     return resolved.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -111,7 +111,7 @@ def _normalize_instances(
     instances: Iterable[Mapping[str, object]],
     *,
     previous_last_used: Mapping[str, str],
-    initialize_last_used_instance_id: str | None,
+    initialize_last_used_instance_id: Optional[str],
     now_iso: str,
 ) -> list[dict[str, str]]:
     normalized: list[dict[str, str]] = []
@@ -141,8 +141,8 @@ def _normalize_instances(
 def _find_instance(
     instances: Iterable[Mapping[str, str]],
     *,
-    instance_id: str | None = None,
-) -> dict[str, str] | None:
+    instance_id: Optional[str] = None,
+) -> Optional[dict[str, str]]:
     target = _string(instance_id)
     if not target:
         return None
@@ -155,9 +155,9 @@ def _find_instance(
 def _choose_default_instance(
     instances: list[dict[str, str]],
     *,
-    preferred_instance_id: str | None,
-    previous_default_instance_id: str | None,
-) -> dict[str, str] | None:
+    preferred_instance_id: Optional[str],
+    previous_default_instance_id: Optional[str],
+) -> Optional[dict[str, str]]:
     for candidate_id in (preferred_instance_id, previous_default_instance_id):
         selected = _find_instance(instances, instance_id=candidate_id)
         if selected is not None:
@@ -169,7 +169,7 @@ def _choose_default_instance(
     return instances[0] if instances else None
 
 
-def _safe_remove_thin_skill_dir(path_value: str | None, *, skill_root: Path) -> None:
+def _safe_remove_thin_skill_dir(path_value: Optional[str], *, skill_root: Path) -> None:
     candidate = _string(path_value)
     if not candidate:
         return
@@ -193,8 +193,8 @@ def _safe_remove_thin_skill_dir(path_value: str | None, *, skill_root: Path) -> 
 def resolve_reuse_decision(
     agent_id: str,
     *,
-    incoming_template_id: str | None = None,
-    skill_root: Path | None = None,
+    incoming_template_id: Optional[str] = None,
+    skill_root: Optional[Path] = None,
 ) -> dict[str, Any]:
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
@@ -244,14 +244,14 @@ def sync_agent_state(
     agent_id: str,
     *,
     instances: Iterable[Mapping[str, object]],
-    default_instance_id: str | None = None,
-    thin_skill_template_id: str | None = None,
-    order_id: str | None = None,
-    thin_skill_dir: str | None = None,
-    initialize_last_used_instance_id: str | None = None,
-    skill_root: Path | None = None,
-    now: datetime | None = None,
-) -> dict[str, Any] | None:
+    default_instance_id: Optional[str] = None,
+    thin_skill_template_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+    thin_skill_dir: Optional[str] = None,
+    initialize_last_used_instance_id: Optional[str] = None,
+    skill_root: Optional[Path] = None,
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
         raise ValueError("agent_id cannot be empty")
@@ -324,8 +324,8 @@ def update_template_id(
     agent_id: str,
     *,
     thin_skill_template_id: str,
-    skill_root: Path | None = None,
-) -> dict[str, Any] | None:
+    skill_root: Optional[Path] = None,
+) -> Optional[dict[str, Any]]:
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
         raise ValueError("agent_id cannot be empty")
@@ -349,9 +349,9 @@ def update_template_id(
 def mark_instance_used(
     instance_id: str,
     *,
-    skill_root: Path | None = None,
-    now: datetime | None = None,
-) -> dict[str, Any] | None:
+    skill_root: Optional[Path] = None,
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
     resolved_instance_id = _string(instance_id)
     if not resolved_instance_id:
         raise ValueError("instance_id cannot be empty")
@@ -383,7 +383,7 @@ def mark_instance_used(
     return None
 
 
-def _remove_agent(agent_id: str, skill_root: Path | None = None) -> bool:
+def _remove_agent(agent_id: str, skill_root: Optional[Path] = None) -> bool:
     """Remove a single agent entry and its thin-skill directory. Returns True if removed."""
     resolved_agent_id = _string(agent_id)
     if not resolved_agent_id:
@@ -403,7 +403,7 @@ def _remove_agent(agent_id: str, skill_root: Path | None = None) -> bool:
     return True
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     """CLI for diagnostics and manual repair.
 
     Subcommands:

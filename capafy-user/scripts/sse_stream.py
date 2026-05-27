@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import Optional, Union
 import urllib.error
 import urllib.request
 
@@ -17,7 +18,7 @@ except ImportError:  # pragma: no cover - CLI fallback
 TERMINAL_EVENT_TYPES = {"done", "timeout"}
 
 
-def parse_event_stream(stream) -> tuple[list[dict], str | None]:
+def parse_event_stream(stream) -> tuple[list[dict], Optional[str]]:
     events = list(iter_event_stream(stream))
     last_event_id = None
     if events:
@@ -27,7 +28,7 @@ def parse_event_stream(stream) -> tuple[list[dict], str | None]:
 
 def iter_event_stream(stream):
     lines: list[str] = []
-    current_event_id: str | None = None
+    current_event_id: Optional[str] = None
 
     for raw_line in stream:
         line = raw_line.decode(errors="replace").rstrip("\r\n")
@@ -50,7 +51,7 @@ def iter_event_stream(stream):
             yield event
 
 
-def _parse_event(lines: list[str], event_id: str | None) -> dict | None:
+def _parse_event(lines: list[str], event_id: Optional[str]) -> Optional[dict]:
     data_parts = []
     for line in lines:
         if line.startswith("data:"):
@@ -85,7 +86,7 @@ def build_interrupt_url(instance_id: str, *, base_url: str = DEFAULT_PLATFORM_BA
     return f"{base_url.rstrip('/')}/agent/relay/instances/{instance_id}/interrupt"
 
 
-def _build_headers(token: str | None, *, has_json_body: bool) -> dict[str, str]:
+def _build_headers(token: Optional[str], *, has_json_body: bool) -> dict[str, str]:
     headers = {
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
@@ -118,7 +119,7 @@ def _normalize_file_entry(entry) -> dict:
     return {"url": url, "originalFileName": name or url}
 
 
-def _normalize_files(files: list | None) -> list[dict] | None:
+def _normalize_files(files: Optional[list]) -> Optional[list[dict]]:
     if not files:
         return None
     return [_normalize_file_entry(f) for f in files]
@@ -128,11 +129,11 @@ def _build_message_request(
     instance_id: str,
     *,
     base_url: str,
-    token: str | None,
-    content: str | None,
-    original_question: str | None,
-    next_step_plan: str | None,
-    files: list | None,
+    token: Optional[str],
+    content: Optional[str],
+    original_question: Optional[str],
+    next_step_plan: Optional[str],
+    files: Optional[list],
     reconnect: bool,
 ):
     body = None
@@ -223,11 +224,11 @@ def _record_successful_send(instance_id: str, *, reconnect: bool) -> None:
 def stream_message(
     instance_id: str,
     *,
-    content: str | None = None,
-    original_question: str | None = None,
-    next_step_plan: str | None = None,
-    next_step: str | None = None,
-    files: list[dict] | list[str] | None = None,
+    content: Optional[str] = None,
+    original_question: Optional[str] = None,
+    next_step_plan: Optional[str] = None,
+    next_step: Optional[str] = None,
+    files: Optional[Union[list[dict], list[str]]] = None,
     reconnect: bool = False,
     base_url: str = "",
     timeout: int = 300,
@@ -288,7 +289,7 @@ def stream_message(
     return 1
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="User Skill message SSE runner")
     parser.add_argument("instance_id")
     parser.add_argument("--content")

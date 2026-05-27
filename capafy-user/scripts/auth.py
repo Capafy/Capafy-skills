@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Optional
 
 
 PLATFORM_ACCESS_TOKEN_ENV = "CAPAFY_ACCESS_TOKEN"
@@ -13,16 +13,16 @@ TOKEN_ENV_VAR = "CAPAFY_TOKEN"
 TOKEN_STORE_FILENAME = "config.json"
 
 
-def buyer_skill_dir_path(current_file: Path | None = None) -> Path:
+def buyer_skill_dir_path(current_file: Optional[Path] = None) -> Path:
     base = Path(current_file) if current_file is not None else Path(__file__).resolve()
     return base.parents[1]
 
 
-def token_file_path(home_dir: Path | None = None) -> Path:
+def token_file_path(home_dir: Optional[Path] = None) -> Path:
     return token_store_path(home_dir)
 
 
-def token_store_path(home_dir: Path | None = None) -> Path:
+def token_store_path(home_dir: Optional[Path] = None) -> Path:
     base = Path(home_dir) if home_dir is not None else buyer_skill_dir_path()
     return base / TOKEN_STORE_FILENAME
 
@@ -37,10 +37,10 @@ def _safe_chmod(path: Path, mode: int) -> None:
 def persist_access_token(
     access_token: str,
     *,
-    home_dir: Path | None = None,
-    user_id: str | None = None,
-    email: str | None = None,
-    name: str | None = None,
+    home_dir: Optional[Path] = None,
+    user_id: Optional[str] = None,
+    email: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> Path:
     normalized_access_token = str(access_token or "").strip()
     if not normalized_access_token:
@@ -61,11 +61,11 @@ def persist_access_token(
 
 def save_token(
     token: str,
-    home_dir: Path | None = None,
+    home_dir: Optional[Path] = None,
     *,
-    user_id: str | None = None,
-    email: str | None = None,
-    name: str | None = None,
+    user_id: Optional[str] = None,
+    email: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> Path:
     return persist_access_token(
         token,
@@ -76,7 +76,7 @@ def save_token(
     )
 
 
-def load_persisted_token_payload(home_dir: Path | None = None) -> dict[str, Any] | None:
+def load_persisted_token_payload(home_dir: Optional[Path] = None) -> Optional[dict[str, Any]]:
     path = token_store_path(home_dir)
     if not path.is_file():
         return None
@@ -89,7 +89,7 @@ def load_persisted_token_payload(home_dir: Path | None = None) -> dict[str, Any]
     return payload
 
 
-def load_persisted_access_token(home_dir: Path | None = None) -> tuple[str, Path] | None:
+def load_persisted_access_token(home_dir: Optional[Path] = None) -> Optional[tuple[str, Path]]:
     payload = load_persisted_token_payload(home_dir)
     if payload is None:
         return None
@@ -100,7 +100,7 @@ def load_persisted_access_token(home_dir: Path | None = None) -> tuple[str, Path
     return access_token, path
 
 
-def load_token(home_dir: Path | None = None) -> str | None:
+def load_token(home_dir: Optional[Path] = None) -> Optional[str]:
     platform_env_value = os.environ.get(PLATFORM_ACCESS_TOKEN_ENV, "").strip()
     if platform_env_value:
         return platform_env_value
@@ -116,20 +116,20 @@ def load_token(home_dir: Path | None = None) -> str | None:
     return value or None
 
 
-def clear_token(home_dir: Path | None = None) -> None:
+def clear_token(home_dir: Optional[Path] = None) -> None:
     path = token_store_path(home_dir)
     if path.exists():
         path.unlink()
 
 
-def has_token(home_dir: Path | None = None) -> bool:
+def has_token(home_dir: Optional[Path] = None) -> bool:
     try:
         return load_token(home_dir) is not None
     except ValueError:
         return False
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="User Skill token storage helper")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

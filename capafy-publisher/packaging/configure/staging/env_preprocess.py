@@ -44,6 +44,19 @@ class RuntimeEnvContext:
                     result[name] = values[name]
         return result
 
+    def staged_dotenv_values_for_consumer(
+        self,
+        staging_root: Path,
+        *,
+        consumer_relpath: str,
+        names: frozenset[str],
+    ) -> dict[str, str]:
+        relpaths = _dotenv_relpaths_for_consumer(consumer_relpath)
+        return self.staged_dotenv_values(staging_root, relpaths=relpaths, names=names)
+
+    def staged_dotenv_relpaths_for_consumer(self, consumer_relpath: str) -> tuple[str, ...]:
+        return _dotenv_relpaths_for_consumer(consumer_relpath)
+
     def consume_staged_dotenv_names(
         self,
         staging_root: Path,
@@ -104,6 +117,23 @@ def _normalize_staged_relpath(relpath: str) -> str:
     while normalized.startswith("./"):
         normalized = normalized[2:]
     return normalized
+
+
+def _dotenv_relpaths_for_consumer(consumer_relpath: str) -> tuple[str, ...]:
+    normalized = _normalize_staged_relpath(consumer_relpath)
+    parts = [part for part in normalized.split("/") if part]
+    if parts and parts[0] in {"_scan_only", ".temp"}:
+        return ()
+    parent_parts = parts[:-1] if parts else []
+    relpaths: list[str] = []
+    for depth in range(len(parent_parts), -1, -1):
+        if depth > 0:
+            if parent_parts[0] in {"_scan_only", ".temp"}:
+                continue
+            relpaths.append("/".join([*parent_parts[:depth], ".env"]))
+        else:
+            relpaths.append(".env")
+    return tuple(relpaths)
 
 
 def _target_names(env_id: str) -> frozenset[str]:

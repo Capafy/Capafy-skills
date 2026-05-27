@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from capafy_platform import runtime_context
 from packaging._shared.common.url_values import has_http_url_scheme
 from packaging._shared.platform.runtime_mapping import (
     documented_agent_runtime_from_values,
@@ -107,6 +108,9 @@ def _build_workflow_info_payload(card_draft: dict) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "selection_groups": _validated_upload_selection_groups(card_draft),
     }
+    skill_version = runtime_context.load_app_version()
+    if skill_version:
+        payload["skill_version"] = skill_version
     description = str(card_draft.get("description", "") or "").strip()
     if description:
         payload["description"] = description

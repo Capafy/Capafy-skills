@@ -6,7 +6,7 @@ import mimetypes
 import os
 from pathlib import Path
 import sys
-from typing import Optional
+from typing import Optional, Union
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
@@ -26,7 +26,7 @@ EXPLICIT_AUTH_HEADER_KEYS = {"authorization", "x-access-token"}
 SKILL_VERSION_STATUS_HEADER = "X-Skill-Version-Status"
 
 
-def _normalize_headers(headers: dict[str, str] | None) -> dict[str, str]:
+def _normalize_headers(headers: Optional[dict[str, str]]) -> dict[str, str]:
     return dict(headers or {})
 
 
@@ -83,7 +83,7 @@ def _resolve_platform_access_token(
     access_token: Optional[str] = None,
     *,
     auth_loader=None,
-) -> tuple[str, str] | tuple[None, None]:
+) -> Union[tuple[str, str], tuple[None, None]]:
     explicit_token = str(access_token or "").strip()
     if explicit_token:
         return explicit_token, "explicit_access_token"
@@ -204,17 +204,17 @@ def _recover_msys_mangled_url(url: str) -> str:
 def request(
     method: str,
     url: str,
-    json_body: dict | None = None,
-    headers: dict[str, str] | None = None,
-    out_file: str | None = None,
+    json_body: Optional[dict] = None,
+    headers: Optional[dict[str, str]] = None,
+    out_file: Optional[str] = None,
     *,
-    file_field: str | None = None,
-    file_path: str | None = None,
+    file_field: Optional[str] = None,
+    file_path: Optional[str] = None,
     auth_loader=None,
     auto_platform_auth: bool = False,
     access_token: Optional[str] = None,
     platform_base_url: Optional[str] = None,
-) -> tuple[dict | str | None, int]:
+) -> tuple[Optional[Union[dict, str]], int]:
     url = _recover_msys_mangled_url(url)
     if url.startswith("/"):
         base = _normalize_platform_base_url(platform_base_url)
@@ -294,7 +294,7 @@ def _parse_file_option(text: str) -> tuple[str, str]:
     return field.strip(), path.strip()
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="capafy HTTP tool")
     parser.add_argument("method", choices=["GET", "POST", "PATCH", "DELETE", "PUT"])
     parser.add_argument("url")

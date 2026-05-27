@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+from pathlib import Path
 import sys
+from typing import Optional
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 try:
     from . import capafy_http
@@ -55,7 +56,7 @@ def get_presign_upload(
     return data
 
 
-def put_to_s3(upload_url: str, file_path: Path, content_type: str, headers: dict | None = None) -> int:
+def put_to_s3(upload_url: str, file_path: Path, content_type: str, headers: Optional[dict] = None) -> int:
     """PUT file bytes to the presigned S3 URL. Returns HTTP status."""
     file_bytes = file_path.read_bytes()
     all_headers = {"Content-Type": content_type}
@@ -148,7 +149,7 @@ def upload_file(
     return result
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Upload file to capafy platform")
     parser.add_argument("file", help="path to the file to upload")
     parser.add_argument("--biz-type", default=DEFAULT_BIZ_TYPE)

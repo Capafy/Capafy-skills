@@ -99,7 +99,7 @@ Usage rules:
 |---|---|---|
 | `download` | `oneTimeFee` | One-Time Purchase price (Download Agent) |
 | `hourly` | `hourlyPrice` / `hourlyMaxMessageCount` / `minPurchaseHours` | Pay-per-Duration billing; `hours` in the order must be ≥ `minPurchaseHours` (see `03_order.md`) |
-| `subscription` | `cycleType` (`day` / `week` / `month`) / `cyclePrice` / `cycleMaxMessageCount` | Periodic subscription; `cycleMaxMessageCount` is the message cap per cycle (cycle total). Display the cap with the cycle unit, e.g. weekly subscription with `cycleMaxMessageCount=88` → "up to 88 messages per week". |
+| `subscription` | `cycleType` (`week` / `month`) / `cyclePrice` / `cycleMaxMessageCount` | Periodic subscription; `cycleMaxMessageCount` is the message cap per cycle (cycle total). Display the cap with the cycle unit, e.g. weekly subscription with `cycleMaxMessageCount=88` → "up to 88 messages per week". |
 
 Common billing item fields:
 
@@ -112,7 +112,7 @@ Common billing item fields:
 | hourlyPrice | number/null | Hourly price for pay-per-duration billing. |
 | hourlyMaxMessageCount | int/null | Message cap for an hourly purchase window, when configured. |
 | minPurchaseHours | int/null | Minimum purchase hours for hourly billing. |
-| cycleType | string/null | Subscription cycle unit: `day`, `week`, or `month`. |
+| cycleType | string/null | Subscription cycle unit: `week` or `month`. |
 | cyclePrice | number/null | Subscription price per cycle. |
 | cycleMaxMessageCount | int/null | Message cap per subscription cycle. |
 | containerMode | string/null | Runtime scheduling mode, independent of billing. |

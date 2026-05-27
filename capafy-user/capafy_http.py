@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+from typing import Optional
 
 try:
     from scripts.capafy_http import request
@@ -12,7 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from scripts.capafy_http import _main as _scripts_main
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     return _scripts_main(argv)
 
 

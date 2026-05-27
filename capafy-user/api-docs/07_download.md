@@ -1,6 +1,6 @@
 # User Skill API Download
 
-## A22 `GET /agent/orders/buyer/{orderId}/download`
+## A23 `GET /agent/orders/buyer/{orderId}/download`
 
 Get download information for a specified order. Both Download Agent orders and Run Online orders use this endpoint. Run Online orders download the Thin Skill.
 
@@ -87,7 +87,7 @@ Response fields:
 | Specified historical version is invalid | 2014 | Only relevant when backend support for `appVersionId` is enabled |
 | Install package does not exist | 2024 | No install package bound or packageUrl is empty |
 
-## A23 `GET /agent/skill/{agentId}/versions`
+## A24 `GET /agent/skill/{agentId}/versions`
 
 Query the version history of a specified Skill. Returns only officially published versions with an install package, sorted by version number in descending order.
 
@@ -128,7 +128,7 @@ Key points:
 
 - Only applicable to Download Agents (`agentType=download`); not applicable to Run Online Agents
 - Not paginated; returns all officially published versions at once
-- Use `appVersionId` with A22 only after confirming the backend supports the query parameter
+- Use `appVersionId` with A23 only after confirming the backend supports the query parameter
 - Does not return drafts, under-review, or review-failed versions
 - Returns `2014` if `agentId` does not exist or is not a Skill
 
@@ -149,7 +149,7 @@ Response fields:
 | data[].createdAt | long | Creation time in Unix milliseconds. |
 | data[].updatedAt | long | Last update time in Unix milliseconds. |
 
-## A24 `GET /agent/agent/agents/{agentId}/package`
+## A25 `GET /agent/agent/agents/{agentId}/package`
 
 Get the download URL for the currently listed Skill version by agentId. Only supports Download Agents (`agentType=download`); does not support Run Online Agents.
 
@@ -183,7 +183,7 @@ Key points:
 - Free Skills (all billing plan amounts ≤ 0) can be downloaded without a purchase
 - Paid Skills require the current buyer to have an existing purchase record; returns `4047` otherwise
 - The returned URL is a presigned download URL with an expiry; use it promptly
-- Difference from A22: A22 downloads by orderId; this endpoint downloads by agentId and always returns the latest listed version
+- Difference from A23: A23 downloads by orderId; this endpoint downloads by agentId and always returns the latest listed version
 
 Response fields:
 
@@ -204,5 +204,5 @@ Response fields:
 
 ## Runtime Note
 
-- `scripts/install_package.py --order-id <orderId>` calls A22 to download and install
+- `scripts/install_package.py --order-id <orderId>` calls A23 to download and install
 - `thin_skill_template_id` is read from `data.thinSkillTemplate.thinSkillTemplateId` in the response JSON

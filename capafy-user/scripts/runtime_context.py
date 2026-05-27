@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+from typing import Optional
 
 
 TIMEZONE_HEADER = "X-Timezone"
@@ -32,14 +33,14 @@ WINDOWS_TZ_TO_IANA = {
     "New Zealand Standard Time": "Pacific/Auckland",
 }
 
-_APP_VERSION_CACHE: str | None = None
+_APP_VERSION_CACHE: Optional[str] = None
 
 
 def skill_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def load_app_version(*, skill_dir: Path | None = None) -> str:
+def load_app_version(*, skill_dir: Optional[Path] = None) -> str:
     global _APP_VERSION_CACHE
     if skill_dir is None and _APP_VERSION_CACHE is not None:
         return _APP_VERSION_CACHE

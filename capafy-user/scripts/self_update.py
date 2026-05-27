@@ -24,6 +24,7 @@ import subprocess
 import shutil
 import sys
 import tempfile
+from typing import Optional
 import urllib.error
 import urllib.request
 import zipfile
@@ -181,7 +182,7 @@ def _exclusive_lock(skill_dir: Path):
 
 
 # --------------------------------------------------------------------------- #
-def _normalize_platform_base_url(base_url: str | None) -> str:
+def _normalize_platform_base_url(base_url: Optional[str]) -> str:
     candidate = str(
         base_url
         or os.environ.get(PLATFORM_BASE_URL_ENV)
@@ -194,7 +195,7 @@ def _normalize_platform_base_url(base_url: str | None) -> str:
     return candidate.rstrip("/")
 
 
-def _load_installed_version_state(skill_dir: Path) -> dict | None:
+def _load_installed_version_state(skill_dir: Path) -> Optional[dict]:
     state_path = _state_path(skill_dir)
     if not state_path.is_file():
         return None
@@ -207,7 +208,7 @@ def _load_installed_version_state(skill_dir: Path) -> dict | None:
     return payload
 
 
-def get_local_version(skill_dir: Path | None = None) -> str:
+def get_local_version(skill_dir: Optional[Path] = None) -> str:
     """Read current installed version, preferring explicit self-update state."""
     root = skill_dir or _detect_skill_dir()
     state = _load_installed_version_state(root)
@@ -306,9 +307,9 @@ def _read_url_bytes(url: str, *, timeout: int, include_platform_context: bool = 
 
 
 def resolve_version_manifest_url(
-    manifest_url: str | None = None,
+    manifest_url: Optional[str] = None,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> str:
     """Resolve the version endpoint against the current platform base URL."""
     endpoint = str(manifest_url or VERSION_MANIFEST_PATH).strip()
@@ -321,7 +322,7 @@ def resolve_version_manifest_url(
     return f"{_normalize_platform_base_url(base_url)}{endpoint}"
 
 
-def _normalize_sha256(value: object) -> str | None:
+def _normalize_sha256(value: object) -> Optional[str]:
     if value is None:
         return None
     digest = str(value).strip().lower()
@@ -335,9 +336,9 @@ def _normalize_sha256(value: object) -> str | None:
 
 
 def fetch_version_manifest(
-    manifest_url: str | None = None,
+    manifest_url: Optional[str] = None,
     *,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict:
     """Load the install manifest and normalize key fields."""
     resolved_manifest_url = resolve_version_manifest_url(manifest_url, base_url=base_url)
@@ -403,7 +404,7 @@ def download_release(download_url: str) -> Path:
     return archive_path
 
 
-def _verify_archive_digest(archive_path: Path, expected_sha256: str | None) -> None:
+def _verify_archive_digest(archive_path: Path, expected_sha256: Optional[str]) -> None:
     if not expected_sha256:
         return
     digest = hashlib.sha256()
@@ -865,7 +866,7 @@ def _install_per_file(root: Path, archive_path: Path, manifest: dict) -> dict:
 # Finalize: promote *.new files left over from a previous interrupted commit
 # --------------------------------------------------------------------------- #
 
-def finalize_pending(skill_dir: Path | None = None) -> dict:
+def finalize_pending(skill_dir: Optional[Path] = None) -> dict:
     """Promote any ``<file>.new`` artefacts staged by an earlier run.
 
     Idempotent. Should be called at the start of every entry path so the
@@ -1044,10 +1045,10 @@ def _install_runtime_requirements(skill_dir: Path) -> dict:
 # --------------------------------------------------------------------------- #
 
 def self_update(
-    manifest_url: str | None = None,
-    skill_dir: Path | None = None,
+    manifest_url: Optional[str] = None,
+    skill_dir: Optional[Path] = None,
     check_only: bool = False,
-    base_url: str | None = None,
+    base_url: Optional[str] = None,
 ) -> dict:
     root = (skill_dir or _detect_skill_dir()).resolve()
     # Single coarse-grained lock for the entire run. finalize_pending is
@@ -1113,7 +1114,7 @@ def self_update(
 # CLI
 # --------------------------------------------------------------------------- #
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="User Skill self-updater")
     parser.add_argument(
         "--check",

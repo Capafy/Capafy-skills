@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import Optional
 
 
 MAX_RESULTS = 5
@@ -174,7 +175,7 @@ def format_search_results(payload: dict) -> str:
     return "\n".join(lines)
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[list[str]] = None) -> int:
     del argv
     payload = json.load(sys.stdin)
     print(format_search_results(payload))

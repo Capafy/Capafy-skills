@@ -2,7 +2,7 @@
 
 ## Scope
 
-This directory describes the latest API surface available to the current User Skill runtime. The authoritative source is [`docs/backend_api_docs.md`](../../docs/backend_api_docs.md); the runtime uses only the 27 endpoints consolidated here.
+This directory describes the latest API surface available to the current User Skill runtime. The authoritative source is [`docs/backend_api_docs.md`](../../docs/backend_api_docs.md); the runtime uses only the 28 endpoints consolidated here.
 
 ## Base URL
 
@@ -43,7 +43,7 @@ This directory describes the latest API surface available to the current User Sk
 - `415` Uploaded object type not supported
 - `429` High-frequency or concurrent request limit exceeded
 
-## Endpoint Index (27 total)
+## Endpoint Index (28 total)
 
 ### `01_auth.md` — Authentication (2)
 
@@ -80,34 +80,35 @@ This directory describes the latest API surface available to the current User Sk
 | A14 | `POST` | `/agent/file/presign/upload` | Get upload presigned URL |
 | A15 | `POST` | `/agent/file/presign/download` | Get download presigned URL |
 
-### `05_instance.md` — Instances (3)
+### `05_instance.md` — Instances (4)
 
 | # | Method | Path | Description |
 |---|--------|------|-------------|
 | A16 | `GET` | `/agent/instance` | View instance list |
 | A17 | `PATCH` | `/agent/instance/{instanceId}` | Rename an instance |
-| A18 | `POST` | `/agent/orders/instance-storage/renew` | Renew instance storage |
+| A18 | `GET` | `/agent/instance/{instanceId}/agent-version-billing` | Get the Agent version and purchased billing plan for an instance |
+| A19 | `POST` | `/agent/orders/instance-storage/renew` | Renew instance storage |
 
 ### `06_subscription.md` — Subscriptions (3)
 
 | # | Method | Path | Description |
 |---|--------|------|-------------|
-| A19 | `GET` | `/agent/subscriptions/list` | View subscription list |
-| A20 | `POST` | `/agent/subscriptions/{subscriptionId}/cancel` | Cancel subscription |
-| A21 | `POST` | `/agent/subscriptions/{subscriptionId}/resume` | Resume subscription |
+| A20 | `GET` | `/agent/subscriptions/list` | View subscription list |
+| A21 | `POST` | `/agent/subscriptions/{subscriptionId}/cancel` | Cancel subscription |
+| A22 | `POST` | `/agent/subscriptions/{subscriptionId}/resume` | Resume subscription |
 
 ### `07_download.md` — Download and Versions (3)
 
 | # | Method | Path | Description |
 |---|--------|------|-------------|
-| A22 | `GET` | `/agent/orders/buyer/{orderId}/download` | Get order download information |
-| A23 | `GET` | `/agent/skill/{agentId}/versions` | Query Skill version history |
-| A24 | `GET` | `/agent/agent/agents/{agentId}/package` | Download latest Skill package by agentId |
+| A23 | `GET` | `/agent/orders/buyer/{orderId}/download` | Get order download information |
+| A24 | `GET` | `/agent/skill/{agentId}/versions` | Query Skill version history |
+| A25 | `GET` | `/agent/agent/agents/{agentId}/package` | Download latest Skill package by agentId |
 
 ### `08_account.md` — Account (3)
 
 | # | Method | Path | Description |
 |---|--------|------|-------------|
-| A25 | `GET` | `/agent/account` | Account aggregate info (also used for token verification) |
-| A26 | `GET` | `/agent/account/profile` | View user Profile |
-| A27 | `PUT` | `/agent/account/profile` | Update user Profile |
+| A26 | `GET` | `/agent/account` | Account aggregate info (also used for token verification) |
+| A27 | `GET` | `/agent/account/profile` | View user Profile |
+| A28 | `PUT` | `/agent/account/profile` | Update user Profile |
