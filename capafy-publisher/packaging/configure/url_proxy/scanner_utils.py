@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, SourceKind
-from packaging.configure.dotenv import iter_dotenv_assignments
+from packaging._shared.config_files.dotenv import iter_dotenv_assignments
 from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
@@ -194,9 +194,35 @@ def resolve_process_env_refs(
     return candidates
 
 
+def source_backed_field_names(candidates: list[Candidate]) -> set[str]:
+    return {
+        candidate.field
+        for candidate in candidates
+        if candidate.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}
+    }
+
+
+def append_process_env_ref_candidates(
+    candidates: list[Candidate],
+    *,
+    staging_root: Path,
+    process_env: Mapping[str, str],
+    fields: UrlProxyFieldSet,
+) -> list[Candidate]:
+    candidates.extend(resolve_process_env_refs(
+        staging_root,
+        process_env,
+        existing_fields=source_backed_field_names(candidates),
+        fields=fields,
+    ))
+    return candidates
+
+
 __all__ = [
     "UrlProxyFieldSet",
+    "append_process_env_ref_candidates",
     "resolve_process_env_refs",
     "scan_dotenv",
     "scan_json_config",
+    "source_backed_field_names",
 ]

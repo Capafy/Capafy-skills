@@ -245,7 +245,7 @@ def _required_non_empty_text(entry: Mapping[str, Any], key: str, *, label: str) 
     return value
 
 
-def _required_reviewed_scan_use(entry: Mapping[str, Any], *, label: str) -> str:
+def require_reviewed_scan_use(entry: Mapping[str, Any], *, label: str) -> str:
     raw_use = entry.get("use")
     if not isinstance(raw_use, str):
         raise ValueError(f"{label}.use must be a string")
@@ -280,7 +280,7 @@ def project_env_var_credentials_item(entry: Mapping[str, Any], *, label: str) ->
     return {
         "field": field,
         "value": entry.get("value", ""),
-        "use": _required_reviewed_scan_use(entry, label=label),
+        "use": require_reviewed_scan_use(entry, label=label),
     }
 
 
@@ -389,6 +389,13 @@ def load_reviewed_scan_payload(raw_json: str, *, label: str = "reviewed_scan_jso
         raise ValueError(f"failed to parse {label}: {exc}") from exc
 
 
+def load_reviewed_scan_object(raw_json: str, *, label: str = "reviewed_scan_json") -> dict[str, Any]:
+    payload = load_reviewed_scan_payload(raw_json, label=label)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{label} must be an object")
+    return payload
+
+
 def normalize_reviewed_scan_payload(
     reviewed_scan_payload: object,
     *,
@@ -455,9 +462,11 @@ __all__ = [
     "collect_runtime_value_items",
     "credential_counts",
     "is_reviewed_scan_payload",
+    "load_reviewed_scan_object",
     "load_reviewed_scan_payload",
     "normalize_reviewed_scan_payload",
     "project_env_var_credentials_item",
+    "require_reviewed_scan_use",
     "require_cloud_hosted_url_proxy_entries",
     "required_list",
     "resolved_review_binding",

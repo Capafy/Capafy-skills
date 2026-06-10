@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from packaging.configure.staging.env_preprocess import RuntimeEnvContext
     from packaging.configure.contracts import UrlProxyPair
 
-from packaging._shared.common.process_env import collect_publish_process_env, url_proxy_os_fallback_names
+from packaging.configure.env_var.process_env import collect_publish_process_env, url_proxy_os_fallback_names
 from packaging.configure.url_proxy.base import RuntimeContract, ScanContext
 from packaging.configure.url_proxy.merge import (
     collect_claimed_process_env_names,

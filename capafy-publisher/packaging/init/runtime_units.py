@@ -10,11 +10,11 @@ from packaging._shared.common.fs import (
     relpath as fs_relpath,
 )
 from packaging._shared.common.packaged_files import should_skip_packaged_relpath
-from packaging.configure.selection.support import (
+from packaging._shared.selection.support import (
     classify_selectable_directory,
     finalize_selectable_entry,
 )
-from packaging.configure.selection.unit_metadata import build_unit_metadata
+from packaging._shared.selection.unit_metadata import build_unit_metadata
 from packaging._shared.contracts.path_shapes import basic_allowed_skill_root_prefixes
 from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 from packaging._shared.runtimes.contracts import call_optional_target_hook
@@ -49,9 +49,6 @@ def _build_discovered_entry(
         "discovery_root": discovery_root,
         "unit_type": unit_type,
         "has_primary_doc": meta["has_primary_doc"],
-        "has_skill_md": meta["has_primary_doc"] if unit_type == "skill" else False,
-        "file_count": meta["file_count"],
-        "size_bytes": meta["size_bytes"],
         "synopsis": meta["synopsis"],
         "suspicious_reasons": meta["suspicious_reasons"],
     }
@@ -106,14 +103,7 @@ def _iter_tree_source_units(
         return []
 
     display_prefix = str(tree_source.display_prefix).strip().rstrip("/")
-    allowed_skill_roots = set(
-        call_optional_target_hook(
-            target,
-            "allowed_skill_root_prefixes",
-            display_prefix,
-            default=basic_allowed_skill_root_prefixes(display_prefix),
-        )
-    )
+    allowed_skill_roots = basic_allowed_skill_root_prefixes(display_prefix)
     discovery_root = _discovery_root_for_tree_source(tree_source)
     discovered: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -194,9 +184,6 @@ def _normalize_additional_entry(entry: dict) -> dict:
     payload.setdefault("description", "")
     payload.setdefault("synopsis", "")
     payload.setdefault("has_primary_doc", False)
-    payload.setdefault("has_skill_md", False)
-    payload.setdefault("file_count", 0)
-    payload.setdefault("size_bytes", 0)
     payload.setdefault("suspicious_reasons", [])
     return payload
 

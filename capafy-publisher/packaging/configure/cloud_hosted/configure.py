@@ -12,19 +12,56 @@ from packaging._shared.contracts.reviewed_scan import (
     credential_counts,
     require_cloud_hosted_url_proxy_entries,
 )
-from packaging._shared.platform import save_config_keys
 from packaging._shared.reviewed_scan.io import require_reviewed_scan_payload
 from packaging.configure.deep_scan_payload import build_deep_scan_payload
+from packaging.configure.platform.config_keys_request import save_config_keys
 from packaging.configure.work_state import (
     configure_extra_with_review_artifacts,
     write_cloud_hosted_bundle_prepared_manifest,
     write_cloud_hosted_config_submitted_manifest,
 )
-from packaging.init.explicit_skill import (
+from packaging._shared.selection.explicit_skill import (
     explicit_skill_from_manifest_extra,
     merge_external_skill_bindings_into_selection_groups,
     merge_explicit_skill_into_selection_groups,
 )
+
+
+def build_credential_summary(counts: dict[str, Any]) -> dict[str, Any]:
+    url_proxy_count = int(counts.get("url_proxy", 0) or 0)
+    generic_count = int(counts.get("generic", 0) or 0)
+    env_var_count = int(counts.get("env_var", 0) or 0)
+
+    has_llm_provider_config = url_proxy_count > 0
+    has_extra_third_party_secrets = generic_count > 0
+    has_runtime_env_vars = env_var_count > 0
+
+    if has_llm_provider_config and not (has_extra_third_party_secrets or has_runtime_env_vars):
+        creator_message = (
+            "No additional third-party service keys were found, but cloud LLM provider configuration "
+            "still needs confirmation."
+        )
+    elif has_llm_provider_config:
+        creator_message = (
+            "Cloud LLM provider configuration and additional hosted credentials or environment variables "
+            "need confirmation."
+        )
+    elif has_extra_third_party_secrets or has_runtime_env_vars:
+        creator_message = "Hosted credentials or runtime environment variables need confirmation."
+    else:
+        creator_message = "No hosted credentials are required for this Agent."
+
+    return {
+        "has_llm_provider_config": has_llm_provider_config,
+        "has_extra_third_party_secrets": has_extra_third_party_secrets,
+        "has_runtime_env_vars": has_runtime_env_vars,
+        "creator_message": creator_message,
+        "bucket_meanings": {
+            "url_proxy": "Cloud-hosted LLM provider API key plus endpoint/base URL.",
+            "generic": "Other standalone secrets or sensitive configuration values.",
+            "env_var": "Runtime environment variables required by the Agent.",
+        },
+    }
 
 
 def run_cloud_hosted_configure(ctx: Any) -> tuple[dict[str, Any], int]:
@@ -66,7 +103,7 @@ def run_cloud_hosted_configure(ctx: Any) -> tuple[dict[str, Any], int]:
             staging_root=result.staging_root,
             reviewed_scan_path=result.reviewed_scan_path,
             reviewed_scan=result.reviewed_scan,
-        ), 1
+        ), 0
 
     reviewed_scan_payload = result.reviewed_scan
 
@@ -112,6 +149,8 @@ def run_cloud_hosted_configure(ctx: Any) -> tuple[dict[str, Any], int]:
     )
     manifest = manifest.with_stage(STAGE_BUNDLE_PREPARED, extra=extra)
     reviewed_scan_path = result.reviewed_scan_path
+    counts = credential_counts(reviewed_scan_payload)
+    credential_summary = build_credential_summary(counts)
 
     if latest_state.is_confirmed_config_keys:
         _write_config_submitted_manifest(
@@ -129,7 +168,8 @@ def run_cloud_hosted_configure(ctx: Any) -> tuple[dict[str, Any], int]:
             "agent_version_id": agent_version_id,
             "env_id": env_id,
             "agent_type": agent_type,
-            "credential_counts": credential_counts(reviewed_scan_payload),
+            "credential_counts": counts,
+            "credential_summary": credential_summary,
             "review_url": "",
             "already_confirmed": True,
         }, 0
@@ -151,7 +191,8 @@ def run_cloud_hosted_configure(ctx: Any) -> tuple[dict[str, Any], int]:
         "agent_version_id": agent_version_id,
         "env_id": env_id,
         "agent_type": agent_type,
-        "credential_counts": credential_counts(reviewed_scan_payload),
+        "credential_counts": counts,
+        "credential_summary": credential_summary,
         "review_url": review_url,
     }, 0
 
@@ -198,5 +239,6 @@ def _write_config_submitted_manifest(
 
 
 __all__ = [
+    "build_credential_summary",
     "run_cloud_hosted_configure",
 ]

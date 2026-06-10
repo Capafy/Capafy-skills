@@ -6,7 +6,7 @@ from pathlib import Path
 
 from packaging._shared.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
 from packaging._shared.common.fs import is_archive_artifact, iter_workspace_files, read_text, relpath
-from packaging._shared.common.json_walk import walk_json_strings
+from packaging._shared.config_files.json_io import walk_json_strings
 from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME
 from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME
 from packaging._shared.policies.content_scan import should_skip_local_path_cleanup_for_file

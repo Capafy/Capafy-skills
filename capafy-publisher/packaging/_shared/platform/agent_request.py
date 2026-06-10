@@ -19,6 +19,15 @@ from packaging._shared.contracts.selection_groups import (
 _OPTIONAL_CREATE_AGENT_FIELDS = ("tags",)
 
 LM_GENERATED_TITLE_NOTICE = "(LM generated — please review and edit before saving)"
+_LOCAL_SKILL_SOURCE_FIELDS = {
+    "source_path",
+    "source_root",
+    "source_kind",
+    "binding_kind",
+    "snapshot_digest",
+    "origin_ref",
+    "skip_skill_runtime_outputs",
+}
 
 
 def _platform_upload_title(title: Any) -> str:
@@ -65,21 +74,18 @@ def _validate_selected_only_selection_groups(selection_groups: dict[str, list[di
 def _validated_upload_selection_groups(card_draft: dict) -> dict[str, list[dict[str, Any]]]:
     normalized = _draft_selection_groups(card_draft)
     _validate_selected_only_selection_groups(normalized)
-    return _strip_local_workspace_skill_sources(normalized)
+    return _strip_local_skill_source_fields(normalized)
 
 
-def _strip_local_workspace_skill_sources(
+def _strip_local_skill_source_fields(
     selection_groups: dict[str, list[dict[str, Any]]],
 ) -> dict[str, list[dict[str, Any]]]:
     groups = {key: list(selection_groups.get(key, [])) for key in SELECTION_GROUP_KEYS}
     skills: list[dict[str, Any]] = []
     for item in groups.get("skills", []):
         normalized = dict(item)
-        binding_kind = str(normalized.get("binding_kind", "")).strip()
-        if binding_kind == "workspace_skill_dir":
-            normalized.pop("source_path", None)
-            normalized.pop("source_root", None)
-            normalized.pop("binding_kind", None)
+        for field in _LOCAL_SKILL_SOURCE_FIELDS:
+            normalized.pop(field, None)
         skills.append(normalized)
     groups["skills"] = skills
     return groups

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging._shared.runtimes.support import collect_optional_command_first_line
-from packaging._shared.openclaw.config import (
+from packaging.configure.runtimes.openclaw.config import (
     rewrite_packaged_extra_skill_dirs,
     rewrite_packaged_workspace_document_refs,
     rewrite_packaged_openclaw_config_as_overlay,

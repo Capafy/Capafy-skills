@@ -3,15 +3,27 @@ from __future__ import annotations
 from packaging.configure.contracts import PROCESS_ENV_SOURCE
 
 
-PROCESS_ENV_IGNORED_NAMES = {
-    "OLDPWD",
-    "PWD",
+PROCESS_ENV_PROXY_NAMES = frozenset({
     "HTTP_PROXY",
     "HTTPS_PROXY",
     "NO_PROXY",
     "ALL_PROXY",
     "FTP_PROXY",
     "SOCKS_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "all_proxy",
+    "ftp_proxy",
+    "socks_proxy",
+})
+
+PROCESS_ENV_PROXY_NAME_LOOKUP = frozenset(name.lower() for name in PROCESS_ENV_PROXY_NAMES)
+
+PROCESS_ENV_IGNORED_NAMES = {
+    "OLDPWD",
+    "PWD",
+    *PROCESS_ENV_PROXY_NAMES,
 }
 
 PROCESS_ENV_SECRET_SUFFIXES = (
@@ -51,6 +63,8 @@ def iter_related_process_env_names(env_name: str) -> set[str]:
 
 __all__ = [
     "PROCESS_ENV_IGNORED_NAMES",
+    "PROCESS_ENV_PROXY_NAMES",
+    "PROCESS_ENV_PROXY_NAME_LOOKUP",
     "PROCESS_ENV_SECRET_SUFFIXES",
     "PROCESS_ENV_SOURCE",
     "PROCESS_ENV_URL_SUFFIXES",

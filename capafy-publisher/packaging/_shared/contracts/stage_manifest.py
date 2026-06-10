@@ -12,19 +12,10 @@ def write_stage_manifest(
     staging_root: Path,
     *,
     scan_only_prefixes: tuple[str, ...],
-    scan_only_source_map: dict[str, str],
-    staging_digest: str,
-    scan_only_digest: str,
-    generated_at: str,
     excluded_credential_files: tuple[str, ...] = (),
 ) -> Path:
     payload = {
-        "schema_version": 1,
         "scan_only_prefixes": list(scan_only_prefixes),
-        "scan_only_source_map": dict(scan_only_source_map),
-        "staging_digest": staging_digest,
-        "scan_only_digest": scan_only_digest,
-        "generated_at": generated_at,
     }
     if excluded_credential_files:
         payload["excluded_credential_files"] = list(excluded_credential_files)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from packaging._shared.common.constants import PLACEHOLDER
 from packaging._shared.contracts.stage_plan import StagePlan
-from packaging.configure.runtimes.openclaw.workspace_common import (
+from packaging.runtimes.openclaw.workspace_common import (
     OPENCLAW_CRON_DISPLAY_PATH,
     OPENCLAW_SELECTED_CRON_IDS_METADATA_KEY,
     DELIVERY_SAFE_CONTAINER_KEYS,

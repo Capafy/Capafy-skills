@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from packaging.configure.candidate import Candidate
-from packaging.configure.contracts import SourceKind, UrlProxyPair
-from packaging.configure.dotenv import upsert_dotenv_key_text
+from packaging.configure.contracts import UrlProxyPair
+from packaging._shared.config_files.dotenv import upsert_dotenv_key_text
 from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.runtimes.codex.dotenv import (
     dotenv_has_any_value,
@@ -27,8 +27,9 @@ from packaging.configure.url_proxy.base import RuntimeContract, ScanContext
 from packaging.configure.runtimes.codex.auth import CODEX_AUTH_OVERRIDE_ENV_KEY, CODEX_AUTH_PROVIDER_NAME
 from packaging.configure.url_proxy.scanner_utils import (
     UrlProxyFieldSet,
+    append_process_env_ref_candidates,
     scan_dotenv,
-    resolve_process_env_refs,
+    source_backed_field_names,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,6 @@ _ID = "codex"
 
 class CodexRuntime(RuntimeContract):
     runtime_id = _ID
-    display_name = "Codex"
     applicable_targets = frozenset({"codex"})
 
     def scan(self, ctx: ScanContext) -> list[Candidate]:
@@ -68,13 +68,13 @@ class CodexRuntime(RuntimeContract):
             ))
 
 
-        existing = {c.field for c in candidates if c.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}}
-        candidates.extend(resolve_process_env_refs(
-            ctx.staging_root, ctx.process_env,
-            existing_fields=existing,
+        append_process_env_ref_candidates(
+            candidates,
+            staging_root=ctx.staging_root,
+            process_env=ctx.process_env,
             fields=field_set,
-        ))
-        existing = {c.field for c in candidates if c.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}}
+        )
+        existing = source_backed_field_names(candidates)
         if not selected_provider_blocked:
             candidates.extend(official_process_env_fallback_candidates(
                 config_exists=(ctx.staging_root / ".codex" / "config.toml").is_file(),

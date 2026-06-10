@@ -4,7 +4,7 @@ import json
 from typing import Callable, Optional
 
 from packaging._shared.common.url_values import build_config_url_proxy_group
-from packaging._shared.openclaw.official_providers import (
+from packaging.configure.runtimes.openclaw.official_providers import (
     OpenClawOfficialProviderSpec,
     find_openclaw_official_provider_in_text,
 )

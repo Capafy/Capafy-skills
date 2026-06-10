@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Any, Optional
 
+from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
 from packaging.runtimes import get_default_target, get_target
 
 
@@ -32,11 +33,7 @@ def is_scan_only_reference_file(
         for spec in profile.get("fixed_scan_files", [])
         if isinstance(spec, dict) and str(spec.get("display_path", "")).strip()
     }
-    fixed_stage_paths = {
-        str(spec.get("target_path", "")).strip().strip("/")
-        for spec in profile.get("fixed_stage_files", [])
-        if isinstance(spec, dict) and str(spec.get("target_path", "")).strip()
-    }
+    fixed_stage_paths = set(collect_packaged_config_paths(profile))
     return normalized in fixed_scan_paths and normalized not in fixed_stage_paths
 
 

@@ -4,7 +4,8 @@ from typing import Optional
 from pathlib import Path
 
 from packaging._shared.common.exclusion_rules import exclude_reason_code_for_path, looks_like_high_risk_file
-from packaging.configure.selection.unit_types import has_skill_owning_path
+from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
+from packaging._shared.selection.unit_types import has_skill_owning_path
 
 
 def is_redacted_runtime_env_file(target, logical_path: str) -> bool:
@@ -15,11 +16,7 @@ def is_redacted_runtime_env_file(target, logical_path: str) -> bool:
     if not isinstance(profile, dict):
         return False
 
-    fixed_stage_paths = {
-        str(spec.get("target_path", "")).strip().rstrip("/")
-        for spec in profile.get("fixed_stage_files", [])
-        if isinstance(spec, dict) and str(spec.get("target_path", "")).strip()
-    }
+    fixed_stage_paths = set(collect_packaged_config_paths(profile))
     basename = Path(normalized).name
     return normalized in fixed_stage_paths and (basename == ".env" or basename.startswith(".env."))
 

@@ -19,7 +19,7 @@ from packaging.configure.sensitive.literals import (
     strip_literal_value,
 )
 
-from .support import pick_domain
+from .support import extract_local_url as _extract_local_url
 
 
 ENV_NAME_LITERAL_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,127}$")
@@ -51,12 +51,6 @@ ENV_REFERENCE_VALUE_TOKENS = {
     "variable",
     "webhook",
 }
-
-
-def _extract_local_url(text: str, start: int, end: int, service: str, default_url: str) -> str:
-    context = text[max(0, start - 800) : min(len(text), end + 800)]
-    domains = find_domains(context)
-    return pick_domain(domains, service, default_url)
 
 
 def collect_env_url_hints(text: str) -> dict[str, str]:

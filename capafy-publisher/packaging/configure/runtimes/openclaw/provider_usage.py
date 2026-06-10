@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.openclaw.official_providers import (
+from packaging.configure.runtimes.openclaw.official_providers import (
     OPENCLAW_OFFICIAL_PROVIDER_SPECS,
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
     OpenClawOfficialProviderSpec,
@@ -26,6 +26,15 @@ def provider_from_openclaw_model_ref(value: object) -> str:
     return value.strip().split("/", 1)[0].strip()
 
 
+def model_id_from_openclaw_model_ref(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    stripped = value.strip()
+    if "/" not in stripped:
+        return ""
+    return stripped.split("/", 1)[1].strip()
+
+
 def openclaw_model_id_from_entry(entry: object) -> str:
     if isinstance(entry, str):
         return entry.strip()
@@ -42,6 +51,20 @@ def model_id_from_openclaw_provider(provider: dict[str, Any]) -> str:
     for model_ref in iter_openclaw_provider_model_refs(provider):
         return model_ref
     return ""
+
+
+def selected_openclaw_provider_model_id(
+    config: dict[str, Any],
+    provider_name: str,
+    provider: dict[str, Any],
+) -> str:
+    for model_ref in iter_openclaw_model_ref_values(config):
+        if provider_from_openclaw_model_ref(model_ref) != provider_name:
+            continue
+        model_id = model_id_from_openclaw_model_ref(model_ref)
+        if model_id:
+            return model_id
+    return model_id_from_openclaw_provider(provider)
 
 
 def iter_openclaw_provider_model_refs(provider: dict[str, Any]) -> list[str]:
@@ -186,9 +209,11 @@ __all__ = [
     "iter_openclaw_model_ref_values",
     "iter_openclaw_provider_model_refs",
     "model_id_from_openclaw_provider",
+    "model_id_from_openclaw_model_ref",
     "openclaw_model_id_from_entry",
     "path_likely_contains_openclaw_model_ref",
     "provider_from_openclaw_model_ref",
+    "selected_openclaw_provider_model_id",
     "selected_openclaw_provider_names",
     "used_openclaw_provider_names",
 ]

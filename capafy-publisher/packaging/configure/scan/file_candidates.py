@@ -8,13 +8,14 @@ from packaging._shared.common.fs import (
     read_text,
     relpath as fs_relpath,
 )
+from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
 from packaging._shared.common.packaged_files import iter_packaged_files
 from packaging._shared.policies.content_scan import should_skip_content_scan_for_file
 from packaging.configure.exclusion import build_exclude_entry, looks_like_high_risk_file
 from packaging.configure.generic_keys import collect_generic_key_candidates
 from packaging.runtimes import get_default_target, get_target
 from packaging._shared.runtimes.contracts import call_optional_target_hook
-from packaging.configure.selection.unit_types import has_skill_owning_path
+from packaging._shared.selection.unit_types import has_skill_owning_path
 
 from .candidate_annotation import annotate_candidate
 from .env_reference_scan import collect_env_url_hints, collect_referenced_env_names
@@ -36,15 +37,7 @@ def _is_runtime_required_env_file(relpath: str, *, target_name: Optional[str] = 
         return False
 
     normalized = relpath.strip().rstrip("/")
-    fixed_stage_files = profile.get("fixed_stage_files", [])
-    if not isinstance(fixed_stage_files, list):
-        return False
-
-    fixed_stage_paths = {
-        str(spec.get("target_path", "")).strip().rstrip("/")
-        for spec in fixed_stage_files
-        if isinstance(spec, dict) and str(spec.get("target_path", "")).strip()
-    }
+    fixed_stage_paths = set(collect_packaged_config_paths(profile))
     basename = PurePosixPath(normalized).name
     return normalized in fixed_stage_paths and (basename == ".env" or basename.startswith(".env."))
 

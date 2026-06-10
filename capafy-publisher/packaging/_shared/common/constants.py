@@ -170,7 +170,7 @@ SSH_PUBLIC_KEY_PATTERN = re.compile(
     r"(?:ssh|ecdsa|sk-ssh|sk-ecdsa)-[A-Za-z0-9@._+-]+ AAAA[^\s]+"
 )
 PII_PATTERNS = [
-    re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"),
+    re.compile(r"[a-zA-Z0-9._%+\-]{1,64}@(?:[a-zA-Z0-9-]{1,63}\.){1,10}[a-zA-Z]{2,63}"),
     re.compile(r"(\+?\d{1,3}[\s\-])?\(?\d{3}\)?[\s\-]\d{3}[\s\-]\d{4}"),
     re.compile(r"192\.168\.\d+\.\d+"),
     re.compile(r"10\.\d+\.\d+\.\d+"),

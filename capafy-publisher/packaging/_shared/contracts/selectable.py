@@ -87,7 +87,7 @@ def _path_security_variants(path: str) -> tuple[str, ...]:
 
 
 def normalize_text(value: object) -> str:
-    return " ".join(str(value or "").strip().split())
+    return str(value or "").strip()
 
 
 def is_absolute_like_path(path: str) -> bool:

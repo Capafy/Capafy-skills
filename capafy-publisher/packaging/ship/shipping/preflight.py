@@ -9,6 +9,7 @@ from packaging._shared.common.cli import build_publish_error
 from packaging._shared.contracts.publish_work_state import (
     PublishWorkStateManifestError,
     PublishWorkState,
+    STAGE_SHIPPED,
     require_publish_work_state,
 )
 from packaging._shared.reviewed_scan.digest import compute_scan_only_digest, compute_staging_digest
@@ -147,7 +148,6 @@ def prepare_ship_context(
         return failed_check
     assert manifest is not None
 
-    expected_stage = mode.ship_required_stage
     failed_check = _first_failed_check(
         (
             (
@@ -162,6 +162,32 @@ def prepare_ship_context(
                     next_step="use_matching_agent_id_or_restart_publish_flow",
                 ),
             ),
+        )
+    )
+    if failed_check is not None:
+        return failed_check
+
+    if manifest.current_stage == STAGE_SHIPPED:
+        return build_publish_error(
+            error="publish-ship has already uploaded the package for this local publish work-state",
+            failed_step="check_prerequisite_stage",
+            blocking_category="already_shipped",
+            developer_next_steps=[
+                "Do not rerun publish-ship for this local draft.",
+                "Use `publish-refresh-url --agent-id <agent_id> --step ship` for a fresh final confirmation link, or `publish-remote-status --agent-id <agent_id>` to inspect platform state.",
+            ],
+            next_step="refresh_final_review_url_or_check_remote_status",
+            agent_id=agent_id,
+            agent_version_id=manifest.agent_version_id,
+            env_id=manifest.env_id,
+            agent_type=manifest.agent_type,
+            review_url=manifest.pending_review_url or "",
+            package_url=manifest.extra_value("package_url"),
+        ), 1
+
+    expected_stage = mode.ship_required_stage
+    failed_check = _first_failed_check(
+        (
             (
                 manifest.current_stage != expected_stage,
                 _error_args(

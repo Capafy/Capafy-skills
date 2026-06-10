@@ -9,7 +9,7 @@ from packaging._shared.common.fs import (
     windows_drive_mount_candidates as _windows_drive_mount_candidates,
     windows_path_parts as _windows_path_parts,
 )
-from packaging.configure.selection.local_ref_confirmation import local_reference_should_be_staged
+from packaging._shared.selection.local_ref_confirmation import local_reference_should_be_staged
 from packaging.configure.staging.markdown_reference_paths import (
     looks_like_local_destination,
     resolve_reference,

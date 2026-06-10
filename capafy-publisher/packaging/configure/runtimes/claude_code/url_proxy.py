@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
+from packaging._shared.llm.official_providers import ALL_OFFICIAL_PROVIDER_SPECS_BY_FAMILY
 from packaging._shared.common.url_values import normalize_http_url_candidate
+from packaging._shared.llm.api_formats import PLATFORM_API_FORMAT_ANTHROPIC_MESSAGES
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, PlanField, SourceKind, UrlProxyPair
 from packaging.configure.env_values import usable_process_env_value
@@ -27,14 +29,16 @@ from packaging.configure.runtimes.claude_code.url_proxy_candidates import (
 )
 from packaging.configure.runtimes.claude_code.settings_json import (
     SETTINGS_RELPATH,
+    validate_claude_settings_json,
     write_settings_env_placeholders,
     write_settings_model_and_prune_env_models,
 )
 from packaging.configure.url_proxy.base import RuntimeContract, ScanContext
 from packaging.configure.url_proxy.scanner_utils import (
     UrlProxyFieldSet,
+    append_process_env_ref_candidates,
     scan_json_config,
-    resolve_process_env_refs,
+    source_backed_field_names,
 )
 
 _API_KEY_FIELDS = frozenset({CLAUDE_AUTH_ENV_KEY, CLAUDE_AUTH_TOKEN_ENV_KEY})
@@ -44,15 +48,16 @@ _FIELD_SET = UrlProxyFieldSet(
 )
 _SERVICE = "Anthropic"
 _ID = "claude_code"
-_API_FORMAT = "anthropic-messages"
+_API_FORMAT = PLATFORM_API_FORMAT_ANTHROPIC_MESSAGES
+_PROVIDER_NAME = ALL_OFFICIAL_PROVIDER_SPECS_BY_FAMILY["anthropic"].provider_name
 
 
 class ClaudeCodeRuntime(RuntimeContract):
     runtime_id = _ID
-    display_name = "Claude Code"
     applicable_targets = frozenset({"claude_code"})
 
     def scan(self, ctx: ScanContext) -> list[Candidate]:
+        validate_claude_settings_json(ctx.staging_root)
         candidates: list[Candidate] = []
 
 
@@ -65,13 +70,13 @@ class ClaudeCodeRuntime(RuntimeContract):
             ))
 
 
-        existing = {c.field for c in candidates if c.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}}
-        candidates.extend(resolve_process_env_refs(
-            ctx.staging_root, ctx.process_env,
-            existing_fields=existing,
+        append_process_env_ref_candidates(
+            candidates,
+            staging_root=ctx.staging_root,
+            process_env=ctx.process_env,
             fields=_FIELD_SET,
-        ))
-        existing = {c.field for c in candidates if c.source_kind in {SourceKind.FILE, SourceKind.PROCESS_ENV}}
+        )
+        existing = source_backed_field_names(candidates)
         candidates.extend(self._scan_canonical_process_env_fallback(ctx, existing))
 
 
@@ -164,7 +169,7 @@ class ClaudeCodeRuntime(RuntimeContract):
             )
 
         model_source = key_candidate.extra.get("model_source")
-        model_plan_field: PlanField | None = None
+        model_plan_field: Optional[PlanField] = None
         if isinstance(model_source, dict) and model_source.get("kind") == "process_env":
             model_env_field = str(model_source.get("field", "") or "").strip()
             model_value = str(key_candidate.extra.get("model", "") or "").strip()
@@ -188,6 +193,7 @@ class ClaudeCodeRuntime(RuntimeContract):
                 model=str(key_candidate.extra.get("model", "") or "").strip(),
                 model_field=model_plan_field,
                 api_format=_API_FORMAT,
+                provider_name=_PROVIDER_NAME,
             )
         ]
 
@@ -220,6 +226,7 @@ class ClaudeCodeRuntime(RuntimeContract):
         )
 
     def rewrite(self, staging_root: Path, pairs: list[UrlProxyPair]) -> None:
+        validate_claude_settings_json(staging_root)
         file_candidates = self._file_candidates_for_rewrite(staging_root)
         for pair in pairs:
             self._write_settings_env_placeholders(staging_root, pair)

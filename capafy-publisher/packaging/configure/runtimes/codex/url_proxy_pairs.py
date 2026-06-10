@@ -39,6 +39,7 @@ def _make_codex_pair(
     group: str,
     model: str = "",
     api_format: str = "",
+    provider_name: str = "",
     is_synthesized: bool = False,
 ) -> UrlProxyPair:
     return make_pair(
@@ -50,6 +51,7 @@ def _make_codex_pair(
         group=group,
         model=model,
         api_format=api_format or DEFAULT_CODEX_API_FORMAT,
+        provider_name=provider_name,
     )
 
 
@@ -116,6 +118,7 @@ def build_codex_url_proxy_pairs(candidates: list[Candidate]) -> list[UrlProxyPai
         url_candidate=url_candidate,
         is_synthesized=fallback_key.source_kind == SourceKind.SYNTHESIZED or url_candidate.source_kind != SourceKind.FILE,
         group=provider_group(CODEX_AUTH_PROVIDER_NAME, url_candidate.source_relpath or ".codex/config.toml"),
+        provider_name=CODEX_AUTH_PROVIDER_NAME,
     )
     return [with_reviewed_sources(pair)]
 
@@ -161,6 +164,7 @@ def _pair_current_provider(
         group=provider_group(provider, url_candidate.source_relpath or provider_candidate.source_relpath or ".codex/config.toml"),
         model=str(provider_candidate.extra.get("model", "") or "").strip(),
         api_format=str(provider_candidate.extra.get("api_format", "") or "").strip(),
+        provider_name=provider,
     )
 
 

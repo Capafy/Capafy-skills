@@ -13,6 +13,14 @@ from packaging.configure.sensitive.placeholders import split_source
 
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:/")
 _DEFAULT_SCAN_ONLY_PREFIXES = ("_scan_only",)
+PUBLISHER_GENERATED_SOURCE_REASONS = {
+    STAGE_MANIFEST_NAME: "publisher_generated",
+    BUNDLE_CONTEXT_NAME: "publisher_generated",
+    "agent.runtime_environment.json": "publisher_generated",
+    "agent.runtime_dependencies.json": "publisher_generated",
+    "agent.selected_units.json": "publisher_generated",
+    "agent.workspace_documents.json": "publisher_generated",
+}
 
 
 def _normalize_agent_type(agent_type: object) -> str:
@@ -78,6 +86,10 @@ def _final_zip_exclude_paths(excluded_relpaths: Iterable[object], *, agent_type:
     return excluded
 
 
+def _is_scan_only_relpath(relpath: str, prefixes: tuple[str, ...]) -> bool:
+    return any(relpath == prefix or relpath.startswith(f"{prefix}/") for prefix in prefixes)
+
+
 def _staging_path(staging_root: Union[str, Path]) -> Path:
     if isinstance(staging_root, str) and not staging_root.strip():
         raise ValueError("staging_root is required for source boundary checks")
@@ -100,6 +112,63 @@ def final_zip_source_relpaths(
         exclude_paths=_final_zip_exclude_paths(excluded_relpaths, agent_type=resolved_agent_type),
         exclude_prefixes=_final_zip_exclude_prefixes(staging_path, agent_type=resolved_agent_type),
     )
+
+
+def deep_scan_file_boundary(
+    *,
+    staging_root: Union[str, Path],
+    excluded_relpaths: Iterable[object] = (),
+    agent_type: str,
+) -> dict[str, object]:
+    resolved_agent_type = _normalize_agent_type(agent_type)
+    staging_path = _staging_path(staging_root)
+    scan_only_prefixes = _scan_only_prefixes(staging_path)
+    final_sources = final_zip_source_relpaths(
+        staging_root=staging_path,
+        excluded_relpaths=tuple(excluded_relpaths),
+        agent_type=resolved_agent_type,
+    )
+
+    items: list[dict[str, object]] = []
+    summary = {
+        "total_files": 0,
+        "reviewable_files": 0,
+        "unreviewable_files": 0,
+    }
+    for file_path in sorted(path for path in staging_path.rglob("*") if path.is_file()):
+        relpath = normalize_packaged_source_relpath(file_path.relative_to(staging_path).as_posix())
+        if not relpath:
+            continue
+        summary["total_files"] += 1
+        reason = ""
+        auto_generated = False
+        reviewable = relpath in final_sources
+        if _is_scan_only_relpath(relpath, scan_only_prefixes):
+            reviewable = False
+            reason = "scan_only_context"
+        elif relpath in PUBLISHER_GENERATED_SOURCE_REASONS:
+            reviewable = False
+            auto_generated = True
+            reason = PUBLISHER_GENERATED_SOURCE_REASONS[relpath]
+        elif not reviewable:
+            reason = "not_in_final_package"
+        if reviewable:
+            summary["reviewable_files"] += 1
+            continue
+        summary["unreviewable_files"] += 1
+        item: dict[str, object] = {
+            "path": relpath,
+            "reviewable": reviewable,
+        }
+        if auto_generated:
+            item["auto_generated"] = True
+        if reason:
+            item["reason"] = reason
+        items.append(item)
+    return {
+        "scan_files": items,
+        "scan_files_summary": summary,
+    }
 
 
 def is_packaged_source_path(
@@ -166,6 +235,7 @@ def filter_generic_values_for_packaged_sources(
 
 
 __all__ = [
+    "deep_scan_file_boundary",
     "filter_generic_payload_items",
     "filter_generic_values_for_packaged_sources",
     "final_zip_source_relpaths",

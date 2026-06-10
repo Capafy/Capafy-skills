@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from typing import Any, Optional
+import http.client
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
@@ -17,6 +19,13 @@ PLATFORM_ACCESS_TOKEN_ENV = "CAPAFY_ACCESS_TOKEN"
 EXPLICIT_AUTH_HEADER_KEYS = {"authorization", "x-access-token"}
 SKILL_VERSION_STATUS_HEADER = "X-Skill-Version-Status"
 _LAST_SKILL_VERSION_STATUS: Optional[str] = None
+_LAST_REQUEST_ERROR: Optional[dict[str, Any]] = None
+TRANSIENT_HTTP_STATUS_CODES = frozenset({502, 503, 504})
+REQUEST_ID_HEADER_NAMES = (
+    "x-request-id",
+    "x-correlation-id",
+    "request-id",
+)
 
 
 def platform_context_headers() -> dict[str, str]:
@@ -101,6 +110,10 @@ def get_last_skill_version_status() -> Optional[str]:
     return _LAST_SKILL_VERSION_STATUS
 
 
+def get_last_request_error() -> Optional[dict[str, Any]]:
+    return dict(_LAST_REQUEST_ERROR) if isinstance(_LAST_REQUEST_ERROR, dict) else None
+
+
 def _maybe_log_skill_version_status(headers: Any) -> None:
     global _LAST_SKILL_VERSION_STATUS
     try:
@@ -119,6 +132,67 @@ def _maybe_log_skill_version_status(headers: Any) -> None:
         print("[http] publisher skill version is deprecated; upgrade may be required soon", file=sys.stderr)
 
 
+def _header_value(headers: Any, name: str) -> str:
+    try:
+        return str(headers.get(name, "") or "").strip()
+    except (AttributeError, TypeError):
+        return ""
+
+
+def _request_id_from_headers(headers: Any) -> str:
+    for name in REQUEST_ID_HEADER_NAMES:
+        value = _header_value(headers, name)
+        if value:
+            return value
+    return ""
+
+
+def _set_last_request_error(
+    *,
+    endpoint: str,
+    http_status: int,
+    request_id: str = "",
+    attempts: int,
+    error: str = "",
+) -> None:
+    global _LAST_REQUEST_ERROR
+    _LAST_REQUEST_ERROR = {
+        "endpoint": endpoint,
+        "http_status": http_status,
+        "request_id": request_id,
+        "attempts": attempts,
+        "error": error,
+    }
+
+
+def _request_error_context(path: str) -> str:
+    error = get_last_request_error()
+    if not error:
+        return ""
+    parts = [
+        f"endpoint={error.get('endpoint') or path}",
+        f"http_status={error.get('http_status')}",
+        f"attempts={error.get('attempts')}",
+    ]
+    request_id = str(error.get("request_id") or "").strip()
+    if request_id:
+        parts.append(f"request_id={request_id}")
+    detail = str(error.get("error") or "").strip()
+    if detail:
+        parts.append(f"error={detail}")
+    return "; ".join(parts)
+
+
+def _retry_delay(attempt: int) -> float:
+    return (0.3, 0.8, 1.6)[min(max(attempt - 1, 0), 2)]
+
+
+def _network_error_reason(exc: BaseException) -> str:
+    if isinstance(exc, urllib.error.URLError):
+        return str(getattr(exc, "reason", exc))
+    return str(exc)
+
+
 def request(
     method: str,
     url: str,
@@ -130,9 +204,11 @@ def request(
     access_token: Optional[str] = None,
     platform_base_url: Optional[str] = None,
     timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    max_attempts: int = 3,
 ) -> tuple[Any, int]:
-    global _LAST_SKILL_VERSION_STATUS
+    global _LAST_REQUEST_ERROR, _LAST_SKILL_VERSION_STATUS
     _LAST_SKILL_VERSION_STATUS = None
+    _LAST_REQUEST_ERROR = None
 
     all_headers: dict[str, Any] = {"Accept": "application/json"}
     if headers:
@@ -162,36 +238,62 @@ def request(
         method=method.upper(),
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
-            status = resp.status
-            raw = resp.read()
-            _maybe_log_skill_version_status(getattr(resp, "headers", None))
-
-            if out_file:
-                with open(out_file, "wb") as handle:
-                    handle.write(raw)
-                return out_file, status
-
-            text = raw.decode(errors="replace")
-            try:
-                return json.loads(text), status
-            except json.JSONDecodeError:
-                return text, status
-    except urllib.error.HTTPError as exc:
-        status = exc.code
-        _maybe_log_skill_version_status(getattr(exc, "headers", None))
-        raw = exc.read().decode(errors="replace")
+    attempts = max(int(max_attempts or 1), 1)
+    for attempt in range(1, attempts + 1):
         try:
-            body = json.loads(raw)
-        except json.JSONDecodeError:
-            body = raw
-        print(f"[http] {method} {url} → {status}", file=sys.stderr)
-        print(f"[http] response: {body}", file=sys.stderr)
-        return body, status
-    except urllib.error.URLError as exc:
-        print(f"[http] network error: {exc.reason}", file=sys.stderr)
-        return None, 0
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+                status = resp.status
+                raw = resp.read()
+                _maybe_log_skill_version_status(getattr(resp, "headers", None))
+
+                if out_file:
+                    with open(out_file, "wb") as handle:
+                        handle.write(raw)
+                    return out_file, status
+
+                text = raw.decode(errors="replace")
+                try:
+                    return json.loads(text), status
+                except json.JSONDecodeError:
+                    return text, status
+        except urllib.error.HTTPError as exc:
+            status = exc.code
+            headers = getattr(exc, "headers", None)
+            _maybe_log_skill_version_status(headers)
+            raw = exc.read().decode(errors="replace")
+            try:
+                body = json.loads(raw)
+            except json.JSONDecodeError:
+                body = raw
+            request_id = _request_id_from_headers(headers)
+            _set_last_request_error(
+                endpoint=url,
+                http_status=status,
+                request_id=request_id,
+                attempts=attempt,
+                error=str(body),
+            )
+            if status in TRANSIENT_HTTP_STATUS_CODES and attempt < attempts:
+                time.sleep(_retry_delay(attempt))
+                continue
+            print(f"[http] {method} {url} -> {status}", file=sys.stderr)
+            if request_id:
+                print(f"[http] request_id: {request_id}", file=sys.stderr)
+            print(f"[http] response: {body}", file=sys.stderr)
+            return body, status
+        except (urllib.error.URLError, http.client.RemoteDisconnected, ConnectionError, TimeoutError) as exc:
+            reason = _network_error_reason(exc)
+            _set_last_request_error(
+                endpoint=url,
+                http_status=0,
+                attempts=attempt,
+                error=reason,
+            )
+            if attempt < attempts:
+                time.sleep(_retry_delay(attempt))
+                continue
+            print(f"[http] network error: {reason}", file=sys.stderr)
+            return None, 0
 
 
 def normalize_platform_base_url(base_url: Optional[str]) -> str:
@@ -269,11 +371,13 @@ def _request_platform_json(
         **request_kwargs,
     )
     if status == 0:
-        raise ValueError(f"{path} request failed: network error")
+        context = _request_error_context(path)
+        raise ValueError(f"{path} request failed: network error ({context})" if context else f"{path} request failed: network error")
     if status == 401 and unauthorized_message:
         raise ValueError(unauthorized_message)
     if status >= 400:
-        raise ValueError(f"{path} request failed: HTTP {status}")
+        context = _request_error_context(path)
+        raise ValueError(f"{path} request failed: HTTP {status} ({context})" if context else f"{path} request failed: HTTP {status}")
     return _attach_skill_version_status(
         unwrap_platform_response(path, body, allow_raw_dict_without_code=allow_raw_dict_without_code)
     )
@@ -321,6 +425,7 @@ def get_platform_json(
 
 __all__ = [
     "get_last_skill_version_status",
+    "get_last_request_error",
     "get_platform_json",
     "normalize_platform_base_url",
     "post_platform_json",

@@ -14,7 +14,29 @@ def emit_json(payload: dict) -> int:
 
 
 def fail(message: str) -> int:
-    return emit_json_result({"status": "error", "error": str(message)}, 1)
+    return emit_json_result({"ok": False, "status": "error", "error": str(message)}, 1)
+
+
+def build_soft_action(
+    *,
+    status: str,
+    action_type: str,
+    next_step: Optional[str] = None,
+    developer_next_steps: Optional[list[str]] = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = dict(extra)
+    payload.update({
+        "ok": True,
+        "status": status,
+        "requires_action": True,
+        "action_type": action_type,
+    })
+    if next_step:
+        payload["next_step"] = next_step
+    if developer_next_steps:
+        payload["developer_next_steps"] = developer_next_steps
+    return payload
 
 
 def build_publish_error(
@@ -27,6 +49,7 @@ def build_publish_error(
     **extra: Any,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
+        "ok": False,
         "status": "error",
         "error": error,
         "failed_step": failed_step,
@@ -68,6 +91,7 @@ def stopped_publish_payload(
 
 __all__ = [
     "build_publish_error",
+    "build_soft_action",
     "emit_json",
     "emit_json_result",
     "fail",

@@ -18,13 +18,12 @@ from .confirmed_payload import (
     CATEGORY_NAMES as _CATEGORY_NAMES,
     SELECTED_CATEGORIES as _SELECTED_CATEGORIES,
     load_confirmed_workspace_documents_payload,
-    normalize_payload_categories,
 )
 from .confirmed_resolution import (
     packaged_path_for_entry,
     resolve_logical_source_path,
 )
-from .support import resolve_workspace_root
+from packaging._shared.selection.support import resolve_workspace_root
 
 
 @dataclass(frozen=True)
@@ -36,6 +35,16 @@ class ConfirmedWorkspaceDocumentEntry:
     source_kind: str
 
 
+def _target_for_workspace(target_name: Optional[str]) -> Optional[object]:
+    from packaging.runtimes import DEFAULT_TARGET, get_target, resolve_target_request
+
+    resolved_target = resolve_target_request(target_name or DEFAULT_TARGET).resolved_name
+    try:
+        return get_target(resolved_target)
+    except ValueError:
+        return None
+
+
 def _entry_source_kind(source_path: Path, logical_path: str) -> str:
     if source_path.is_dir():
         return "directory"
@@ -45,16 +54,15 @@ def _entry_source_kind(source_path: Path, logical_path: str) -> str:
 
 
 def normalize_confirmed_workspace_document_entries(
-    payload: dict,
+    normalized_payload: dict[str, list],
     *,
     target_name: Optional[str],
     workspace: Optional[str],
     agent_type: str,
 ) -> dict[str, list[ConfirmedWorkspaceDocumentEntry]]:
-    normalized_payload = normalize_payload_categories(payload)
     workspace_root = resolve_workspace_root(
         workspace=workspace,
-        target_name=target_name,
+        target=_target_for_workspace(target_name),
     )
     excluded_paths = {
         normalize_text(item.get("path") if isinstance(item, dict) else item)

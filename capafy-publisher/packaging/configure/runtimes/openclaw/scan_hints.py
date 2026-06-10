@@ -21,7 +21,7 @@ from packaging.configure.runtimes.openclaw.auth_profile_scan_hints import (
     collect_openclaw_auth_profile_scan_hints,
 )
 from packaging.configure.runtimes.openclaw.provider_url import extract_provider_url
-from packaging.configure.runtimes.openclaw.workspace_common import OPENCLAW_GENERIC_PATH_PARTS
+from packaging.runtimes.openclaw.workspace_common import OPENCLAW_GENERIC_PATH_PARTS
 
 
 _OPENCLAW_CONFIG_REL_SOURCE = ".openclaw/openclaw.json"

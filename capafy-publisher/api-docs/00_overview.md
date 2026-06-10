@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This document describes the seller-side capability surface that the current Developer Skill runtime can rely on. With the seller-side integrated backend documentation and the current runtime code as the source of truth, the current runtime uses the **11 `/agent/**` query/handling endpoints**, **1 account info endpoint**, and **2 login CLI entry points** consolidated here.
+This document describes the seller-side capability surface that the current Developer Skill runtime can rely on. With the seller-side integrated backend documentation and the current runtime code as the source of truth, the current runtime uses the **12 `/agent/**` query/handling endpoints**, **1 account info endpoint**, and **2 login CLI entry points** consolidated here.
 
 `api-docs/index.json` only keeps the version number and runtime entry declarations; interface details are governed by this document.
 
@@ -93,13 +93,13 @@ This is an "axiomatic" rule; it is not repeated below — only "the returned `ur
 - `publish-configure` only accepts a dispositions file path via `--dispositions-file <dispositions.json>` when buyout mode needs the creator to choose how to handle sensitive items; do not pass inline JSON.
 - Copyable command form: `python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter --selections-file .temp/confirmed-selections.json`. Example paths must be replaced with the actual paths on the local machine.
 - `publish-init` first verifies platform login state; if not logged in or the token has expired, it returns `platform_login_required` / `platform_login_invalid` and does not continue local candidate discovery or submission.
-- The CLI additionally handles: token persistence, publish working state, upload, and reporting.
+- The CLI additionally handles: token persistence, publish working state, upload, reporting, remote latest-version status, Agent listing, and refreshing an expired review URL.
 - When troubleshooting, first check the local working state from `publish-status`; the login state only keeps two sources — the environment variable and the current skill's `config.json`.
 - `login-token --access-token <token>` is used to change the local fallback token / local platform account; what is written here is the `config.json` under the `capafy-publisher` root directory. It is not a blind write: the command first calls `/agent/account`, and only persists the token and the available account fields (`user_id` / `email` / `name`) after confirming the token is usable. If the current process still sets `CAPAFY_ACCESS_TOKEN`, the runtime will continue to prefer the account in the environment variable.
 - When `/agent/*` returns `401`, guide the creator to rerun `login-init` + `login-verify`, or provide a new token and run `login-token`; do not retry automatically.
 - Endpoints without CLI wrapping are recommended to be called via `python3 -m capafy_platform.http_cli` (after login, `base_url` and token are injected automatically; no manual parameter passing is needed); statistics, payouts, certification, and refunds are currently called directly on demand.
 - `GET /agent/account` is used to verify whether the token supplied to `login-token` is still valid and to read back current account info; it belongs to the account info endpoints, not the publish main chain. The endpoint may return the platform standard `R<T>` response, or a bare account object; the runtime uniformly takes the account object.
-- All `url` values returned by the platform are mandatory human web confirmation steps; see §2.5.
+- All `url` values returned by the platform are mandatory human web confirmation steps; see §2.5. If an existing `review_url` expires, call `publish-refresh-url --agent-id <agent_id> [--step init|configure|ship]`; this wraps `GET /agent/agents/{agentId}/editLink` and returns a fresh web confirmation URL for the latest editable version without rerunning the publish step.
 - `module_index` is the authoritative directory of the current runtime:
   - Modules with `runtime_active=true` belong to the current runtime input set
   - Modules with `runtime_active=false` are only maintainer context and should not be treated as a runtime contract
@@ -120,7 +120,7 @@ This table is the **single source of truth** for all error codes. Interfaces ret
 | Developer refund response has timed out | `4014` | Developer refund response invalid or timed out |
 | Developer certification re-initiated | `4037` | Developer certification already completed |
 
-## 6. Entry and endpoint index (14 items)
+## 6. Entry and endpoint index (15 items)
 
 > Numbers S12, S13 are still reserved for the pricing module that has not yet been activated; new endpoints use S23 to avoid renumbering existing entries.
 
@@ -151,12 +151,13 @@ Common S05 account fields:
 | `developerVerified` | boolean/int/null | Developer certification status; only used for display and flow prompts, does not replace the KYC query endpoint. |
 | `accessToken` | string/null | Login verify response may return; `login-token` validation output must not echo it. |
 
-### 6.2 Agent queries and lifecycle gaps (2)
+### 6.2 Agent queries and lifecycle gaps (3)
 
 | # | Calling path | Corresponding endpoint | Description |
 |---|---|---|---|
 | S03 | Internal adapter layer / host platform capability | `GET /agent/agents` | Seller Agent list |
 | S04 | Internal readback inside `publish-*` orchestration | `GET /agent/agents/{agentId}` | Latest version details of an Agent |
+| S23 | `publish-refresh-url --agent-id <agent_id> [--step init|configure|ship]` | `GET /agent/agents/{agentId}/editLink` | Refresh a human web confirmation URL for the latest editable version; does not rerun init/configure/ship |
 
 #### Common enumerations
 
@@ -286,6 +287,15 @@ Stability notes:
 - If the platform still returns extra fields, treat them as best-effort additional info inside `raw_data`, not a stable minimum contract.
 - The backend source of truth for billing fields is `billings[]`; type determination for the publish main chain only reads `agentType`.
 - Confirmed skill selection is based on `workflowInfo.selection_groups`; the raw top-level `selectionGroups` may be empty or missing and is not the basis for confirmation. Runtime code normalizes to top-level `selection_groups` via `get_latest_version()`.
+
+#### `GET /agent/agents/{agentId}/editLink`
+
+Use:
+
+- Refresh an expired human web confirmation URL for the latest editable version
+- Resume a paused confirmation step without rerunning `publish-init`, `publish-configure`, or `publish-ship`
+
+Returned `url` is still a mandatory creator web confirmation step; see §2.5. If the latest version is not editable, the endpoint fails instead of creating a new version.
 
 #### Lifecycle gaps
 

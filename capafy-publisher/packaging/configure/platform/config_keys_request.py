@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import json
+from typing import Any, Optional
+
+from capafy_platform.api import save_config_keys_raw
+from packaging._shared.contracts.reviewed_scan import (
+    project_env_var_credentials_item,
+    require_reviewed_scan_use as _require_reviewed_use,
+    sanitize_reviewed_scan_payload,
+)
+from packaging._shared.platform.response_normalize import (
+    attach_platform_status,
+    normalize_edit_link_response,
+)
+from packaging.configure.env_var.dedupe import reviewed_env_var_covered_by_generic_entries
+from packaging.configure.scan.scan_only_paths import is_scan_only_source_path
+
+
+def _strip_tracking_source(item: dict, *, label: str) -> str:
+    raw_source = item.get("source")
+    if not isinstance(raw_source, str):
+        raise ValueError(f"{label}.source must be a string")
+    source = raw_source.strip()
+    if not source:
+        raise ValueError(f"{label}.source must not be empty")
+    return source
+
+
+def _strip_tracking_url_proxy_entry(entry: dict, *, index: int) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError("reviewed_scan_payload.url_proxy items must be objects")
+    api_key = entry.get("api_key")
+    url = entry.get("url")
+    if not isinstance(api_key, dict):
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].api_key must be an object")
+    if not isinstance(url, dict):
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].url must be an object")
+    projected: dict[str, Any] = {
+        "api_key": {
+            "value": api_key.get("value", ""),
+            "placeholder": api_key.get("placeholder", ""),
+            "field": api_key.get("field", ""),
+            "source": _strip_tracking_source(api_key, label=f"reviewed_scan_payload.url_proxy[{index}].api_key"),
+        },
+        "url": {
+            "value": url.get("value", ""),
+            "placeholder": url.get("placeholder", ""),
+            "field": url.get("field", ""),
+            "source": _strip_tracking_source(url, label=f"reviewed_scan_payload.url_proxy[{index}].url"),
+        },
+        "use": _require_reviewed_use(entry, label=f"reviewed_scan_payload.url_proxy[{index}]"),
+    }
+    model = str(entry.get("model", "") or "").strip()
+    if model:
+        projected["model"] = model
+    provider_name = str(entry.get("provider_name", "") or "").strip()
+    if provider_name:
+        projected["provider_name"] = provider_name
+    api_format = str(entry.get("api_format", "") or "").strip()
+    if not api_format:
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].api_format must not be empty")
+    projected["api_format"] = api_format
+    value_type = str(url.get("value_type", "")).strip()
+    if value_type:
+        projected["url"]["value_type"] = value_type
+    return projected
+
+
+def _strip_tracking_generic_entry(entry: dict, *, index: int) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError("reviewed_scan_payload.generic items must be objects")
+    source = _strip_tracking_source(entry, label=f"reviewed_scan_payload.generic[{index}]")
+    projected = {
+        "value": entry.get("value", ""),
+        "placeholder": entry.get("placeholder", ""),
+        "field": entry.get("field", ""),
+        "source": source,
+        "use": _require_reviewed_use(entry, label=f"reviewed_scan_payload.generic[{index}]"),
+    }
+    value_type = str(entry.get("value_type", "")).strip()
+    if value_type:
+        projected["value_type"] = value_type
+    source_detail = str(entry.get("source_detail", "") or "").strip()
+    if source_detail:
+        projected["source_detail"] = source_detail
+    occurrence_index = entry.get("occurrence_index")
+    if occurrence_index not in (None, ""):
+        projected["occurrence_index"] = occurrence_index
+    return projected
+
+
+def _is_uploadable_generic_entry(entry: Any) -> bool:
+    return isinstance(entry, dict) and not is_scan_only_source_path(str(entry.get("source", "") or ""))
+
+
+def _strip_tracking_env_var_entry(entry: dict, *, index: int) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError("reviewed_scan_payload.env_var items must be objects")
+    return project_env_var_credentials_item(entry, label=f"reviewed_scan_payload.env_var[{index}]")
+
+
+def _strip_tracking_exclude_entry(entry: dict, *, index: int) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError("reviewed_scan_payload.excludes items must be objects")
+    raw_source = entry.get("source")
+    if not isinstance(raw_source, str):
+        raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must be a string")
+    source = raw_source.strip()
+    if not source:
+        raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must not be empty")
+    return {
+        "source": source,
+        "use": _require_reviewed_use(entry, label=f"reviewed_scan_payload.excludes[{index}]"),
+    }
+
+
+def build_config_keys_request(
+    agent_version_id: str,
+    reviewed_scan_payload: dict,
+) -> dict[str, Any]:
+    if not str(agent_version_id or "").strip():
+        raise ValueError("agent_version_id must not be empty")
+    if not isinstance(reviewed_scan_payload, dict):
+        raise ValueError("reviewed_scan_payload must be an object")
+    reviewed_scan_payload = sanitize_reviewed_scan_payload(reviewed_scan_payload)
+
+    url_proxy = reviewed_scan_payload.get("url_proxy")
+    generic = reviewed_scan_payload.get("generic")
+    env_vars = reviewed_scan_payload.get("env_var")
+    excludes = reviewed_scan_payload.get("excludes", [])
+
+    if not isinstance(url_proxy, list):
+        raise ValueError("reviewed_scan_payload.url_proxy must be an array")
+    if not isinstance(generic, list):
+        raise ValueError("reviewed_scan_payload.generic must be an array")
+    if not isinstance(env_vars, list):
+        raise ValueError("reviewed_scan_payload.env_var must be an array")
+    if "excludes" in reviewed_scan_payload and not isinstance(excludes, list):
+        raise ValueError("reviewed_scan_payload.excludes must be an array")
+
+    uploadable_generic_entries = [
+        entry
+        for entry in generic
+        if _is_uploadable_generic_entry(entry)
+    ]
+
+    credentials_payload: dict[str, Any] = {
+        "url_proxy": [
+            _strip_tracking_url_proxy_entry(entry, index=index)
+            for index, entry in enumerate(url_proxy)
+        ],
+        "generic": [
+            _strip_tracking_generic_entry(entry, index=index)
+            for index, entry in enumerate(generic)
+            if _is_uploadable_generic_entry(entry)
+        ],
+        "env_var": [
+            _strip_tracking_env_var_entry(entry, index=index)
+            for index, entry in enumerate(env_vars)
+            if not (
+                isinstance(entry, dict)
+                and reviewed_env_var_covered_by_generic_entries(entry, uploadable_generic_entries)
+            )
+        ],
+        "excludes": [
+            _strip_tracking_exclude_entry(entry, index=index)
+            for index, entry in enumerate(excludes)
+        ],
+    }
+
+    return {
+        "agentVersionId": str(agent_version_id).strip(),
+        "requiredCredentials": json.dumps(credentials_payload, ensure_ascii=False),
+    }
+
+
+def save_config_keys(
+    agent_id: str,
+    agent_version_id: str,
+    reviewed_scan_payload: dict,
+    *,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> dict[str, Any]:
+    normalized_agent_id = str(agent_id or "").strip()
+    if not normalized_agent_id:
+        raise ValueError("agent_id must not be empty")
+    request_body = build_config_keys_request(agent_version_id, reviewed_scan_payload)
+    data = save_config_keys_raw(
+        normalized_agent_id,
+        request_body,
+        access_token=access_token,
+        base_url=base_url,
+    )
+    response = normalize_edit_link_response(
+        "save_config_keys",
+        request_body,
+        data,
+        base_url=base_url,
+        agent_id=normalized_agent_id,
+    )
+    return attach_platform_status(response, data, workflow_status="pending_config_confirmation")
+
+
+__all__ = ["build_config_keys_request", "save_config_keys"]

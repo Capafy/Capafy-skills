@@ -54,6 +54,9 @@ def build_reviewed_scan_from_input(
             item["model"] = model
         if api_format:
             item["api_format"] = api_format
+        provider_name = str(pair.provider_name or "").strip()
+        if provider_name:
+            item["provider_name"] = provider_name
         url_proxy_items.append(item)
 
     generic_items: list[dict[str, Any]] = []

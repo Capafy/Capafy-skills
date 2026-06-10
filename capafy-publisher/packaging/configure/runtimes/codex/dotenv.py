@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from packaging.configure.dotenv import iter_dotenv_assignments
+from packaging._shared.config_files.dotenv import iter_dotenv_assignments
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
 

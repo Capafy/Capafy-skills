@@ -8,9 +8,6 @@ from packaging._shared.common.packaged_files import is_credential_excluded_dir
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
 
-_OPENCLAW_WORKSPACE_SOURCE_KEY = ".openclaw/workspace"
-
-
 def selected_workflow_unit_paths(
     *,
     selected_skill_paths: Optional[set[str]],
@@ -25,18 +22,17 @@ def selected_workflow_unit_paths(
     }
 
 
-def _workflow_runtime_auth_paths(*, bundle_context: dict, stage_plan) -> set[str]:
-    env_id = str(bundle_context.get("env_id") or stage_plan.metadata.get("env_id") or "").strip().lower()
-    if env_id != "openclaw":
-        return set()
-    runtime_paths: set[str] = set()
-    for tree_source in getattr(stage_plan, "tree_sources", []):
-        source_key = str(getattr(tree_source, "source_key", "")).strip()
-        display_prefix = str(getattr(tree_source, "display_prefix", "")).strip().rstrip("/")
-        if source_key != _OPENCLAW_WORKSPACE_SOURCE_KEY or not display_prefix:
-            continue
-        runtime_paths.add(f"{display_prefix}/auth-profiles.json")
-    return runtime_paths
+def _workflow_runtime_auth_paths(*, stage_plan, target) -> set[str]:
+    return {
+        str(path).strip().rstrip("/")
+        for path in call_optional_target_hook(
+            target,
+            "cloud_workspace_auth_paths",
+            stage_plan,
+            default=(),
+        )
+        if str(path).strip()
+    }
 
 
 def _is_workflow_related_credential_skip(
@@ -86,10 +82,8 @@ def build_workflow_related_no_auth_paths(
             selected_plugin_paths=selected_plugin_paths,
             selected_cron_paths=selected_cron_paths,
         )
-    runtime_auth_paths = _workflow_runtime_auth_paths(
-        bundle_context=bundle_context,
-        stage_plan=stage_plan,
-    )
+    _ = bundle_context
+    runtime_auth_paths = _workflow_runtime_auth_paths(stage_plan=stage_plan, target=target)
     return sorted({
         path.rstrip("/")
         for path in skipped

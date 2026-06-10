@@ -1,0 +1,176 @@
+{
+  "platform_contract": {
+    "config_files": [
+      ".hermes/config.yaml",
+      ".hermes/.env",
+      "_scan_only/.hermes/config.yaml",
+      "_scan_only/.hermes/.env",
+      "_scan_only/.hermes/credentials",
+      "_scan_only/.hermes/oauth",
+      "_scan_only/.hermes/.anthropic_oauth.json",
+      "_scan_only/.hermes/auth.json",
+      "_scan_only/.hermes/auth/google_oauth.json"
+    ],
+    "env_vars": {
+      "ANTHROPIC_API_KEY": {
+        "service": "Anthropic",
+        "canonical_url": "https://api.anthropic.com"
+      },
+      "OPENAI_API_KEY": {
+        "service": "OpenAI",
+        "canonical_url": "https://api.openai.com/v1"
+      },
+      "GOOGLE_API_KEY": {
+        "service": "Google",
+        "canonical_url": "https://generativelanguage.googleapis.com"
+      },
+      "GEMINI_API_KEY": {
+        "service": "Google",
+        "canonical_url": "https://generativelanguage.googleapis.com"
+      },
+      "NOUS_API_KEY": {
+        "service": "Nous Portal",
+        "canonical_url": "https://inference-api.nousresearch.com/v1"
+      },
+      "DEEPSEEK_API_KEY": {
+        "service": "DeepSeek",
+        "canonical_url": "https://api.deepseek.com/v1"
+      },
+      "XAI_API_KEY": {
+        "service": "xAI",
+        "canonical_url": "https://api.x.ai/v1"
+      },
+      "ZAI_API_KEY": {
+        "service": "Z.AI",
+        "canonical_url": "https://api.z.ai/api/paas/v4"
+      },
+      "ZHIPUAI_API_KEY": {
+        "service": "Z.AI",
+        "canonical_url": "https://api.z.ai/api/paas/v4"
+      },
+      "MOONSHOT_API_KEY": {
+        "service": "Moonshot",
+        "canonical_url": "https://api.moonshot.cn/v1"
+      },
+      "KIMI_API_KEY": {
+        "service": "Moonshot",
+        "canonical_url": "https://api.moonshot.cn/v1"
+      },
+      "MINIMAX_API_KEY": {
+        "service": "MiniMax",
+        "canonical_url": "https://api.minimax.chat/v1"
+      },
+      "OPENROUTER_API_KEY": {
+        "service": "OpenRouter",
+        "canonical_url": "https://openrouter.ai/api/v1"
+      }
+    }
+  },
+  "url_proxy_os_fallback_names": [
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "NOUS_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "XAI_API_KEY",
+    "ZAI_API_KEY",
+    "ZHIPUAI_API_KEY",
+    "MOONSHOT_API_KEY",
+    "KIMI_API_KEY",
+    "MINIMAX_API_KEY",
+    "OPENROUTER_API_KEY"
+  ],
+  "discovery_skill_precedence": [
+    ".hermes/skills"
+  ],
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".hermes/skills",
+      "display_prefix": ".hermes/skills",
+      "target_path": ".hermes/skills",
+      "source_key": ".hermes/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true,
+      "excluded_relpath_prefixes": [
+        "sessions",
+        "memories",
+        "logs",
+        "credentials",
+        "oauth",
+        "auth",
+        "worktrees"
+      ]
+    }
+  ],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".hermes/config.yaml",
+      "display_path": ".hermes/config.yaml"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/.env",
+      "display_path": ".hermes/.env"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/SOUL.md",
+      "display_path": ".hermes/SOUL.md"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/memories/MEMORY.md",
+      "display_path": ".hermes/memories/MEMORY.md"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/memories/USER.md",
+      "display_path": ".hermes/memories/USER.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".hermes.md",
+      "display_path": "workspace/.hermes.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "HERMES.md",
+      "display_path": "workspace/HERMES.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.md",
+      "display_path": "workspace/AGENTS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "agents.md",
+      "display_path": "workspace/agents.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "CLAUDE.md",
+      "display_path": "workspace/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "claude.md",
+      "display_path": "workspace/claude.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".cursorrules",
+      "display_path": "workspace/.cursorrules"
+    }
+  ],
+  "runtime_env": {
+    "field": "hermes_version",
+    "command": [
+      "hermes",
+      "--version"
+    ]
+  }
+}

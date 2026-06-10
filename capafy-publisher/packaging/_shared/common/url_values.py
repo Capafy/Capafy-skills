@@ -8,7 +8,10 @@ from urllib.parse import urlparse
 
 
 
-DOMAIN_PATTERN = re.compile(r"https?://[^\s'\"<>]+|(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?:/[^\s'\"<>]*)?")
+DOMAIN_PATTERN = re.compile(
+    r"https?://[^\s'\"<>]{1,2048}|"
+    r"(?:[A-Za-z0-9-]{1,63}\.){1,20}[A-Za-z]{2,63}(?:/[^\s'\"<>]{0,2048})?"
+)
 
 
 def has_http_url_scheme(value: str) -> bool:

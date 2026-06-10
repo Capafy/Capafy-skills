@@ -7,18 +7,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
-from packaging._shared.common.json_walk import iter_json_string_leaves
+from packaging._shared.config_files.json_io import iter_json_string_leaves
 from packaging._shared.common.url_values import build_config_url_proxy_group
 from packaging.configure.scan.env_scan_rules import (
     candidate_source,
     config_literal_candidate_kind,
     is_endpoint_config_key,
 )
-from packaging.configure.scan.secret_context import CONTEXTUAL_KEY_SECRET_MARKERS
+from packaging.configure.scan.secret_context import (
+    CONTEXTUAL_KEY_SECRET_MARKERS,
+    is_contextual_secret_key,
+)
 from packaging.configure.scan.support import append_candidate
 from packaging.configure.sensitive.keywords import (
     contains_explicit_secret_keyword,
-    key_tokens,
     normalize_key_name,
 )
 from packaging.configure.sensitive.literals import (
@@ -82,17 +84,6 @@ def should_skip_claude_login_state_leaf(path_name: str, path_parts: list[str], k
         return True
     parent_tokens = {normalize_key_name(part) for part in path_parts[:-1] if not part.startswith("[")}
     return bool(parent_tokens & CLAUDE_LOGIN_STATE_PARENT_MARKERS) and contains_explicit_secret_keyword(key)
-
-
-def is_contextual_secret_key(path_parts: list[str], key: str) -> bool:
-    if "key" not in set(key_tokens(key)) and normalize_key_name(key) != "key":
-        return False
-    context_tokens = {
-        normalize_key_name(part)
-        for part in [*path_parts[:-1], *key_tokens(key)]
-        if part and not str(part).startswith("[")
-    }
-    return bool(context_tokens & CONTEXTUAL_KEY_SECRET_MARKERS)
 
 
 def claude_env_service_from_key(key: str) -> str:

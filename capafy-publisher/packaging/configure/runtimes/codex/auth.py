@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from packaging._shared.common.json_io import load_json_object
+from packaging._shared.config_files.json_io import load_json_object
+from packaging._shared.common.exclusion_rules import make_skip_scan_predicate
 from packaging.configure.env_values import usable_env_value, usable_process_env_value
 
 
@@ -23,6 +24,10 @@ _CODEX_OAUTH_AUTH_MODES = {
     "login",
     "oauth",
 }
+_should_skip_auth_structured_scan = make_skip_scan_predicate(
+    ".codex/auth.json",
+    "_scan_only/.codex/auth.json",
+)
 
 def _is_usable_codex_auth_key(value: object) -> bool:
     if not isinstance(value, str):
@@ -137,8 +142,7 @@ def codex_auth_oauth_detected(staging_root: Path, stage_plan=None) -> bool:
 
 
 def should_skip_codex_auth_structured_scan(relpath: str) -> bool:
-    normalized = str(relpath or "").replace("\\", "/").lower()
-    return normalized.endswith(".codex/auth.json") or normalized.endswith("_scan_only/.codex/auth.json")
+    return _should_skip_auth_structured_scan(relpath)
 
 
 __all__ = [

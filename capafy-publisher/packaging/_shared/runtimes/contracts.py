@@ -7,6 +7,10 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, runtime
 from packaging._shared.contracts.stage_plan import StagePlan
 
 
+OPENCLAW_LEGACY_TARGET = "openclaw_legacy_native"
+OPENCLAW_MODERN_TARGET = "openclaw_bundle_aware"
+
+
 @dataclass(frozen=True)
 class TargetDescriptor:
     target_id: str
@@ -14,13 +18,24 @@ class TargetDescriptor:
     profile_env_id: Optional[str] = None
     runtime_generation: Optional[str] = None
     runtime_variant: Optional[str] = None
-    feature_tags: tuple[str, ...] = ()
 
 
 
 CandidateAnnotator = Callable[..., Optional[dict]]
 
 SpecialScanResult = Tuple[Dict[str, str], Dict[str, str], Dict[str, str], List[dict]]
+
+
+@dataclass(frozen=True)
+class RuntimePlugin:
+    runtime_id: str
+    descriptors: Callable[[], tuple[TargetDescriptor, ...]]
+    target_factory: Optional[Callable[[TargetDescriptor, dict], "PackagingTarget"]] = None
+    url_proxy_runtime_factory: Optional[Callable[[], Any]] = None
+    env_preprocess_hook: Optional[Callable[..., frozenset[str]]] = None
+    owns_structured_pair: Optional[Callable[[Any], bool]] = None
+    review_consistency_hook: Optional[Callable[..., None]] = None
+    semantic_field_identity_hook: Optional[Callable[[Any], tuple[str, str, str]]] = None
 
 
 @runtime_checkable
@@ -69,7 +84,10 @@ def call_optional_target_hook(
 
 __all__ = [
     "CandidateAnnotator",
+    "OPENCLAW_LEGACY_TARGET",
+    "OPENCLAW_MODERN_TARGET",
     "PackagingTarget",
+    "RuntimePlugin",
     "SpecialScanResult",
     "TargetDescriptor",
     "call_optional_target_hook",

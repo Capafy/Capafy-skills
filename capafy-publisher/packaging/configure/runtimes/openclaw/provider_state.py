@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.openclaw.official_providers import (
+from packaging.configure.runtimes.openclaw.official_providers import (
     OPENCLAW_OFFICIAL_PROVIDER_SPECS,
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
     find_openclaw_official_provider_by_marker,

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from importlib import import_module
+
 from packaging.configure.contracts import GenericValue, ReviewedScanBuildInput, SourceKind, UrlProxyPair
 
 
 LocationIdentity = tuple[str, str, str, int, str]
 SimpleFieldIdentity = tuple[str, str, str]
+SemanticFieldIdentity = tuple[str, str, str]
+EnvValueIdentity = tuple[str, str]
 
 
 def _plan_field_identity(plan_field) -> LocationIdentity:
@@ -77,6 +81,121 @@ def _claimed_simple_identities(pairs: list[UrlProxyPair]) -> set[SimpleFieldIden
             if all(identity):
                 identities.add(identity)
     return identities
+
+
+def _plugin_semantic_field_identities(field_obj) -> set[SemanticFieldIdentity]:
+    plugins_module = import_module("packaging.runtimes.plugins")
+    identities: set[SemanticFieldIdentity] = set()
+    for plugin in plugins_module.list_runtime_plugins():
+        hook = plugin.semantic_field_identity_hook
+        if hook is None:
+            continue
+        identity = hook(field_obj)
+        normalized = tuple(str(part or "").strip() for part in identity)
+        if len(normalized) == 3 and all(normalized):
+            identities.add(normalized)
+    return identities
+
+
+def _claimed_semantic_field_identities(
+    pairs: list[UrlProxyPair],
+) -> set[SemanticFieldIdentity]:
+    identities: set[SemanticFieldIdentity] = set()
+    for pair in pairs:
+        for plan_field in (pair.key, pair.url):
+            identities.update(_plugin_semantic_field_identities(plan_field))
+    return identities
+
+
+def _normalized_source_ref(source: object) -> str:
+    normalized = str(source or "").strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _pair_source_references(pair: UrlProxyPair) -> set[str]:
+    references: set[str] = set()
+    for plan_field in (pair.key, pair.url, pair.model_field):
+        if plan_field is None:
+            continue
+        for source in (
+            plan_field.source_identity(),
+            getattr(plan_field, "source_relpath", ""),
+            getattr(plan_field, "reviewed_source", ""),
+        ):
+            normalized = _normalized_source_ref(source)
+            if normalized:
+                references.add(normalized)
+    return references
+
+
+def _claimed_process_env_name_references(pairs: list[UrlProxyPair]) -> dict[str, set[str]]:
+    references_by_name: dict[str, set[str]] = {}
+    for pair in pairs:
+        pair_references = _pair_source_references(pair)
+        for plan_field in (pair.key, pair.url, pair.model_field):
+            if plan_field is None:
+                continue
+            field_name = str(getattr(plan_field, "field", "") or "").strip()
+            if not field_name:
+                continue
+            if getattr(plan_field, "source_kind", None) == SourceKind.PROCESS_ENV:
+                references_by_name.setdefault(field_name, set()).update(pair_references)
+    return references_by_name
+
+
+def _claimed_env_value_references(pairs: list[UrlProxyPair]) -> dict[EnvValueIdentity, set[str]]:
+    references_by_identity: dict[EnvValueIdentity, set[str]] = {}
+    for pair in pairs:
+        pair_references = _pair_source_references(pair)
+        for plan_field in (pair.key, pair.url, pair.model_field):
+            if plan_field is None:
+                continue
+            field_name = str(getattr(plan_field, "field", "") or "").strip()
+            value = str(getattr(plan_field, "original_value", "") or "").strip()
+            if field_name and value:
+                references_by_identity.setdefault((field_name, value), set()).update(pair_references)
+    return references_by_identity
+
+
+def _normalized_references(references: object) -> set[str]:
+    if not isinstance(references, (list, tuple)):
+        return set()
+    return {
+        normalized
+        for normalized in (_normalized_source_ref(item) for item in references)
+        if normalized
+    }
+
+
+def _env_var_has_independent_references(env_var, claimed_references: set[str]) -> bool:
+    references = _normalized_references(env_var.referenced_in)
+    if not references:
+        return False
+    return any(reference not in claimed_references for reference in references)
+
+
+def _env_var_claimed_by_url_proxy(
+    env_var,
+    *,
+    claimed_env_name_references: dict[str, set[str]],
+    claimed_env_value_references: dict[EnvValueIdentity, set[str]],
+) -> bool:
+    name = str(env_var.name or "").strip()
+    value = str(env_var.process_value or "").strip()
+    if not name:
+        return False
+    claimed_references = set(claimed_env_name_references.get(name, set()))
+    if value:
+        claimed_references.update(claimed_env_value_references.get((name, value), set()))
+    if not claimed_references and (name not in claimed_env_name_references or not value):
+        return False
+    return not _env_var_has_independent_references(env_var, claimed_references)
+
+
+def _generic_semantic_field_identities(generic_value: GenericValue) -> set[SemanticFieldIdentity]:
+    return _plugin_semantic_field_identities(generic_value)
 
 
 def _pair_identity(pair: UrlProxyPair) -> tuple[LocationIdentity, LocationIdentity]:
@@ -160,16 +279,27 @@ def dedupe_fallback_generic_entries(
 
 def filter_url_proxy_claimed_reviewed_input(reviewed_input: ReviewedScanBuildInput) -> ReviewedScanBuildInput:
     claimed_identities = _claimed_location_identities(list(reviewed_input.url_proxy_pairs))
-    claimed_env_names = collect_claimed_process_env_names(list(reviewed_input.url_proxy_pairs))
+    claimed_semantic_fields = _claimed_semantic_field_identities(
+        list(reviewed_input.url_proxy_pairs)
+    )
+    claimed_env_name_references = _claimed_process_env_name_references(
+        list(reviewed_input.url_proxy_pairs)
+    )
+    claimed_env_value_references = _claimed_env_value_references(list(reviewed_input.url_proxy_pairs))
     generic_values = tuple(
         generic_value
         for generic_value in reviewed_input.generic_values
         if _generic_value_identity(generic_value) not in claimed_identities
+        and _generic_semantic_field_identities(generic_value).isdisjoint(claimed_semantic_fields)
     )
     env_vars = tuple(
         env_var
         for env_var in reviewed_input.env_vars
-        if str(env_var.name or "").strip() not in claimed_env_names
+        if not _env_var_claimed_by_url_proxy(
+            env_var,
+            claimed_env_name_references=claimed_env_name_references,
+            claimed_env_value_references=claimed_env_value_references,
+        )
     )
     if generic_values == reviewed_input.generic_values and env_vars == reviewed_input.env_vars:
         return reviewed_input

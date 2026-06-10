@@ -8,6 +8,7 @@ from packaging.configure.staging.review import refresh_reviewed_scan_metadata
 from packaging.configure.staging.review_confirmation import reconcile_reviewed_scan_with_platform_confirmation
 from packaging._shared.reviewed_scan.io import persist_reviewed_scan
 from packaging.configure.scan.staging_scan import scan_staging_full
+from packaging.configure.staging.strip.removed_generic import remove_unconfirmed_generic_config_values
 from packaging.ship.cloud_hosted.effective_scan import EffectiveScanGroups
 from packaging.configure.url_proxy.orchestrator import is_runtime_applicable
 from packaging.configure.url_proxy.runtime_registry import BUILTIN_RUNTIMES
@@ -68,6 +69,15 @@ def _apply_confirmed_platform_configuration(
         env_id=env_id,
         reviewed_scan=reconciled,
     )
+    generic_result = remove_unconfirmed_generic_config_values(
+        staging_root,
+        reviewed_scan=reconciled,
+        required_credentials_payload=required_credentials_payload,
+    )
+    reconciled = generic_result["reviewed_scan"]
+    generic_summary = generic_result["summary"]
+    if generic_summary.get("generic_config_entries_removed"):
+        provider_summary.update(generic_summary)
     if any(provider_summary.values()):
         raw_scan = scan_staging_full(
             staging_root,
@@ -99,7 +109,7 @@ def prune_cloud_hosted_reviewed_scan(
     staging_root: str = "",
     required_credentials_payload: Union[dict[str, Any], object] = None,
     developer_work_dir_path: Optional[Path] = None,
-) -> tuple[Union[ShipPruneResult, dict[str, Any]], int]:
+) -> tuple[ShipPruneResult, int]:
     provider_summary: dict[str, Any] = {}
 
 

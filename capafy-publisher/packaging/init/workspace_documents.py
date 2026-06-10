@@ -12,11 +12,10 @@ from packaging._shared.common.fs import (
     relpath as fs_relpath,
 )
 from packaging._shared.common.packaged_files import should_skip_packaged_relpath
-from packaging._shared.common.toml_loader import safe_toml_loads, tomllib
 from packaging._shared.contracts.selectable import is_instruction_doc, should_skip_skill_reference_document
 from packaging._shared.env_profiles.path_resolver import resolve_path_spec
-from packaging.configure.selection.local_ref_confirmation import display_path_for_local_reference
-from packaging.configure.selection.support import classify_selectable_directory
+from packaging._shared.runtimes.contracts import call_optional_target_hook
+from packaging._shared.selection.support import classify_selectable_directory
 from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 
 from .selection_candidates import SourceDocument
@@ -135,75 +134,15 @@ def _iter_profile_fixed_instruction_documents(
     return documents
 
 
-def _source_file_for_display_path(stage_plan: StagePlan, display_path: str) -> Optional[Path]:
-    normalized_display_path = display_path.strip().strip("/")
-    if not normalized_display_path:
-        return None
-    for file_source in stage_plan.file_sources:
-        if file_source.relative_target_path.as_posix() != normalized_display_path:
-            continue
-        source_file = file_source.source_file.expanduser()
-        if source_file.is_file():
-            return source_file
-    return None
-
-
-def _resolve_codex_model_instructions_source(raw_value: str) -> Optional[Path]:
-    from packaging.configure.runtimes.codex.local_files import resolve_codex_local_config_file_source
-
-    return resolve_codex_local_config_file_source(raw_value)
-
-
-def _append_config_referenced_instruction_document(
-    documents: list[SourceDocument],
-    *,
-    source_path: Optional[Path],
-    stage_plan: StagePlan,
-) -> None:
-    if source_path is None or not source_path.is_file():
-        return
-    display_path = display_path_for_local_reference(source_path, stage_plan)
-    if not display_path or not is_instruction_doc(display_path):
-        return
-    if should_skip_skill_reference_document(display_path):
-        return
-    text, _encoding = read_text(source_path)
-    if text is None or not text.strip():
-        return
-    documents.append(_build_document_entry(display_path, source_path, text))
-
-
-def _iter_codex_config_referenced_instruction_documents(stage_plan: StagePlan) -> list[SourceDocument]:
-    config_path = _source_file_for_display_path(stage_plan, ".codex/config.toml")
-    if config_path is None:
-        return []
-    text, _encoding = read_text(config_path)
-    if text is None:
-        return []
-    try:
-        payload = safe_toml_loads(text)
-    except tomllib.TOMLDecodeError:
-        return []
-    raw_value = payload.get("model_instructions_file")
-    if not isinstance(raw_value, str):
-        return []
-
-    documents: list[SourceDocument] = []
-
-
-    _append_config_referenced_instruction_document(
-        documents,
-        source_path=_resolve_codex_model_instructions_source(raw_value),
-        stage_plan=stage_plan,
-    )
-    return documents
-
-
 def _iter_config_referenced_instruction_documents(stage_plan: StagePlan, *, target=None) -> list[SourceDocument]:
-    env_id = str(getattr(target, "env_id", "") or "").strip()
-    if env_id == "codex":
-        return _iter_codex_config_referenced_instruction_documents(stage_plan)
-    return []
+    return list(
+        call_optional_target_hook(
+            target,
+            "iter_config_referenced_instruction_documents",
+            stage_plan,
+            default=[],
+        )
+    )
 
 
 def _append_unique_document(

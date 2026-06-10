@@ -22,7 +22,7 @@ from packaging.ship.artifacts.package_pipeline import run_artifact_package
 from packaging.ship.artifacts.validate_runtime import run_artifact_validate
 from packaging.ship.cloud_hosted.package import require_cloud_hosted_url_proxy
 from packaging.ship.cloud_hosted.readback_safety import find_plaintext_required_credentials
-from packaging.ship.cloud_hosted.ship_prune import ShipPruneResult, prune_cloud_hosted_reviewed_scan
+from packaging.ship.cloud_hosted.ship_prune import prune_cloud_hosted_reviewed_scan
 from packaging.ship.shipping.preflight import ShipContext, prepare_ship_context
 from packaging.ship.shipping.upload import publish_upload_and_report
 
@@ -69,14 +69,6 @@ def run_publish_ship(
     )
     if context_code != 0:
         return context_or_error, context_code
-    if not isinstance(context_or_error, ShipContext):
-        return build_publish_error(
-            error="prepare_ship_context returned an invalid success payload",
-            failed_step="prepare_ship_context",
-            blocking_category="invalid_ship_context",
-            agent_id=agent_id,
-        ), 1
-
     ctx = context_or_error
     bundle_path = default_bundle_path
 
@@ -106,14 +98,6 @@ def run_publish_ship(
         )
         if prune_code != 0:
             return prune_result, prune_code
-        if not isinstance(prune_result, ShipPruneResult):
-            return _build_ship_error(
-                ctx,
-                agent_id=agent_id,
-                error="ship-prune returned an invalid success payload",
-                failed_step="ship_prune",
-                blocking_category="invalid_prune_result",
-            ), 1
         try:
             require_cloud_hosted_url_proxy(prune_result.effective_scan)
         except ValueError as exc:

@@ -9,7 +9,7 @@ from typing import Mapping
 
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import SourceKind
-from packaging.configure.dotenv import iter_dotenv_assignments
+from packaging._shared.config_files.dotenv import iter_dotenv_assignments
 from packaging.configure.env_values import usable_env_value
 from packaging.configure.runtimes.claude_code.auth import (
     CLAUDE_AUTH_ENV_KEY,

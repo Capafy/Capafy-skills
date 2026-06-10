@@ -5,15 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from packaging._shared.contracts.bundle_context import validate_agent_type
-from packaging._shared.contracts.reviewed_scan import load_reviewed_scan_payload as load_reviewed_scan_contract_payload
+from packaging._shared.contracts.reviewed_scan import load_reviewed_scan_object
 from packaging.ship.contexts import ArtifactPackageContext, PackageContext
 from packaging.ship.mode_dispatch import get_ship_mode
 
 
 def _agent_type_from_package_json(package_json: str) -> str:
-    payload = load_reviewed_scan_contract_payload(package_json, label="package_json")
-    if not isinstance(payload, dict):
-        raise ValueError("package_json must be an object")
+    payload = load_reviewed_scan_object(package_json, label="package_json")
     agent_type = str(payload.get("agent_type", "")).strip()
     if not agent_type:
         raise ValueError("package_json is missing top-level agent_type")

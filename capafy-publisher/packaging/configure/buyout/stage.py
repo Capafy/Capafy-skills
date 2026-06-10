@@ -3,8 +3,6 @@ from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
-from datetime import datetime, timezone
-
 from packaging._shared.common.fs import (
     looks_like_absolute_symlink,
     looks_like_virtualenv_dir,
@@ -16,7 +14,6 @@ from packaging._shared.common.packaged_files import (
 from packaging.configure.staging.tree_copy import copy_tree
 from packaging._shared.contracts.bundle_context import write_bundle_context
 from packaging._shared.contracts.stage_manifest import write_stage_manifest
-from packaging.configure.staging.review import compute_scan_only_digest, compute_staging_digest
 from packaging._shared.contracts.selection_groups import (
     is_selected_selection_group_item,
     normalize_documented_selection_groups,
@@ -24,7 +21,7 @@ from packaging._shared.contracts.selection_groups import (
 from packaging._shared.contracts.selectable import candidate_path_for_logical_path
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging.configure.contexts import StageContext
-from packaging.configure.selection.unit_types import infer_selection_unit_type
+from packaging._shared.selection.unit_types import infer_selection_unit_type
 
 
 def _should_skip_buyout_relpath(relpath: str, *, is_dir: bool) -> bool:
@@ -178,10 +175,6 @@ def stage_buyout(
     stage_manifest_path = write_stage_manifest(
         staging_root,
         scan_only_prefixes=(),
-        scan_only_source_map={},
-        staging_digest=compute_staging_digest(staging_root),
-        scan_only_digest=compute_scan_only_digest(staging_root),
-        generated_at=datetime.now(timezone.utc).isoformat(),
     )
 
     generated_files_payload = [bundle_context_path.name, *generated_files]

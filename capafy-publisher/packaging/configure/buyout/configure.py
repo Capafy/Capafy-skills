@@ -25,7 +25,7 @@ from packaging.configure.deep_scan_payload import build_deep_scan_payload
 from packaging.configure.staging.review import compute_scan_digest, refresh_reviewed_scan_metadata
 from packaging._shared.contracts.selection_groups import validate_buyout_skill_count
 from packaging.configure.work_state import write_buyout_bundle_prepared_manifest
-from packaging.init.explicit_skill import (
+from packaging._shared.selection.explicit_skill import (
     explicit_skill_from_manifest_extra,
     merge_external_skill_bindings_into_selection_groups,
     merge_explicit_skill_into_selection_groups,

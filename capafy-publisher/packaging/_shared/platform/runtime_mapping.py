@@ -10,12 +10,14 @@ PACKAGE_REPORT_ALLOWED_STATUSES = {0, 2}
 _DOCUMENTED_AGENT_RUNTIME_BY_ENV_ID = {
     "claude_code": "claude",
     "codex": "codex",
+    "hermes": "hermes",
     "openclaw": "openclaw",
 }
 _ENV_ID_BY_DOCUMENTED_AGENT_RUNTIME = {
     "claude": "claude_code",
     "claude_code": "claude_code",
     "codex": "codex",
+    "hermes": "hermes",
     "openclaw": "openclaw",
 }
 

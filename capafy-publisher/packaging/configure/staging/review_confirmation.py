@@ -1,12 +1,40 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Any, Optional, Tuple, Union
 
 
 def _managed_item_identity_value(item: object, key: str) -> str:
     if not isinstance(item, dict):
         return ""
     return str(item.get(key, "") or "").strip()
+
+
+GenericIdentity = Tuple[str, ...]
+
+
+def generic_entry_identities(entry: object) -> set[GenericIdentity]:
+    if not isinstance(entry, dict):
+        return set()
+    placeholder = _managed_item_identity_value(entry, "placeholder")
+    if not placeholder:
+        return set()
+    return {("placeholder", placeholder)}
+
+
+def confirmed_generic_identities(
+    required_credentials_payload: dict[str, Any],
+) -> Optional[set[GenericIdentity]]:
+    if "generic" not in required_credentials_payload:
+        return None
+    generic = required_credentials_payload.get("generic")
+    if not isinstance(generic, list):
+        return None
+    if not generic:
+        return set()
+    confirmed: set[GenericIdentity] = set()
+    for entry in generic:
+        confirmed.update(generic_entry_identities(entry))
+    return confirmed
 
 
 def _url_proxy_entry_identities(entry: object) -> set[str]:
@@ -88,5 +116,7 @@ def reconcile_reviewed_scan_with_platform_confirmation(
 
 
 __all__ = [
+    "confirmed_generic_identities",
+    "generic_entry_identities",
     "reconcile_reviewed_scan_with_platform_confirmation",
 ]

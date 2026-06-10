@@ -1,8 +1,6 @@
 from __future__ import annotations
 from typing import Optional
 
-from datetime import datetime, timezone
-
 from packaging._shared.common.fs import record_skip
 from packaging._shared.common.packaged_files import should_skip_packaged_path
 from packaging._shared.common.exclusion_rules import exclude_reason_code_for_path
@@ -30,8 +28,7 @@ from packaging.configure.cloud_hosted.runtime_manifest import (
     write_runtime_dependencies_manifest,
     write_runtime_environment_manifest,
 )
-from packaging.configure.staging.review import compute_scan_only_digest, compute_staging_digest
-from packaging.configure.selection.inventory import build_skill_inventory
+from packaging._shared.selection.inventory import build_skill_inventory
 from packaging.configure.selection.units_manifest import write_selected_units_manifest
 from packaging.configure.selection.confirmed_workspace_documents import write_confirmed_workspace_documents_manifest
 from packaging.configure.contexts import StageContext
@@ -39,18 +36,25 @@ from packaging.runtimes import get_target
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
 
-_CLOUD_WORKSPACE_EXCLUDED_PREFIXES = (
-    ".pytest_cache",
-    "dev/tests",
-)
-_OPENCLAW_WORKSPACE_SOURCE_KEY = ".openclaw/workspace"
+def _cloud_workspace_excluded_prefixes(target, tree_source) -> tuple[str, ...]:
+    return tuple(
+        call_optional_target_hook(
+            target,
+            "cloud_workspace_excluded_prefixes",
+            tree_source,
+            default=(),
+        )
+    )
 
 
-def _cloud_workspace_excluded_prefixes(display_prefix: str) -> tuple[str, ...]:
-    normalized = str(display_prefix or "").strip().rstrip("/")
-    if normalized.startswith(_OPENCLAW_WORKSPACE_SOURCE_KEY):
-        return _CLOUD_WORKSPACE_EXCLUDED_PREFIXES
-    return ()
+def _cloud_workspace_allowlist(target, tree_source, workspace_allowlist):
+    return call_optional_target_hook(
+        target,
+        "cloud_workspace_allowlist",
+        tree_source,
+        workspace_allowlist,
+        default=None,
+    )
 
 
 def _should_report_public_stage_source(*, source_value: str) -> bool:
@@ -96,7 +100,6 @@ def stage_cloud_hosted(
     explicit_excluded_credential_files: set[str] = set()
     sources: dict[str, str] = {}
     scan_only_prefixes: list[str] = []
-    scan_only_source_map: dict[str, str] = {}
     selected_unit_paths: Optional[set[str]] = None
     if any(group is not None for group in (selected_skill_paths, selected_plugin_paths, selected_cron_paths)):
 
@@ -113,7 +116,7 @@ def stage_cloud_hosted(
 
         effective_excluded_prefixes = (
             *tree_source.excluded_relpath_prefixes,
-            *_cloud_workspace_excluded_prefixes(tree_source.display_prefix),
+            *_cloud_workspace_excluded_prefixes(target, tree_source),
         )
         copied_files += _copy_stage_tree(
             StageTreeCopyRequest(
@@ -126,11 +129,7 @@ def stage_cloud_hosted(
                 selected_paths=selected_unit_paths,
                 selected_skill_paths=selected_skill_paths,
                 selected_plugin_paths=selected_plugin_paths,
-                workspace_allowlist=(
-                    workspace_allowlist
-                    if tree_source.source_key == _OPENCLAW_WORKSPACE_SOURCE_KEY
-                    else None
-                ),
+                workspace_allowlist=_cloud_workspace_allowlist(target, tree_source, workspace_allowlist),
                 apply_selection_filters=not getattr(tree_source, "scan_only", False),
                 skip_high_risk_files=not getattr(tree_source, "scan_only", False),
                 target=target,
@@ -145,7 +144,6 @@ def stage_cloud_hosted(
             display_prefix = str(tree_source.display_prefix).strip().rstrip("/")
             if display_prefix:
                 scan_only_prefixes.append(display_prefix)
-                scan_only_source_map[display_prefix] = str(source_root)
         if _should_report_public_stage_source(source_value=source_value):
             sources[source_key] = source_value
 
@@ -182,7 +180,6 @@ def stage_cloud_hosted(
             normalized_relpath = target_relpath.rstrip("/")
             if normalized_relpath:
                 scan_only_prefixes.append(normalized_relpath)
-                scan_only_source_map[normalized_relpath] = str(source_file)
                 excluded_relpath = _scan_only_excluded_credential_relpath(normalized_relpath, target=target)
                 if excluded_relpath:
                     explicit_excluded_credential_files.add(excluded_relpath)
@@ -280,10 +277,6 @@ def stage_cloud_hosted(
     stage_manifest_path = write_stage_manifest(
         staging_root,
         scan_only_prefixes=tuple(dict.fromkeys(scan_only_prefixes)),
-        scan_only_source_map=scan_only_source_map,
-        staging_digest=compute_staging_digest(staging_root),
-        scan_only_digest=compute_scan_only_digest(staging_root),
-        generated_at=datetime.now(timezone.utc).isoformat(),
         excluded_credential_files=tuple(manifest_excluded_credential_files),
     )
 

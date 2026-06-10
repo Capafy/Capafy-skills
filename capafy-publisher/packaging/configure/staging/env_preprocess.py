@@ -4,8 +4,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
-from packaging._shared.common.process_env import collect_publish_process_env
-from packaging.configure.dotenv import iter_dotenv_assignments, remove_dotenv_keys_text
+from packaging._shared.common.fs import iter_workspace_files
+from packaging._shared.config_files.dotenv import iter_dotenv_assignments, remove_dotenv_keys_text
+from packaging.configure.env_var.process_env import collect_publish_process_env
+from packaging.configure.env_var.names import PROCESS_ENV_PROXY_NAMES
 from packaging.configure.env_values import usable_env_value
 
 
@@ -157,23 +159,76 @@ def _target_names(env_id: str) -> frozenset[str]:
     return frozenset(names)
 
 
+def _plugin_match_names(plugin) -> frozenset[str]:
+    names = {str(getattr(plugin, "runtime_id", "") or "").strip()}
+    descriptors = getattr(plugin, "descriptors", None)
+    if callable(descriptors):
+        for descriptor in descriptors():
+            for value in (
+                descriptor.target_id,
+                descriptor.canonical_name,
+                descriptor.profile_env_id,
+                descriptor.runtime_generation,
+            ):
+                name = str(value or "").strip()
+                if name:
+                    names.add(name)
+    return frozenset(name for name in names if name)
+
+
 def preprocess_runtime_env_sources(
     staging_root: Path,
     *,
     env_id: str,
     env_context: RuntimeEnvContext,
 ) -> frozenset[str]:
+    prune_proxy_env_sources(staging_root)
+
     names = _target_names(env_id)
     consumed: set[str] = set()
 
-    if "openclaw" in names:
-        from packaging.configure.runtimes.openclaw.provider_rewrite import resolve_openclaw_staged_env_templates
+    from packaging.runtimes.plugins import list_runtime_plugins
 
-        consumed.update(resolve_openclaw_staged_env_templates(staging_root, env_context=env_context))
-
-    if "claude_code" in names:
-        from packaging.configure.runtimes.claude_code.settings_json import preprocess_settings_model_env
-
-        consumed.update(preprocess_settings_model_env(staging_root, env_context=env_context))
+    for plugin in list_runtime_plugins():
+        if plugin.env_preprocess_hook is None:
+            continue
+        if not (_plugin_match_names(plugin) & names):
+            continue
+        consumed.update(plugin.env_preprocess_hook(staging_root, env_context=env_context))
 
     return frozenset(consumed)
+
+
+def prune_proxy_env_sources(staging_root: Path) -> int:
+    return _prune_dotenv_proxy_env(staging_root)
+
+
+def _prune_dotenv_proxy_env(staging_root: Path) -> int:
+    rewrites = 0
+    root = Path(staging_root)
+    for path in iter_workspace_files(root, skip_system=True):
+        if path.name != ".env" or not _is_packaged_staging_path(root, path):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        updated_text, changed = remove_dotenv_keys_text(text, PROCESS_ENV_PROXY_NAMES)
+        if not changed:
+            continue
+        path.write_text(updated_text, encoding="utf-8")
+        rewrites += 1
+    return rewrites
+
+
+def _is_packaged_staging_path(staging_root: Path, path: Path) -> bool:
+    try:
+        relpath = path.relative_to(staging_root).as_posix()
+    except ValueError:
+        return False
+    return not (
+        relpath == "_scan_only"
+        or relpath.startswith("_scan_only/")
+        or relpath == ".temp"
+        or relpath.startswith(".temp/")
+    )

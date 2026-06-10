@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Callable
 from typing import Optional
 
 from pathlib import PurePosixPath
@@ -47,17 +48,8 @@ _NON_CREDENTIAL_EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".log"}
 
 CREDENTIAL_EXCLUDED_SUFFIXES = STAGE_EXCLUDED_SUFFIXES - _NON_CREDENTIAL_EXCLUDED_SUFFIXES
 
-_SCAN_EXCLUDED_FILE_EXTENSION_CANDIDATES = {
-    ".jks",
-    ".key",
-    ".keystore",
-    ".p12",
-    ".pem",
-    ".pfx",
-}
-_SCAN_EXCLUDED_FILE_EXTENSIONS = tuple(
-    sorted(STAGE_EXCLUDED_SUFFIXES & _SCAN_EXCLUDED_FILE_EXTENSION_CANDIDATES)
-)
+_SCAN_EXCLUDED_FILE_EXTENSIONS = tuple(sorted(CREDENTIAL_EXCLUDED_SUFFIXES))
+_CERT_OR_KEYSTORE_SUFFIXES = (".jks", ".keystore", ".p12", ".pem", ".pfx")
 
 _COMMON_CREDENTIAL_FILE_BASENAMES: set[str] = set()
 
@@ -114,6 +106,20 @@ SOURCE_CODE_SUFFIXES = {
 }
 
 
+def make_skip_scan_predicate(*suffixes: str) -> Callable[[str], bool]:
+    normalized_suffixes = tuple(
+        str(suffix or "").replace("\\", "/").lower()
+        for suffix in suffixes
+        if str(suffix or "").strip()
+    )
+
+    def check(relpath: str) -> bool:
+        normalized = str(relpath or "").replace("\\", "/").lower()
+        return any(normalized.endswith(suffix) for suffix in normalized_suffixes)
+
+    return check
+
+
 def looks_like_high_risk_file(relpath: str) -> Optional[str]:
     pure = PurePosixPath(relpath)
     basename = pure.name
@@ -145,9 +151,11 @@ def exclude_reason_code_for_path(relpath: str, *, reason: str = "") -> Optional[
         return "private_key"
 
     if basename.endswith(_SCAN_EXCLUDED_FILE_EXTENSIONS):
-        if basename.endswith(".key"):
+        if basename.endswith((".key", ".ppk")):
             return "private_key"
-        return "cert"
+        if basename.endswith(_CERT_OR_KEYSTORE_SUFFIXES):
+            return "cert"
+        return "known_credential_file"
 
     if basename in _SCAN_EXCLUDED_FILE_BASENAMES:
         return "known_credential_file"
@@ -175,6 +183,7 @@ __all__ = [
     "exclude_reason_code_for_path",
     "EXCLUDE_FILE_SUFFIXES",
     "looks_like_high_risk_file",
+    "make_skip_scan_predicate",
     "PRIVATE_KEY_FILE_BASENAMES",
     "SOURCE_CODE_SUFFIXES",
     "SPECIAL_SCAN_PATH_SUFFIXES",

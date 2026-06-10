@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.openclaw.official_providers import (
+from packaging.configure.runtimes.openclaw.official_providers import (
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
     find_openclaw_official_provider_by_marker,
 )
 from packaging.configure.env_values import usable_env_value
+from packaging.configure.runtimes.openclaw.provider_usage import get_openclaw_providers as _get_providers
 
 
 def ensure_auth_profile_providers(config: dict[str, Any], auth_keys: dict[str, list[str]]) -> bool:
@@ -68,14 +69,6 @@ def ensure_auth_profile_providers(config: dict[str, Any], auth_keys: dict[str, l
                 changed = True
             continue
     return changed
-
-
-def _get_providers(config: dict[str, Any]) -> dict[str, Any]:
-    models = config.get("models")
-    if not isinstance(models, dict):
-        return {}
-    providers = models.get("providers")
-    return providers if isinstance(providers, dict) else {}
 
 
 def _match_existing_provider_name(provider_name: str, providers: dict[str, Any]) -> str:

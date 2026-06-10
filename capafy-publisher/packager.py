@@ -8,10 +8,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from packaging._shared.common.cli import emit_json_result, fail
+from packaging._shared.common.cli import fail
 from packaging.init.publish_init import publish_init
 from packaging.configure.publish_configure import publish_configure
 from packaging.ship.publish_ship import publish_ship
+from packaging.ship.remote_status import publish_list, publish_remote_status
+from packaging.ship.review_url import publish_refresh_url
 from packaging.ship.status import publish_status
 from capafy_platform.login_commands import (
     command_platform_login_init,
@@ -41,6 +43,9 @@ def _build_parser() -> argparse.ArgumentParser:
     publish_init_parser.add_argument("--runtime-dir", required=True)
     publish_init_parser.add_argument("--skill-dir")
     publish_init_parser.add_argument("--agent-id")
+    publish_init_parser.add_argument("--brief", action="store_true")
+    publish_init_parser.add_argument("--title")
+    publish_init_parser.add_argument("--description")
     selections_group = publish_init_parser.add_mutually_exclusive_group()
     selections_group.add_argument("--selections")
     selections_group.add_argument("--selections-file")
@@ -54,6 +59,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     ship_parser = subparsers.add_parser("publish-ship")
     ship_parser.add_argument("--agent-id", required=True)
+
+    remote_status_parser = subparsers.add_parser("publish-remote-status")
+    remote_status_parser.add_argument("--agent-id", required=True)
+
+    refresh_url_parser = subparsers.add_parser("publish-refresh-url")
+    refresh_url_parser.add_argument("--agent-id", required=True)
+    refresh_url_parser.add_argument("--step", choices=("init", "configure", "ship"))
+
+    subparsers.add_parser("publish-list")
 
     subparsers.add_parser("publish-status")
 
@@ -93,6 +107,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 agent_id=args.agent_id,
                 selections_json=selections_json,
                 reset_local_state=args.reset_local_state,
+                brief=args.brief,
+                title=args.title,
+                description=args.description,
             )
         if args.command == "publish-configure":
             return publish_configure(
@@ -103,10 +120,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
         if args.command == "publish-ship":
             return publish_ship(agent_id=args.agent_id)
+        if args.command == "publish-remote-status":
+            return publish_remote_status(agent_id=args.agent_id)
+        if args.command == "publish-refresh-url":
+            return publish_refresh_url(agent_id=args.agent_id, step=args.step)
+        if args.command == "publish-list":
+            return publish_list()
         if args.command == "publish-status":
             return publish_status()
     except Exception as exc:  # pragma: no cover - CLI safety
-        return emit_json_result({"status": "error", "error": str(exc)}, 1)
+        return fail(str(exc))
 
     return fail(f"Unknown command: {args.command}")
 

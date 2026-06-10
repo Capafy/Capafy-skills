@@ -1,10 +1,12 @@
 from __future__ import annotations
 from typing import Optional
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from packaging._shared.contracts.path_shapes import rootless_skill_path
 from packaging._shared.contracts.selection_groups import build_selected_selection_groups
+from packaging._shared.contracts.selectable import normalize_text
+from packaging._shared.common.constants import SKILL_CONFIG_PATH
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
 from .selection_candidates import DiscoveryUnit, candidate_context_input, candidate_selection_groups
@@ -13,11 +15,25 @@ from .runtime_units import discover_units
 
 
 CANDIDATE_REASON_LIMIT = 3
+CANDIDATE_GROUP_KEYS = ("skills", "plugins", "crons")
+DEFAULT_UNIT_PURPOSES = {
+    "Workflow execution unit",
+    "Workflow plugin extension",
+    "Workflow scheduled task",
+}
+BRIEF_ITEM_KEYS = (
+    "path",
+    "name",
+    "description",
+    "unit_type",
+    "suggested",
+    "reasons",
+)
 
 
 def _candidate_reasons(entry: DiscoveryUnit) -> list[str]:
     reasons: list[str] = []
-    for key in ("reasons", "structural_reasons", "suspicious_reasons"):
+    for key in ("reasons", "suspicious_reasons"):
         raw = entry.get(key, [])
         if not isinstance(raw, list):
             continue
@@ -41,6 +57,204 @@ def _candidate_payload(entry: DiscoveryUnit) -> DiscoveryUnit:
 def _normalize_discovery_path(value: object) -> str:
     normalized = PurePosixPath(str(value or "").strip().rstrip("/")).as_posix()
     return "" if normalized == "." else normalized
+
+
+def _path_is_nested_under(parent: str, child: str) -> bool:
+    normalized_parent = _normalize_discovery_path(parent)
+    normalized_child = _normalize_discovery_path(child)
+    return bool(
+        normalized_parent
+        and normalized_child
+        and normalized_child != normalized_parent
+        and normalized_child.startswith(f"{normalized_parent}/")
+    )
+
+
+def _is_self_publisher_candidate(entry: DiscoveryUnit) -> bool:
+    name = normalize_text(entry.get("name")).lower()
+    path = _normalize_discovery_path(entry.get("path")).lower()
+    source_path = str(entry.get("source_path") or entry.get("source_root") or "").strip()
+    if source_path:
+        try:
+            if Path(source_path).expanduser().resolve(strict=False) == SKILL_CONFIG_PATH.parent:
+                return True
+        except OSError:
+            pass
+    if name == "capafy-publisher" or PurePosixPath(path).name.lower() == "capafy-publisher":
+        return True
+    return False
+
+
+def _is_plugin_skill_path(path: str) -> bool:
+    return "/plugins/" in f"/{_normalize_discovery_path(path)}/"
+
+
+def _suppress_nested_skill_copies(candidates: list[DiscoveryUnit]) -> list[DiscoveryUnit]:
+    parent_paths = {
+        _normalize_discovery_path(item.get("path"))
+        for item in candidates
+        if str(item.get("unit_type", "")) == "skill" and _normalize_discovery_path(item.get("path"))
+    }
+    if not parent_paths:
+        return candidates
+    filtered: list[DiscoveryUnit] = []
+    for item in candidates:
+        if str(item.get("unit_type", "")) != "skill":
+            filtered.append(item)
+            continue
+        path = _normalize_discovery_path(item.get("path"))
+        if _is_plugin_skill_path(path):
+            filtered.append(item)
+            continue
+        if any(_path_is_nested_under(parent, path) for parent in parent_paths):
+            continue
+        filtered.append(item)
+    return filtered
+
+
+def _candidate_search_text(item: dict) -> str:
+    return " ".join(
+        normalize_text(item.get(key)).lower()
+        for key in ("name", "description", "synopsis", "path")
+        if normalize_text(item.get(key))
+    )
+
+
+def _query_tokens(*values: Optional[str]) -> set[str]:
+    tokens: set[str] = set()
+    for value in values:
+        text = normalize_text(value).lower()
+        token = ""
+        for char in text:
+            if char.isalnum():
+                token += char
+            elif token:
+                if len(token) >= 3:
+                    tokens.add(token)
+                token = ""
+        if token and len(token) >= 3:
+            tokens.add(token)
+    return tokens
+
+
+def _candidate_match_score(item: dict, query_tokens: set[str]) -> int:
+    if not query_tokens:
+        return 0
+    search_text = _candidate_search_text(item)
+    score = 0
+    for token in query_tokens:
+        if token in search_text:
+            score += 1
+    return score
+
+
+def _rank_and_mark_suggestion(groups: dict, *, title: Optional[str], description: Optional[str]) -> dict:
+    query_tokens = _query_tokens(title, description)
+    if not query_tokens:
+        return groups
+
+    ranked_groups = dict(groups)
+    best_score = 0
+    best_key = ""
+    for key in CANDIDATE_GROUP_KEYS:
+        items = ranked_groups.get(key)
+        if not isinstance(items, list):
+            continue
+        scored: list[tuple[int, int, dict]] = []
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            score = _candidate_match_score(item, query_tokens)
+            if score > best_score:
+                best_score = score
+                best_key = key
+            scored.append((score, index, item))
+        scored.sort(key=lambda entry: (-entry[0], entry[1]))
+        ranked_groups[key] = [item for _score, _index, item in scored]
+
+    if best_score <= 0 or not best_key:
+        return ranked_groups
+    best_item = ranked_groups[best_key][0] if ranked_groups.get(best_key) else None
+    if isinstance(best_item, dict):
+        best_item["suggested"] = True
+    return ranked_groups
+
+
+def _brief_item(item: dict) -> dict:
+    return {
+        key: item[key]
+        for key in BRIEF_ITEM_KEYS
+        if key in item and item[key] not in ("", [], None)
+    }
+
+
+def _brief_groups(groups: dict) -> dict:
+    payload = dict(groups)
+    for key in CANDIDATE_GROUP_KEYS:
+        items = payload.get(key)
+        if isinstance(items, list):
+            payload[key] = [_brief_item(item) if isinstance(item, dict) else item for item in items]
+    return payload
+
+
+def _format_candidate_groups(
+    groups: dict,
+    *,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+) -> dict:
+    formatted = dict(groups)
+    for key in CANDIDATE_GROUP_KEYS:
+        items = formatted.get(key)
+        if not isinstance(items, list):
+            continue
+        formatted_items = []
+        for item in items:
+            if not isinstance(item, dict):
+                formatted_items.append(item)
+                continue
+            payload = dict(item)
+            payload.pop("suggested", None)
+            if normalize_text(payload.get("purpose")) in DEFAULT_UNIT_PURPOSES:
+                payload.pop("purpose", None)
+            formatted_items.append(payload)
+        formatted[key] = formatted_items
+    formatted = _rank_and_mark_suggestion(formatted, title=title, description=description)
+    if brief:
+        formatted = _brief_groups(formatted)
+    return formatted
+
+
+def _candidate_groups_for_output(
+    candidates: list[DiscoveryUnit],
+    *,
+    target=None,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+) -> dict:
+    return _format_candidate_groups(
+        candidate_selection_groups(candidates, target=target),
+        brief=brief,
+        title=title,
+        description=description,
+    )
+
+
+def format_discovery_payload(
+    discovery_payload: dict,
+    *,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+) -> dict:
+    return _format_candidate_groups(
+        discovery_payload,
+        brief=brief,
+        title=title,
+        description=description,
+    )
 
 
 def _skill_root_prefix(path: object) -> str:
@@ -117,6 +331,8 @@ def _candidate_units(discovered_units: list[DiscoveryUnit], *, target=None) -> l
     for index, entry in enumerate(discovered_units):
         if str(entry.get("unit_type", "")) == "skill" and not bool(entry.get("has_primary_doc")):
             continue
+        if _is_self_publisher_candidate(entry):
+            continue
         payload = _candidate_payload(entry)
         dedup_key = _skill_dedupe_key(payload)
         if not dedup_key:
@@ -130,7 +346,7 @@ def _candidate_units(discovered_units: list[DiscoveryUnit], *, target=None) -> l
 
     ordered_candidates.extend((index, payload) for _preference, index, payload in skill_winners.values())
     ordered_candidates.sort(key=lambda item: item[0])
-    return [payload for _index, payload in ordered_candidates]
+    return _suppress_nested_skill_copies([payload for _index, payload in ordered_candidates])
 
 
 def _target_stage_plan(target, runtime_dir: str):
@@ -175,6 +391,9 @@ def resolve_skills_for_target(
     *,
     target_name: Optional[str] = None,
     runtime_dir: str,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> dict:
     from packaging.runtimes import get_default_target, get_target
 
@@ -189,13 +408,17 @@ def resolve_skills_for_target(
         raise ValueError(str(exc)) from exc
 
     discovered_units, _suspicious_units = discover_units(stage_plan, target=target)
-    return candidate_selection_groups(
+    return _candidate_groups_for_output(
         _candidate_units(discovered_units, target=target),
         target=target,
+        brief=brief,
+        title=title,
+        description=description,
     )
 
 
 __all__ = [
     "discover_context_selection_groups_for_target",
+    "format_discovery_payload",
     "resolve_skills_for_target",
 ]

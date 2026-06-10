@@ -13,7 +13,6 @@ from packaging.configure.sensitive.keywords import (
     contains_explicit_value_keyword,
     contains_login_identifier_keyword,
     is_database_setting_key,
-    is_password_secret_key,
     normalize_key_name,
 )
 
@@ -266,7 +265,7 @@ def extract_assignment_value(key: str, value: str) -> Optional[str]:
         secret_value = extract_secret_value(key, stripped)
         if secret_value and (
             looks_like_secret_literal(secret_value)
-            or (is_password_secret_key(key) and looks_like_password_literal(secret_value))
+            or looks_like_password_literal(secret_value)
             or (normalize_key_name(key).endswith("apikeys") and _looks_like_secret_list_literal(secret_value))
         ):
             return secret_value

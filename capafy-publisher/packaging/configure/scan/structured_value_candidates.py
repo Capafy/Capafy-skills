@@ -5,12 +5,10 @@ import re
 from pathlib import PurePosixPath
 
 from packaging._shared.common.constants import STRUCTURED_ASSIGNMENT_PATTERNS
-from packaging._shared.common.json_walk import iter_json_string_leaves
-from packaging._shared.common.toml_loader import tomllib
-from packaging._shared.common.url_values import find_domains
+from packaging._shared.config_files.json_io import iter_json_string_leaves
+from packaging._shared.config_files.toml_loader import tomllib
 from packaging.configure.sensitive.keywords import (
     contains_explicit_secret_keyword,
-    key_tokens,
     normalize_key_name,
 )
 from packaging.configure.sensitive.literals import (
@@ -20,7 +18,7 @@ from packaging.configure.sensitive.literals import (
     looks_like_secret_literal,
     looks_like_url_or_dsn,
 )
-from packaging.configure.scan.secret_context import CONTEXTUAL_KEY_SECRET_MARKERS
+from packaging.configure.scan.secret_context import is_contextual_secret_key as _is_contextual_secret_key
 
 from .candidate_annotation import annotate_candidate
 from .structured_scan_policy import (
@@ -28,19 +26,35 @@ from .structured_scan_policy import (
     infer_assignment_service,
     should_scan_structured_values,
 )
-from .support import pick_domain
+from .support import extract_local_url as _extract_local_url
 
 
 JSON_STRUCTURED_SCAN_SUFFIXES = {".json", ".jsonc"}
 TOML_STRUCTURED_SCAN_SUFFIXES = {".toml"}
 YAML_STRUCTURED_SCAN_SUFFIXES = {".yaml", ".yml"}
 ENV_NAME_LITERAL_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,127}$")
+ENV_MAPPING_PARENT_KEYS = {
+    "env",
+    "envvars",
+    "environment",
+    "environmentvariables",
+    "environmentvars",
+    "vars",
+    "variables",
+}
 
 
-def _extract_local_url(text: str, start: int, end: int, service: str, default_url: str) -> str:
-    context = text[max(0, start - 800) : min(len(text), end + 800)]
-    domains = find_domains(context)
-    return pick_domain(domains, service, default_url)
+def _is_env_mapping_leaf(path_parts: list[str], key: str) -> bool:
+    if len(path_parts) < 2 or not ENV_NAME_LITERAL_PATTERN.fullmatch(key):
+        return False
+    parent_key = normalize_key_name(path_parts[-2])
+    return parent_key in ENV_MAPPING_PARENT_KEYS
+
+
+def _logical_field_name(path_parts: list[str], key: str) -> str:
+    if len(path_parts) <= 1 or _is_env_mapping_leaf(path_parts, key):
+        return key
+    return ".".join(path_parts)
 
 
 def _service_from_json_path(relpath: str, path_parts: list[str], key: str, value: str) -> str:
@@ -51,18 +65,6 @@ def _service_from_json_path(relpath: str, path_parts: list[str], key: str, value
         if cleaned not in {"env", "config", "settings", "options", "credentials", "secrets", "vars", "variables"}:
             return part
     return infer_assignment_service(relpath, key, value)
-
-
-def _is_contextual_secret_key(path_parts: list[str], key: str) -> bool:
-    if "key" not in set(key_tokens(key)) and normalize_key_name(key) != "key":
-        return False
-    context_tokens = {
-        normalize_key_name(part)
-        for part in [*path_parts[:-1], *key_tokens(key)]
-        if part and not str(part).startswith("[")
-    }
-    return bool(context_tokens & CONTEXTUAL_KEY_SECRET_MARKERS)
-
 
 def _collect_leaf_value_candidates(payload: object, relpath: str, text: str) -> list[dict]:
     if not isinstance(payload, (dict, list)):
@@ -85,19 +87,23 @@ def _collect_leaf_value_candidates(payload: object, relpath: str, text: str) -> 
         local_url = metadata_url
         if entry_type == "api_key":
             local_url = _extract_local_url(text, 0, len(text), service, "unknown")
+        field = _logical_field_name(path_parts, key)
+        candidate_payload = {
+            "entry_type": entry_type,
+            "field": field,
+            "value_type": value_type,
+            "value": extracted_value,
+            "service": service,
+            "default_url": metadata_url,
+            "local_url": local_url,
+            "source": relpath,
+            "source_detail": ".".join(path_parts),
+            "env_name": key if ENV_NAME_LITERAL_PATTERN.fullmatch(key) else None,
+        }
+        if field != key:
+            candidate_payload["_field_aliases"] = [key]
         candidate = annotate_candidate(
-            {
-                "entry_type": entry_type,
-                "field": key,
-                "value_type": value_type,
-                "value": extracted_value,
-                "service": service,
-                "default_url": metadata_url,
-                "local_url": local_url,
-                "source": relpath,
-                "source_detail": ".".join(path_parts),
-                "env_name": key if ENV_NAME_LITERAL_PATTERN.fullmatch(key) else None,
-            },
+            candidate_payload,
             relpath,
         )
         if candidate is not None:

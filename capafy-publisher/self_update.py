@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import shutil
@@ -70,14 +71,33 @@ def _is_protected(rel_path: Path) -> bool:
 
 def _version_tuple(version_str: str) -> tuple[int, ...]:
 
+    normalized = str(version_str or "").strip().lstrip("vV")
+    main, _, _build = normalized.partition("+")
+    release, _, prerelease = main.partition("-")
     parts: list[int] = []
-    for segment in version_str.lstrip("vV").split("."):
-        numeric = segment.split("-")[0]
-        try:
-            parts.append(int(numeric))
-        except ValueError:
+    for segment in release.split("."):
+        match = re.match(r"\d+", segment)
+        if not match:
             break
-    return tuple(parts)
+        parts.append(int(match.group(0)))
+    while len(parts) < 3:
+        parts.append(0)
+
+    if not prerelease:
+        return tuple([*parts, 0, 0])
+
+    tag_match = re.match(r"[A-Za-z]+", prerelease)
+    tag = tag_match.group(0).lower() if tag_match else ""
+    prerelease_rank = {
+        "alpha": -3,
+        "a": -3,
+        "beta": -2,
+        "b": -2,
+        "rc": -1,
+    }.get(tag, -4)
+    number_match = re.search(r"\d+", prerelease)
+    prerelease_number = int(number_match.group(0)) if number_match else 0
+    return tuple([*parts, prerelease_rank, prerelease_number])
 
 
 def _detect_skill_dir() -> Path:
@@ -113,6 +133,7 @@ def _exclusive_lock(skill_dir: Path):
         if os.name == "nt":
             import msvcrt
             try:
+                fp.seek(0)
                 msvcrt.locking(fp.fileno(), msvcrt.LK_NBLCK, 1)
                 acquired = True
             except OSError as exc:

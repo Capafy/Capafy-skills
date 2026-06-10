@@ -136,6 +136,25 @@ _SECRET_NORMALIZED_EXACT = {
     "creds",
     *_PASSWORD_SECRET_NORMALIZED_EXACT,
 }
+_SECRET_NORMALIZED_SUBSTRINGS = (
+    "apikey",
+    "apitoken",
+    "accesstoken",
+    "authtoken",
+    "bottoken",
+    "githubtoken",
+    "gitlabtoken",
+    "sessiontoken",
+    "secretkey",
+    "clientsecret",
+    "appsecret",
+    "sessionsecret",
+    "cookiesecret",
+    "jwtsecret",
+    "signingsecret",
+    "webhooksecret",
+    "privatekey",
+)
 
 
 _SECRET_TOKEN_RULES: list[tuple[frozenset[str], Optional[frozenset[str]]]] = [
@@ -179,6 +198,8 @@ def contains_explicit_secret_keyword(key: str) -> bool:
     token_set = set(key_tokens(key))
     normalized = normalize_key_name(key)
     if normalized in _SECRET_NORMALIZED_EXACT or is_password_secret_key(key):
+        return True
+    if any(part in normalized for part in _SECRET_NORMALIZED_SUBSTRINGS):
         return True
     for required, optional_any in _SECRET_TOKEN_RULES:
         if required <= token_set and (optional_any is None or token_set & optional_any):

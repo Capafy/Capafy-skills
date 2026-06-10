@@ -32,11 +32,7 @@ class DiscoveryUnit(TypedDict, total=False):
     discovery_root: str
     unit_type: str
     has_primary_doc: bool
-    has_skill_md: bool
-    file_count: int
-    size_bytes: int
     suspicious_reasons: list[str]
-    structural_reasons: list[str]
     source_kind: str
     origin: str
     origin_ref: str

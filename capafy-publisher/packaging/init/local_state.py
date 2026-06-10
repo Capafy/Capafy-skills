@@ -11,7 +11,11 @@ from packaging._shared.contracts.publish_work_state import (
     classify_publish_work_state_cleanup_error,
     write_publish_work_state_manifest,
 )
-from packaging.init.explicit_skill import explicit_skill_for_manifest
+from packaging._shared.selection.explicit_skill import explicit_skill_for_manifest
+
+
+CONFIRMED_SELECTIONS_FILENAME = "confirmed-selections.json"
+LAST_GOOD_SELECTIONS_FILENAME = "last-good-selections.json"
 
 
 def _cleanup_publish_work_state_path(
@@ -44,6 +48,11 @@ def cleanup_previous_publish_work_state(work_dir: Path = DEVELOPER_WORK_DIR_PATH
     preserved: list[str] = []
     if not work_dir.exists():
         return {"work_dir": str(work_dir), "removed": removed, "preserved": preserved}
+
+    confirmed = work_dir / CONFIRMED_SELECTIONS_FILENAME
+    last_good = work_dir / LAST_GOOD_SELECTIONS_FILENAME
+    if confirmed.is_file():
+        shutil.copy2(confirmed, last_good)
 
     for item in sorted(work_dir.iterdir(), key=lambda path: path.name):
         _cleanup_publish_work_state_path(

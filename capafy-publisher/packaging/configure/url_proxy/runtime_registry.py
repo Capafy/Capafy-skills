@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Any, Optional
+from typing import Optional
 
 
 def _build_builtin_runtimes() -> tuple[object, ...]:
-    from packaging.configure.runtimes.claude_code.url_proxy import ClaudeCodeRuntime
-    from packaging.configure.runtimes.codex.url_proxy import CodexRuntime
-    from packaging.configure.runtimes.openclaw import OpenClawRuntime
+    from packaging.runtimes.plugins import list_runtime_plugins
 
-    return (
-        CodexRuntime(),
-        ClaudeCodeRuntime(),
-        OpenClawRuntime(),
-    )
+    runtimes = []
+    for plugin in list_runtime_plugins():
+        if plugin.url_proxy_runtime_factory is not None:
+            runtimes.append(plugin.url_proxy_runtime_factory())
+    return tuple(runtimes)
 
 
 class _LazyBuiltinRuntimes(Sequence):
@@ -37,21 +35,6 @@ class _LazyBuiltinRuntimes(Sequence):
 
 BUILTIN_RUNTIMES = _LazyBuiltinRuntimes()
 
-
-def __getattr__(name: str) -> Any:
-    if name == "CodexRuntime":
-        from packaging.configure.runtimes.codex.url_proxy import CodexRuntime
-
-        return CodexRuntime
-    if name == "ClaudeCodeRuntime":
-        from packaging.configure.runtimes.claude_code.url_proxy import ClaudeCodeRuntime
-
-        return ClaudeCodeRuntime
-    if name == "OpenClawRuntime":
-        from packaging.configure.runtimes.openclaw import OpenClawRuntime
-
-        return OpenClawRuntime
-    raise AttributeError(name)
 
 __all__ = [
     "BUILTIN_RUNTIMES",

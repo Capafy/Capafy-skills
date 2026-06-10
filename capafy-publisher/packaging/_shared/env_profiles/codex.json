@@ -1,9 +1,26 @@
 {
-  "env_id": "codex",
-  "display_name": "Codex",
-  "target_registration": {
-    "runtime_generation": "codex_standalone"
+  "platform_contract": {
+    "config_files": [
+      ".codex/config.toml",
+      ".codex/.env",
+      "_scan_only/.codex/config.toml"
+    ],
+    "env_vars": {
+      "OPENAI_API_KEY": {
+        "service": "OpenAI",
+        "canonical_url": "https://api.openai.com/v1"
+      },
+      "OPENAI_BASE_URL": {
+        "service": "OpenAI",
+        "canonical_url": "https://api.openai.com/v1"
+      }
+    }
   },
+  "url_proxy_os_fallback_names": [
+    "CODEX_API_KEY",
+    "CODEX_ACCESS_TOKEN",
+    "OPENAI_BASE_URL"
+  ],
   "discovery_skill_precedence": [
     ".agents/skills",
     ".codex/skills"
@@ -28,7 +45,6 @@
       "skip_skill_runtime_outputs": true
     }
   ],
-  "asset_roots": [],
   "fixed_scan_files": [
     {
       "base": "home",
@@ -69,48 +85,6 @@
       "base": "runtime_dir",
       "path": "AGENTS.override.md",
       "display_path": "workspace/AGENTS.override.md"
-    }
-  ],
-  "fixed_stage_files": [
-    {
-      "base": "home",
-      "path": ".codex/config.toml",
-      "target_path": ".codex/config.toml",
-      "source_key": ".codex/config.toml",
-      "source_value": "copied"
-    },
-    {
-      "base": "home",
-      "path": ".codex/.env",
-      "target_path": ".codex/.env",
-      "source_key": ".codex/.env",
-      "source_value": "copied"
-    }
-  ],
-  "redact_files": [
-    {
-      "target_path": ".codex/config.toml",
-      "strategy": "toml_stage_config"
-    },
-    {
-      "target_path": ".codex/.env",
-      "strategy": "env_stage_config"
-    },
-    {
-      "target_path": ".codex/AGENTS.md",
-      "strategy": "markdown_instruction"
-    },
-    {
-      "target_path": ".codex/AGENTS.override.md",
-      "strategy": "markdown_instruction"
-    },
-    {
-      "target_path": "workspace/AGENTS.md",
-      "strategy": "markdown_instruction"
-    },
-    {
-      "target_path": "workspace/AGENTS.override.md",
-      "strategy": "markdown_instruction"
     }
   ],
   "runtime_env": {

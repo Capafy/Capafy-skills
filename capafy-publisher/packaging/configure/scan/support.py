@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
+from packaging._shared.common.url_values import find_domains
+
 
 
 SERVICE_HINTS = {
@@ -35,9 +37,15 @@ def pick_domain(domains: Iterable[str], service: str, default_url: str) -> str:
     return domain_list[0]
 
 
+def extract_local_url(text: str, start: int, end: int, service: str, default_url: str) -> str:
+    context = text[max(0, start - 800) : min(len(text), end + 800)]
+    domains = find_domains(context)
+    return pick_domain(domains, service, default_url)
+
+
 def append_candidate(candidates: list[dict], candidate: Optional[dict]) -> None:
     if candidate is not None:
         candidates.append(candidate)
 
 
-__all__ = ["append_candidate", "pick_domain"]
+__all__ = ["append_candidate", "extract_local_url", "pick_domain"]

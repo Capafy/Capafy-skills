@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 
 class SourceKind(str, Enum):
@@ -17,7 +17,7 @@ PROCESS_ENV_SOURCE = "process.env"
 
 @dataclass(frozen=True)
 class FieldLocation:
-    fmt: Literal["dotenv", "json", "toml"]
+    fmt: Literal["dotenv", "json", "toml", "yaml"]
     occurrence_index: int = 0
     line_number: int = 0
     json_pointer: str = ""
@@ -38,6 +38,13 @@ class FieldLocation:
                 return f"toml:{section}"
             if field_name:
                 return f"toml:{field_name}"
+        if self.fmt == "yaml":
+            parts = tuple(str(part or "").strip() for part in self.key_path if str(part or "").strip())
+            if parts:
+                return "yaml:" + ".".join(parts)
+            field_name = str(field or "").strip()
+            if field_name:
+                return f"yaml:{field_name}"
         return ""
 
     def occurrence_index_identity(self) -> int:
@@ -56,6 +63,10 @@ class FieldLocation:
             elif field_name and toml_path.endswith(f".{field_name}"):
                 toml_path = toml_path[: -(len(field_name) + 1)]
             return cls(fmt="toml", toml_section=toml_path)
+        if detail.startswith("yaml:"):
+            yaml_path = detail[len("yaml:") :].strip()
+            key_path = tuple(part for part in yaml_path.split(".") if part)
+            return cls(fmt="yaml", key_path=key_path)
         if detail.startswith("line "):
             try:
                 line_number = int(detail.split(" ", 1)[1].strip())
@@ -115,6 +126,7 @@ class UrlProxyPair:
     model: str = ""
     model_field: Optional[PlanField] = None
     api_format: str = ""
+    provider_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -161,11 +173,6 @@ class ReviewedScanBuildInput:
     generic_values: tuple[GenericValue, ...]
     env_vars: tuple[EnvVar, ...]
     excludes: tuple[ExcludedFile, ...]
-
-    def to_reviewed_scan(self, *, review_binding: dict[str, str]) -> dict[str, Any]:
-        from packaging.configure.reviewed_scan_builder import build_reviewed_scan_from_input
-
-        return build_reviewed_scan_from_input(self, review_binding=review_binding)
 
 __all__ = [
     "EnvVar",

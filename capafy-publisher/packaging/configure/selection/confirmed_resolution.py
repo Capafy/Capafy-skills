@@ -3,6 +3,7 @@ from typing import Optional
 
 from pathlib import Path, PurePosixPath
 
+from packaging._shared.common.home import safe_expanduser_path
 from packaging._shared.contracts.selectable import is_absolute_like_path, normalize_text
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 from packaging.configure.selection.confirmed_paths import packaged_fallback_path
@@ -14,6 +15,7 @@ ROOT_PREFIXES = (
     ".claude",
     ".codex",
     ".config",
+    ".hermes",
 )
 
 
@@ -29,7 +31,7 @@ def resolve_logical_source_path(
     if not normalized:
         raise ValueError("confirmed workspace document path must not be empty")
     if is_absolute_like_path(normalized):
-        candidate = Path(normalized).expanduser()
+        candidate = safe_expanduser_path(normalized)
         if not candidate.exists():
             raise ValueError(f"confirmed workspace document does not exist: {normalized}")
         return candidate.resolve(strict=True)
@@ -38,10 +40,10 @@ def resolve_logical_source_path(
     target = get_target(resolved_target)
     prefix_map: dict[str, Optional[Path]] = {
         "workspace": workspace_root,
-        ".agents": (Path.home() / ".agents").expanduser(),
-        ".claude": (Path.home() / ".claude").expanduser(),
-        ".codex": (Path.home() / ".codex").expanduser(),
-        ".config": (Path.home() / ".config").expanduser(),
+        ".agents": safe_expanduser_path("~/.agents"),
+        ".claude": safe_expanduser_path("~/.claude"),
+        ".codex": safe_expanduser_path("~/.codex"),
+        ".config": safe_expanduser_path("~/.config"),
     }
     prefix_map.update(
         call_optional_target_hook(

@@ -4,7 +4,7 @@ from typing import Optional
 import json
 from pathlib import Path
 
-from packaging._shared.common.json_walk import walk_json_strings
+from packaging._shared.config_files.json_io import walk_json_strings
 from packaging._shared.common.local_path_detection import LOCAL_PATH_PLACEHOLDER, looks_like_local_path
 from packaging._shared.policies.path_refs import is_packaged_runtime_ref
 from packaging.configure.sensitive.keywords import normalize_key_name

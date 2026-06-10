@@ -179,9 +179,10 @@ def clean_text_content(relative_file: str, text: str) -> tuple[str, dict]:
 
 
 def _safe_relative_file(staging_root: Path, relative_file: str) -> Path:
-    candidate = (staging_root / relative_file).resolve()
+    resolved_root = staging_root.resolve()
+    candidate = (resolved_root / relative_file).resolve()
 
-    if not is_within(candidate, staging_root):
+    if not is_within(candidate, resolved_root):
         raise ValueError("file path escapes the staging directory")
     return candidate
 

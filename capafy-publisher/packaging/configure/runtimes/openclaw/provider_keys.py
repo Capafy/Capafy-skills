@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Mapping
 
-from packaging._shared.openclaw.official_providers import OpenClawOfficialProviderSpec
+from packaging.configure.runtimes.openclaw.official_providers import OpenClawOfficialProviderSpec
 from packaging.configure.env_values import (
     env_reference_name,
     usable_env_value,

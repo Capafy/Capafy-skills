@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from packaging.configure.candidate import Candidate
+from packaging.configure.config_errors import invalid_json_config_error
 from packaging.configure.contracts import (
     SourceKind,
     UrlProxyPair,
@@ -38,9 +39,12 @@ logger = logging.getLogger(__name__)
 _CONFIG_REL = ".openclaw/openclaw.json"
 
 
+def _invalid_config_error(exc: json.JSONDecodeError) -> ValueError:
+    return invalid_json_config_error("OpenClaw config", _CONFIG_REL, exc)
+
+
 class OpenClawRuntime(RuntimeContract):
     runtime_id = "openclaw"
-    display_name = "OpenClaw"
     applicable_targets = frozenset({"openclaw"})
 
 
@@ -59,8 +63,10 @@ class OpenClawRuntime(RuntimeContract):
                 env_context=env_context,
             )
             config = json.loads(updated_text)
-        except (OSError, json.JSONDecodeError):
+        except OSError:
             return
+        except json.JSONDecodeError as exc:
+            raise _invalid_config_error(exc) from exc
         if not isinstance(config, dict):
             return
 
@@ -107,8 +113,10 @@ class OpenClawRuntime(RuntimeContract):
             return []
         try:
             config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError:
             return []
+        except json.JSONDecodeError as exc:
+            raise _invalid_config_error(exc) from exc
 
         return scan_openclaw_provider_candidates(ctx, config)
 
@@ -125,8 +133,10 @@ class OpenClawRuntime(RuntimeContract):
             return
         try:
             config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError:
             return
+        except json.JSONDecodeError as exc:
+            raise _invalid_config_error(exc) from exc
 
         changed = False
         for pair in pairs:

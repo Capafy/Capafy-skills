@@ -38,6 +38,23 @@ def list_agents_raw(*, access_token: Optional[str] = None, base_url: Optional[st
     return get_platform_json("/agent/agents", access_token=access_token, base_url=base_url, require_auth=True)
 
 
+def refresh_draft_url_raw(
+    agent_id: str,
+    *,
+    access_token: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> dict[str, Any]:
+    normalized_agent_id = str(agent_id or "").strip()
+    if not normalized_agent_id:
+        raise ValueError("agent_id must not be empty")
+    return get_platform_json(
+        f"/agent/agents/{normalized_agent_id}/editLink",
+        access_token=access_token,
+        base_url=base_url,
+        require_auth=True,
+    )
+
+
 def get_account_me_raw(*, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
     normalized_access_token = str(access_token or "").strip()
     if not normalized_access_token:
@@ -114,6 +131,7 @@ __all__ = [
     "get_account_me_raw",
     "get_latest_version_raw",
     "list_agents_raw",
+    "refresh_draft_url_raw",
     "report_package_raw",
     "review_url_warnings",
     "save_config_keys_raw",

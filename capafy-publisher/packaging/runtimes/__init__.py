@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Keep this package free of module-load imports from packaging.configure.
+# Runtime hooks should lazy-load configure-only modules inside functions.
+
 from packaging.runtimes.factory import (
     TARGETS,
     build_target_instances,
@@ -27,6 +30,7 @@ from packaging.runtimes.resolution import (
     resolve_target_name,
     resolve_target_request,
 )
+from packaging.runtimes.validation import validate_env_runtime
 
 __all__ = [
     "DEFAULT_TARGET",
@@ -50,4 +54,5 @@ __all__ = [
     "resolve_runtime_validation_target",
     "resolve_target_name",
     "resolve_target_request",
+    "validate_env_runtime",
 ]

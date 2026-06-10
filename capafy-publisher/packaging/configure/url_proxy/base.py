@@ -30,8 +30,6 @@ class RuntimeContract(ABC):
 
     runtime_id: ClassVar[str]
 
-    display_name: ClassVar[str]
-
     applicable_targets: ClassVar[Optional[frozenset[str]]] = None
 
 

@@ -11,7 +11,7 @@ from packaging._shared.reviewed_scan.io import load_reviewed_scan_path, persist_
 from packaging.configure.scan.staging_scan import scan_staging_full
 from packaging.configure.staging.selection_payload import skills_plan_from_selection_groups
 from packaging.configure.staging.pipeline import StageBuildResult, run_stage_pipeline
-from packaging.configure.cloud_hosted_pipeline import build_cloud_hosted_reviewed_scan
+from packaging.configure.cloud_hosted.pipeline import build_cloud_hosted_reviewed_scan
 from packaging.configure.contracts import DeepScanFindingsInput
 
 

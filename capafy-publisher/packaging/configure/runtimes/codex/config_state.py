@@ -4,17 +4,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from packaging._shared.common.toml_loader import safe_toml_loads, tomllib
+from packaging._shared.config_files.toml_loader import safe_toml_loads, tomllib
 from packaging._shared.common.url_values import normalize_http_url_candidate
+from packaging._shared.llm.api_formats import (
+    PLATFORM_API_FORMAT_OPENAI_COMPLETIONS,
+    PLATFORM_API_FORMAT_OPENAI_RESPONSES,
+)
 from packaging.configure.runtimes.codex.auth import CODEX_AUTH_ENV_KEY, CODEX_AUTH_PROVIDER_NAME
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
 
 CONFIG_RELPATH = ".codex/config.toml"
-DEFAULT_CODEX_API_FORMAT = "openai-responses"
-_CODEX_WIRE_API_FORMATS = {
-    "chat": "openai-completions",
-    "responses": DEFAULT_CODEX_API_FORMAT,
+DEFAULT_CODEX_API_FORMAT = PLATFORM_API_FORMAT_OPENAI_RESPONSES
+CODEX_WIRE_API_FORMATS = {
+    "chat": PLATFORM_API_FORMAT_OPENAI_COMPLETIONS,
+    "responses": PLATFORM_API_FORMAT_OPENAI_RESPONSES,
 }
 
 
@@ -38,11 +42,12 @@ class CodexConfigState:
     parse_failed: bool
     payload: dict[str, Any]
     provider: Optional[CodexProviderState]
+    parse_error: str = ""
 
 
 def api_format_for_wire_api(value: object) -> str:
     normalized = str(value or "").strip()
-    return _CODEX_WIRE_API_FORMATS.get(normalized, DEFAULT_CODEX_API_FORMAT)
+    return CODEX_WIRE_API_FORMATS.get(normalized, DEFAULT_CODEX_API_FORMAT)
 
 
 def api_format_for_codex_provider_section(section: dict[str, Any]) -> str:
@@ -56,18 +61,18 @@ def load_codex_config_state(config_path: Path) -> CodexConfigState:
         return CodexConfigState(False, False, {}, None)
     try:
         text = config_path.read_text(encoding="utf-8")
-    except OSError:
-        return CodexConfigState(True, True, {}, None)
+    except OSError as exc:
+        return CodexConfigState(True, True, {}, None, str(exc))
     return load_codex_config_state_from_text(text, exists=True)
 
 
 def load_codex_config_state_from_text(text: str, *, exists: bool = True) -> CodexConfigState:
     try:
         payload = safe_toml_loads(str(text or ""))
-    except tomllib.TOMLDecodeError:
-        return CodexConfigState(exists, True, {}, None)
+    except tomllib.TOMLDecodeError as exc:
+        return CodexConfigState(exists, True, {}, None, str(exc))
     if not isinstance(payload, dict):
-        return CodexConfigState(exists, True, {}, None)
+        return CodexConfigState(exists, True, {}, None, "root value is not a TOML table")
     return CodexConfigState(
         exists=exists,
         parse_failed=False,

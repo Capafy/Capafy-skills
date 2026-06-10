@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from packaging.configure.runtimes.claude_code.url_proxy_candidates import SETTINGS_SCAN_RELPATHS
 from packaging.configure.url_proxy.base import RuntimeContract
 
 if TYPE_CHECKING:
@@ -56,18 +55,24 @@ def runtime_context_target_id(env_id: Optional[str]) -> Optional[str]:
     return resolved_target_id if resolved_target_id in match_names else str(env_id or "").strip()
 
 
-_CLAUDE_SETTINGS_RELPATHS = frozenset(SETTINGS_SCAN_RELPATHS)
-_OPENCLAW_PROVIDER_GROUP_PREFIX = ".openclaw/openclaw.json#models.providers."
+def _plugin_owns_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
+    if not target_id:
+        return False
+    try:
+        from packaging.runtimes.plugins import get_runtime_plugin_for_target
+
+        plugin = get_runtime_plugin_for_target(target_id)
+    except ValueError:
+        return False
+    if plugin.owns_structured_pair is not None:
+        return plugin.owns_structured_pair(pair)
+    group = str(getattr(pair, "group", "") or "").strip()
+    return group.startswith(f"{plugin.runtime_id}/")
 
 
 def runtime_owned_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
-    key_source = str(getattr(pair.key, "source_relpath", "") or "").strip()
-    url_source = str(getattr(pair.url, "source_relpath", "") or "").strip()
-    if target_id == "claude_code":
-        return key_source in _CLAUDE_SETTINGS_RELPATHS or url_source in _CLAUDE_SETTINGS_RELPATHS
-    if target_id == "openclaw":
-        group = str(getattr(pair, "group", "") or "").strip()
-        return group.startswith(_OPENCLAW_PROVIDER_GROUP_PREFIX)
+    if _plugin_owns_structured_pair(pair, target_id=target_id):
+        return True
     return False
 
 

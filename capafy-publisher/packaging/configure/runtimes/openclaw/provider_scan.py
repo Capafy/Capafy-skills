@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.openclaw.official_providers import (
+from packaging.configure.runtimes.openclaw.official_providers import (
     OPENCLAW_OFFICIAL_PROVIDER_SPECS,
     OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME,
     OpenClawOfficialProviderSpec,
@@ -22,7 +22,7 @@ from packaging.configure.env_values import (
 from packaging.configure.runtimes.openclaw.provider_usage import (
     api_format_from_openclaw_provider,
     get_openclaw_providers,
-    model_id_from_openclaw_provider,
+    selected_openclaw_provider_model_id,
     selected_openclaw_provider_names,
 )
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
@@ -53,7 +53,7 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
 
         api_key = str(provider.get("apiKey", "")).strip()
         base_url = str(provider.get("baseUrl", "")).strip()
-        provider_model = model_id_from_openclaw_provider(provider)
+        provider_model = selected_openclaw_provider_model_id(config, provider_name, provider)
 
         key_candidates = _official_provider_key_candidates(
             ctx,
@@ -97,7 +97,7 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
             continue
 
         service = provider_name
-        provider_model = model_id_from_openclaw_provider(provider)
+        provider_model = selected_openclaw_provider_model_id(config, provider_name, provider)
         provider_api_format = api_format_from_openclaw_provider(provider, provider_name=provider_name)
         base_url = str(provider.get("baseUrl", "")).strip()
         normalized_url = normalize_http_url_candidate(base_url)

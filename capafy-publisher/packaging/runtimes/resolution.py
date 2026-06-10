@@ -5,17 +5,18 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from packaging._shared.runtimes.contracts import TargetDescriptor
+from packaging._shared.common.home import safe_expanduser_path
+from packaging._shared.runtimes.contracts import (
+    OPENCLAW_LEGACY_TARGET,
+    OPENCLAW_MODERN_TARGET,
+    TargetDescriptor,
+)
 from packaging._shared.runtimes.support import collect_optional_command_first_line
 from packaging._shared.runtimes.version import (
     OPENCLAW_MODERN_MIN_VERSION,
     extract_version,
     version_tuple,
 )
-
-
-OPENCLAW_LEGACY_TARGET = "openclaw_legacy_native"
-OPENCLAW_MODERN_TARGET = "openclaw_bundle_aware"
 
 
 @dataclass(frozen=True)
@@ -82,9 +83,7 @@ def _lookup_openclaw_config_version(path: Path) -> Optional[str]:
 def _resolve_openclaw_config_path(home: Optional[Path] = None) -> Path:
     if home is not None:
         return (home.expanduser() / ".openclaw" / "openclaw.json").resolve()
-    from packaging.configure.runtimes.openclaw import target as openclaw_target
-
-    return (openclaw_target.OPENCLAW_ROOT / "openclaw.json").expanduser().resolve()
+    return safe_expanduser_path("~/.openclaw/openclaw.json").resolve()
 
 
 def detect_openclaw_target_resolution(*, home: Optional[Path] = None) -> TargetResolution:

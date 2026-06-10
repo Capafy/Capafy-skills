@@ -4,11 +4,15 @@ from typing import Optional
 from collections.abc import Iterator, Mapping
 from functools import lru_cache
 
+from packaging._shared.env_profiles import load_profile
 from packaging._shared.runtimes.contracts import PackagingTarget, TargetDescriptor
-from packaging.runtimes.registry import DEFAULT_TARGET, get_profile_target_descriptor, list_target_descriptors
+from packaging.runtimes.registry import (
+    DEFAULT_TARGET,
+    get_profile_target_descriptor,
+    get_target_descriptor,
+    list_target_descriptors,
+)
 from packaging.runtimes.resolution import (
-    OPENCLAW_LEGACY_TARGET,
-    OPENCLAW_MODERN_TARGET,
     resolve_runtime_validation_target,
     resolve_target_name,
 )
@@ -17,40 +21,16 @@ from packaging.runtimes.resolution import (
 @lru_cache(maxsize=None)
 def get_profile_target(env_id: str) -> tuple[dict, PackagingTarget]:
     profile, _ = get_profile_target_descriptor(env_id)
-    if env_id == "codex":
-        from packaging.configure.runtimes.codex.target import CodexTarget
+    try:
+        from packaging.runtimes.plugins import get_runtime_plugin_for_target
 
-        return profile, CodexTarget(profile)
-    if env_id == "claude_code":
-        from packaging.configure.runtimes.claude_code.target import ClaudeCodeTarget
-
-        return profile, ClaudeCodeTarget(profile)
+        plugin = get_runtime_plugin_for_target(env_id)
+    except ValueError:
+        plugin = None
+    if plugin is not None and plugin.target_factory is not None:
+        descriptor = get_target_descriptor(env_id)
+        return profile, plugin.target_factory(descriptor, profile)
     raise ValueError(f"{env_id} does not have a concrete profile target class")
-
-
-def _build_profile_target_instance(descriptor: TargetDescriptor) -> PackagingTarget:
-    if not descriptor.profile_env_id:
-        raise ValueError(f"{descriptor.target_id} is missing profile_env_id, so {descriptor.target_id} target cannot be built")
-    _, target = get_profile_target(descriptor.profile_env_id)
-    return target
-
-
-def _build_openclaw_instance(descriptor: TargetDescriptor) -> PackagingTarget:
-    from packaging.configure.runtimes.openclaw import target as openclaw_target
-
-    if descriptor.runtime_variant == "legacy":
-        return openclaw_target.LEGACY_TARGET
-    if descriptor.runtime_variant == "modern":
-        return openclaw_target.MODERN_TARGET
-    raise ValueError(f"{descriptor.target_id} is missing openclaw runtime_variant, so the target cannot be built")
-
-
-_TARGET_BUILDERS = {
-    "codex": _build_profile_target_instance,
-    "claude_code": _build_profile_target_instance,
-    OPENCLAW_LEGACY_TARGET: _build_openclaw_instance,
-    OPENCLAW_MODERN_TARGET: _build_openclaw_instance,
-}
 
 
 def _is_dispatch_target_descriptor(descriptor: TargetDescriptor) -> bool:
@@ -62,11 +42,18 @@ def build_target_instances() -> dict[str, PackagingTarget]:
     for descriptor in list_target_descriptors().values():
         if not _is_dispatch_target_descriptor(descriptor):
             continue
+        from packaging.runtimes.plugins import get_runtime_plugin_for_target
+
         try:
-            builder = _TARGET_BUILDERS[descriptor.target_id]
-        except KeyError as exc:
+            plugin = get_runtime_plugin_for_target(descriptor.target_id)
+        except ValueError as exc:
             raise ValueError(f"{descriptor.target_id} does not have a registered target builder") from exc
-        targets[descriptor.target_id] = builder(descriptor)
+        if plugin.target_factory is None:
+            raise ValueError(f"{descriptor.target_id} does not have a registered target builder")
+        targets[descriptor.target_id] = plugin.target_factory(
+            descriptor,
+            load_profile(descriptor.profile_env_id) if descriptor.profile_env_id else {},
+        )
     return targets
 
 

@@ -3,18 +3,7 @@ from typing import Optional
 
 from packaging._shared.contracts.reviewed_scan import build_reviewed_env_var_item
 from packaging.configure.contracts import PROCESS_ENV_SOURCE
-
-
-_INFRASTRUCTURE_ENV_NAMES = frozenset(
-    {
-        "http_proxy",
-        "https_proxy",
-        "no_proxy",
-        "all_proxy",
-        "ftp_proxy",
-        "socks_proxy",
-    }
-)
+from packaging.configure.env_var.names import PROCESS_ENV_PROXY_NAME_LOOKUP
 
 
 def build_env_vars_output(
@@ -31,7 +20,7 @@ def build_env_vars_output(
     for candidate in process_env_candidates:
         env_name = candidate.get("env_name", "")
         field = str(candidate.get("field") or env_name).strip()
-        if field.lower() in _INFRASTRUCTURE_ENV_NAMES:
+        if field.lower() in PROCESS_ENV_PROXY_NAME_LOOKUP:
             continue
         if field in normalized_excluded_fields:
             continue

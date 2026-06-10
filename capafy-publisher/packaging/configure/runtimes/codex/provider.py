@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from packaging._shared.common.constants import OPENAI_OFFICIAL_URL_V1
-from packaging._shared.common.toml_loader import safe_toml_loads, tomllib
+from packaging._shared.config_files.toml_loader import safe_toml_loads, tomllib
 from packaging.configure.runtimes.toml_text import (
     KEY_VALUE_PATTERN as _TOML_ASSIGNMENT_PATTERN,
     SECTION_PATTERN as _CODEX_PROVIDER_SECTION_PATTERN,

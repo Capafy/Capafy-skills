@@ -7,7 +7,7 @@ from pathlib import Path
 from packaging._shared.common.fs import path_basename
 from packaging._shared.common.home import safe_expanduser_path
 from packaging._shared.contracts.selectable import normalize_text
-from packaging._shared.common.json_io import load_json_object
+from packaging._shared.config_files.json_io import load_json_object
 
 
 def _plugin_id_from_manifest(plugin_root: Path, payload: dict) -> str:

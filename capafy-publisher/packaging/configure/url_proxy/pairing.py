@@ -1,21 +1,43 @@
 from __future__ import annotations
+from typing import Optional
 
+from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.generic_keys.builder import build_generic_from_entry
 from packaging.configure.url_proxy.entry_converters import (
     build_url_proxy_entry as _build_url_proxy_entry,
     url_proxy_entry_to_pair,
 )
 from packaging.configure.url_proxy.group_hints import apply_url_proxy_group_hints
-from packaging.configure.url_proxy.pairing_entries import (
-    normalized_url_entry_for_pairing,
-)
-from packaging.configure.url_proxy.predicates import is_url_proxy_candidate
+
+
+def is_url_proxy_candidate(candidate: dict) -> bool:
+    if not str(candidate.get("url_proxy_group", "") or "").strip():
+        return False
+    entry_type = str(candidate.get("entry_type", "") or "").strip()
+    if entry_type == "api_key":
+        return True
+    value_type = str(candidate.get("value_type", "") or "").strip()
+    return value_type == "url"
 
 
 def _append_generic(generic: list[dict], entry: dict) -> None:
     generic_entry = build_generic_from_entry(entry)
     if generic_entry is not None:
         generic.append(generic_entry)
+
+
+def _normalized_url_entry_for_pairing(url_entry: dict) -> Optional[dict]:
+    normalized_url = normalize_http_url_candidate(str(url_entry.get("value", "")).strip())
+    if not normalized_url:
+        return None
+    normalized_entry = dict(url_entry)
+    normalized_entry["value"] = normalized_url
+    current_locator = str(normalized_entry.get("url", "")).strip()
+    if not current_locator or normalize_http_url_candidate(current_locator):
+        normalized_entry["url"] = normalize_http_url_candidate(current_locator) or normalized_url
+    else:
+        normalized_entry["url"] = normalized_url
+    return normalized_entry
 
 
 def pair_url_proxy_entries(
@@ -48,7 +70,7 @@ def pair_url_proxy_entries(
         normalized_url_entries: list[dict] = []
         extra_url_entries: list[dict] = []
         _first_url_value, first_url_entry = url_entries[0]
-        first_normalized_url_entry = normalized_url_entry_for_pairing(first_url_entry)
+        first_normalized_url_entry = _normalized_url_entry_for_pairing(first_url_entry)
         if first_normalized_url_entry is None:
             for _value, entry in [*key_entries, *url_entries]:
                 _append_generic(generic, entry)
@@ -56,7 +78,7 @@ def pair_url_proxy_entries(
         first_url_value = str(first_normalized_url_entry.get("value", "")).strip()
         normalized_url_entries.append(first_normalized_url_entry)
         for _value, url_entry in url_entries[1:]:
-            normalized_url_entry = normalized_url_entry_for_pairing(url_entry)
+            normalized_url_entry = _normalized_url_entry_for_pairing(url_entry)
             if normalized_url_entry is None:
                 extra_url_entries.append(url_entry)
                 continue

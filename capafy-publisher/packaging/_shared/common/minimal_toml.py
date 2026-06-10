@@ -12,9 +12,9 @@ class MinimalTOMLDecodeError(ValueError):
 
 _BARE_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
-_INTEGER_PATTERN = re.compile(r"^[+-]?\d+$")
+_INTEGER_PATTERN = re.compile(r"^[+-]?\d+(?:_\d+)*$")
 
-_FLOAT_PATTERN = re.compile(r"^[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][+-]?\d+)?$")
+_FLOAT_PATTERN = re.compile(r"^[+-]?(?:(?:\d+(?:_\d+)*)\.(?:\d+(?:_\d+)*)?|\.(?:\d+(?:_\d+)*))(?:[eE][+-]?\d+(?:_\d+)*)?$")
 
 
 def _strip_comment(line: str) -> str:

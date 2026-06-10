@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any, Mapping, Union
 
 from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
-from packaging._shared.common.json_io import load_json_object
+from packaging._shared.common.exclusion_rules import make_skip_scan_predicate
+from packaging._shared.config_files.json_io import load_json_object
 from packaging.configure.env_values import usable_env_value, usable_process_env_value
 from packaging.configure.sensitive.keywords import normalize_key_name
 
@@ -34,6 +35,10 @@ _CLAUDE_LOGIN_SECRET_KEYS = {
     "authtoken",
     "api",
 }
+_should_skip_login_structured_scan = make_skip_scan_predicate(
+    ".claude/.credentials.json",
+    "_scan_only/.claude/.credentials.json",
+)
 
 
 def load_claude_json(staging_root: Path) -> dict[str, Any]:
@@ -163,8 +168,7 @@ def claude_oauth_token_env_detected(process_env: Union[Mapping[str, str], Any]) 
 
 
 def should_skip_claude_login_structured_scan(relpath: str) -> bool:
-    normalized = str(relpath or "").replace("\\", "/").lower()
-    return normalized.endswith(".claude/.credentials.json") or normalized.endswith("_scan_only/.claude/.credentials.json")
+    return _should_skip_login_structured_scan(relpath)
 
 
 __all__ = [

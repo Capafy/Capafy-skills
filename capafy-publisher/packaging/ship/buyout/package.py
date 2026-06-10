@@ -8,7 +8,7 @@ from packaging.ship.artifacts.archive import build_bundle_archive
 from packaging._shared.common.fs import cleanup_staging_root
 from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME
 from packaging._shared.contracts.reviewed_scan import (
-    load_reviewed_scan_payload,
+    load_reviewed_scan_object,
     sanitize_reviewed_scan_payload,
     validate_reviewed_scan_gate,
 )
@@ -54,10 +54,8 @@ def package_buyout_staging(
     *,
     cleanup_staging: bool = False,
 ) -> dict:
-    package_payload = load_reviewed_scan_payload(package_json, label="package_json")
+    package_payload = load_reviewed_scan_object(package_json, label="package_json")
     validate_reviewed_scan_gate(package_payload, label="package_json")
-    if not isinstance(package_payload, dict):
-        raise ValueError("package_json must be an object")
     if not reviewed_scan_has_final_dispositions(package_payload):
         raise ValueError("download package requires reviewed_scan payload with final_disposition for every item")
 

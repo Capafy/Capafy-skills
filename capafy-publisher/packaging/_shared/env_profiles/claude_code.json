@@ -1,6 +1,34 @@
 {
-  "env_id": "claude_code",
-  "display_name": "Claude Code",
+  "platform_contract": {
+    "config_files": [
+      ".claude/settings.json",
+      ".claude/settings.local.json",
+      ".claude/managed-settings.json",
+      "_scan_only/.claude/.claude.json",
+      "_scan_only/.claude/settings.json",
+      "_scan_only/.claude/settings.local.json",
+      "_scan_only/.claude/managed-settings.json"
+    ],
+    "env_vars": {
+      "ANTHROPIC_API_KEY": {
+        "service": "Anthropic",
+        "canonical_url": "https://api.anthropic.com"
+      },
+      "ANTHROPIC_AUTH_TOKEN": {
+        "service": "Anthropic",
+        "canonical_url": "https://api.anthropic.com"
+      },
+      "ANTHROPIC_BASE_URL": {
+        "service": "Anthropic",
+        "canonical_url": "https://api.anthropic.com"
+      }
+    }
+  },
+  "url_proxy_os_fallback_names": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL"
+  ],
   "discovery_skill_precedence": [
     ".claude/skills"
   ],
@@ -55,55 +83,6 @@
       "base": "runtime_dir",
       "path": ".claude/CLAUDE.md",
       "display_path": "workspace/.claude/CLAUDE.md"
-    }
-  ],
-  "fixed_stage_files": [
-    {
-      "base": "home",
-      "path": ".claude/settings.json",
-      "target_path": ".claude/settings.json",
-      "source_key": ".claude/settings.json",
-      "source_value": "copied"
-    },
-    {
-      "base": "home",
-      "path": ".claude/settings.local.json",
-      "target_path": ".claude/settings.local.json",
-      "source_key": ".claude/settings.local.json",
-      "source_value": "settings_local"
-    },
-    {
-      "base": "home",
-      "path": ".claude/managed-settings.json",
-      "target_path": ".claude/managed-settings.json",
-      "source_key": ".claude/managed-settings.json",
-      "source_value": "managed_settings"
-    }
-  ],
-  "redact_files": [
-    {
-      "target_path": ".claude/settings.json",
-      "strategy": "json_stage_config"
-    },
-    {
-      "target_path": ".claude/settings.local.json",
-      "strategy": "json_stage_config"
-    },
-    {
-      "target_path": ".claude/managed-settings.json",
-      "strategy": "json_stage_config"
-    },
-    {
-      "target_path": ".claude/CLAUDE.md",
-      "strategy": "markdown_instruction"
-    },
-    {
-      "target_path": "workspace/CLAUDE.md",
-      "strategy": "markdown_instruction"
-    },
-    {
-      "target_path": "workspace/.claude/CLAUDE.md",
-      "strategy": "markdown_instruction"
     }
   ],
   "runtime_env": {

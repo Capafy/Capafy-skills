@@ -3,8 +3,7 @@ from __future__ import annotations
 from packaging.configure.contracts import UrlProxyPair
 from packaging.configure.url_proxy.entry_converters import url_proxy_entry_to_pair
 from packaging.configure.url_proxy.group_hints import UrlProxyPairingHints, apply_url_proxy_group_hints
-from packaging.configure.url_proxy.pairing import pair_url_proxy_entries
-from packaging.configure.url_proxy.predicates import is_url_proxy_candidate
+from packaging.configure.url_proxy.pairing import is_url_proxy_candidate, pair_url_proxy_entries
 
 
 def build_url_proxy_scan_groups_from_candidates(

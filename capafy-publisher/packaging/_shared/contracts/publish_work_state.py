@@ -7,10 +7,10 @@ import os
 import stat
 import uuid
 from datetime import datetime, timezone
-import errno
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from packaging._shared.common.fs import classify_cleanup_error as classify_publish_work_state_cleanup_error
 from packaging._shared.common.fs import safe_chmod
 
 
@@ -265,6 +265,8 @@ def _cleanup_temp_manifest_path(path: Path) -> None:
 
 
 PUBLISH_WORK_STATE_KEEP_RELATIVE_PATHS = {
+    Path("confirmed-selections.json"),
+    Path("last-good-selections.json"),
     Path("self-update-state.json"),
     Path(PUBLISH_WORK_STATE_MANIFEST_NAME),
 }
@@ -367,15 +369,3 @@ def _remove_tree(path: Path) -> None:
         else:
             child.unlink()
     path.rmdir()
-
-
-def classify_publish_work_state_cleanup_error(exc: OSError) -> str:
-    if isinstance(exc, PermissionError):
-        return "permission_denied"
-    if isinstance(exc, FileNotFoundError):
-        return "path_missing"
-    if isinstance(exc, FileExistsError):
-        return "path_conflict"
-    if getattr(exc, "errno", None) == errno.ENOSPC:
-        return "disk_full"
-    return "os_error"

@@ -6,10 +6,11 @@ from typing import Any, Dict, List, Set, Tuple
 
 from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME
 from packaging.configure.exclusion import project_scan_excludes
+from packaging.configure.generic_keys.builder import build_generic_from_entry
+from packaging.configure.scan.entries import build_scan_entries, build_scan_groups
 from packaging.runtimes import resolve_target_name
 
 from .file_candidates import collect_api_key_candidates
-from .bucket_postprocess import dedupe_scan_results
 
 
 ScanCollectionResult = Tuple[
@@ -139,16 +140,20 @@ def _build_scan_groups(
     value_url_hints: dict[str, str],
 ) -> dict[str, list[dict]]:
     from packaging.configure.url_proxy.group_hints import apply_url_proxy_group_hints
-    from packaging.configure.url_proxy.predicates import is_url_proxy_candidate
+    from packaging.configure.url_proxy.pairing import is_url_proxy_candidate
 
     apply_url_proxy_group_hints(all_candidates)
 
     generic_candidates = [c for c in all_candidates if not is_url_proxy_candidate(c)]
-    return dedupe_scan_results(
-        generic_candidates,
-        env_url_hints,
-        service_url_hints,
-        value_url_hints,
+    entries = build_scan_entries(generic_candidates, env_url_hints, service_url_hints, value_url_hints)
+    generic_entries = [
+        generic_entry
+        for entry in entries.values()
+        if (generic_entry := build_generic_from_entry(entry)) is not None
+    ]
+    return build_scan_groups(
+        [],
+        generic_entries,
     )
 
 

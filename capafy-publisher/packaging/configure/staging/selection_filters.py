@@ -6,7 +6,7 @@ from pathlib import PurePosixPath
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
 from packaging._shared.contracts.path_shapes import is_plugin_unit_type
-from packaging.configure.selection.unit_types import infer_selection_unit_type, owning_selectable_paths
+from packaging._shared.selection.unit_types import infer_selection_unit_type, owning_selectable_paths
 
 
 def looks_like_plugin_related_display_path(display_path: str, *, target=None) -> bool:
@@ -30,14 +30,6 @@ def _selectable_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
 
 
 def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
-    owning_paths = tuple(
-        call_optional_target_hook(
-            target,
-            "owning_plugin_paths",
-            display_path,
-            default=(),
-        )
-    )
     selectable_paths = tuple(
         call_optional_target_hook(
             target,
@@ -46,8 +38,6 @@ def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
             default=(),
         )
     )
-    if owning_paths or not selectable_paths:
-        return owning_paths
     return tuple(
         path
         for path in selectable_paths

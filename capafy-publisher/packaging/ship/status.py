@@ -27,9 +27,21 @@ def _build_publish_local_files_summary(
         "staging_exists": Path(staging_path).is_dir(),
         "bundle_exists": Path(bundle_path).is_file(),
         "reviewed_scan_exists": (work_dir / "reviewed-scan.json").is_file(),
+        "confirmed_selections_exists": (work_dir / "confirmed-selections.json").is_file(),
+        "last_good_selections_exists": (work_dir / "last-good-selections.json").is_file(),
         "existing": list(temp_state.get("existing", [])),
         "blocking": list(temp_state.get("blocking", [])),
         "preserved": list(temp_state.get("preserved", [])),
+    }
+
+
+def _local_only_status_fields(agent_id: str = "") -> dict[str, Any]:
+    normalized_agent_id = str(agent_id or "").strip()
+    command_agent_id = normalized_agent_id or "<agent_id>"
+    return {
+        "status_scope": "local_only",
+        "does_not_include_remote_review_status": True,
+        "remote_status_command": f"publish-remote-status --agent-id {command_agent_id}",
     }
 
 
@@ -43,6 +55,8 @@ def run_publish_status(
         payload = require_publish_work_state_manifest(developer_work_dir_path)
     except PublishWorkStateManifestError as exc:
         return {
+            **_local_only_status_fields(),
+            "ok": False,
             "status": "error",
             "error": str(exc),
             "failed_step": "load_publish_work_state_manifest",
@@ -62,12 +76,16 @@ def run_publish_status(
     )
     if payload is None:
         return {
+            **_local_only_status_fields(),
+            "ok": True,
             "status": "no_active_publish",
             "next_step": "run_init_to_start_new_publish",
             "local_files": local_files,
         }, 0
 
     manifest_payload = dict(payload)
+    manifest_payload.setdefault("ok", True)
+    manifest_payload.update(_local_only_status_fields(str(manifest_payload.get("agent_id", "")).strip()))
     manifest_payload["local_files"] = local_files
     return manifest_payload, 0
 

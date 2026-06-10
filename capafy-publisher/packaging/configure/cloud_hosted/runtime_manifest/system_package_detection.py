@@ -3,10 +3,8 @@ from typing import Optional
 
 import logging
 import platform
-import shutil
 from collections.abc import Callable, Mapping, Sequence
 
-from packaging._shared.common.constants import SYSTEM_PACKAGE_CANDIDATES
 from packaging.configure.cloud_hosted.runtime_manifest.system_package_collectors import (
     collect_apt_packages,
     collect_apk_packages,
@@ -17,25 +15,18 @@ from packaging.configure.cloud_hosted.runtime_manifest.system_package_collectors
     collect_scoop_packages,
     collect_winget_packages,
 )
+from packaging.configure.cloud_hosted.runtime_manifest.system_package_probe import (
+    runtime_candidates as _runtime_candidates,
+    runtime_logger,
+    runtime_which as _runtime_which,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-def _runtime_candidates(
-    candidates: Optional[Mapping[str, Sequence[str]]],
-) -> Mapping[str, Sequence[str]]:
-    return SYSTEM_PACKAGE_CANDIDATES if candidates is None else candidates
-
-
-def _runtime_which(
-    which: Optional[Callable[[str], Optional[str]]],
-) -> Callable[[str], Optional[str]]:
-    return shutil.which if which is None else which
-
-
 def _runtime_logger(log: Optional[logging.Logger]) -> logging.Logger:
-    return logger if log is None else log
+    return runtime_logger(logger, log)
 
 
 def detect_windows_system_packages(

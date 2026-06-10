@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Optional
+
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import (
     PlanField,
@@ -23,6 +26,26 @@ def _reviewed_occurrence_index(candidate: Candidate) -> int:
     return location.occurrence_index_identity()
 
 
+def usable_provider_key_candidates(candidates: list[Candidate]) -> list[Candidate]:
+    return [
+        candidate
+        for candidate in candidates
+        if str(candidate.value or "").strip()
+        or bool(candidate.extra.get("placeholder_provider"))
+        or candidate.source_kind == SourceKind.SYNTHESIZED
+    ]
+
+
+def first_candidate_extra_value(candidates: Iterable[Optional[Candidate]], field: str) -> str:
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        value = str(candidate.extra.get(field, "") or "").strip()
+        if value:
+            return value
+    return ""
+
+
 def make_pair(
     *,
     contract_id: str,
@@ -33,6 +56,7 @@ def make_pair(
     group: str = "",
     model: str = "",
     api_format: str = "",
+    provider_name: str = "",
 ) -> UrlProxyPair:
     source_for_group = key_candidate.source_relpath or url_candidate.source_relpath or ""
     resolved_group = group or source_for_group or f"<{contract_id}:{key_candidate.field}>"
@@ -45,6 +69,11 @@ def make_pair(
         api_format
         or str(key_candidate.extra.get("api_format", "") or "").strip()
         or str(url_candidate.extra.get("api_format", "") or "").strip()
+    )
+    resolved_provider_name = (
+        provider_name
+        or str(key_candidate.extra.get("provider_name", "") or "").strip()
+        or str(url_candidate.extra.get("provider_name", "") or "").strip()
     )
     key_placeholder_source = key_candidate.source_relpath or (
         "" if url_candidate.source_kind == SourceKind.SYNTHESIZED else source_for_group
@@ -92,9 +121,12 @@ def make_pair(
         is_synthesized=is_synthesized,
         model=resolved_model,
         api_format=resolved_api_format,
+        provider_name=resolved_provider_name,
     )
 
 
 __all__ = [
+    "first_candidate_extra_value",
     "make_pair",
+    "usable_provider_key_candidates",
 ]

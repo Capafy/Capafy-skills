@@ -7,14 +7,12 @@ from capafy_platform.api import (
     create_agent_version,
     get_latest_version_raw,
     report_package_raw,
-    save_config_keys_raw,
 )
 from packaging._shared.platform.agent_request import (
     build_agent_create_request,
     build_agent_version_create_request,
     build_package_report_request,
 )
-from packaging._shared.platform.config_keys_request import build_config_keys_request
 from packaging._shared.platform.response_normalize import (
     attach_platform_status,
     normalize_edit_link_response,
@@ -54,34 +52,6 @@ def create_version_from_draft(
     return attach_platform_status(response, data, workflow_status="pending_skill_confirmation")
 
 
-def save_config_keys(
-    agent_id: str,
-    agent_version_id: str,
-    reviewed_scan_payload: dict,
-    *,
-    access_token: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> dict[str, Any]:
-    normalized_agent_id = str(agent_id or "").strip()
-    if not normalized_agent_id:
-        raise ValueError("agent_id must not be empty")
-    request_body = build_config_keys_request(agent_version_id, reviewed_scan_payload)
-    data = save_config_keys_raw(
-        normalized_agent_id,
-        request_body,
-        access_token=access_token,
-        base_url=base_url,
-    )
-    response = normalize_edit_link_response(
-        "save_config_keys",
-        request_body,
-        data,
-        base_url=base_url,
-        agent_id=normalized_agent_id,
-    )
-    return attach_platform_status(response, data, workflow_status="pending_config_confirmation")
-
-
 def report_package(
     agent_id: str,
     agent_version_id: str,
@@ -115,5 +85,4 @@ __all__ = [
     "create_version_from_draft",
     "get_latest_version",
     "report_package",
-    "save_config_keys",
 ]

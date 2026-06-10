@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from packaging.configure.candidate import Candidate
+from packaging.configure.config_errors import invalid_text_config_error
 from packaging.configure.contracts import FieldLocation, SourceKind
 from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.runtimes.codex.config_state import (
@@ -15,7 +16,12 @@ from packaging.configure.url_proxy.base import ScanContext
 def scan_toml_providers(ctx: ScanContext, out_env_keys: set[str]) -> list[Candidate]:
     config_state = load_codex_config_state(ctx.staging_root / CONFIG_RELPATH)
     if config_state.exists and config_state.parse_failed:
-        return [_codex_provider_marker(provider_name="", provider_exists=False)]
+        raise invalid_text_config_error(
+            "Codex config",
+            "TOML",
+            CONFIG_RELPATH,
+            config_state.parse_error,
+        )
     state = config_state.provider
     if state is None:
         return []

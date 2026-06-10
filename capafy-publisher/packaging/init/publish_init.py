@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from packaging._shared.common.cli import build_publish_error, emit_json
+from packaging._shared.common.cli import build_publish_error, build_soft_action, emit_json
 from packaging._shared.common.constants import DEVELOPER_WORK_DIR_PATH
 from packaging._shared.contracts.publish_work_state import (
     classify_publish_work_state_cleanup_error,
@@ -11,9 +11,10 @@ from packaging._shared.contracts.publish_work_state import (
 )
 from packaging.init.env import prepare_environment
 from packaging.init.selection_discovery import (
+    format_discovery_payload,
     resolve_skills_for_target,
 )
-from packaging.init.explicit_skill import (
+from packaging._shared.selection.explicit_skill import (
     discovery_payload_from_explicit_skill,
     explicit_skill_for_manifest,
     resolve_explicit_skill,
@@ -26,6 +27,15 @@ from packaging.init.login_state import platform_login_error
 from packaging.init.submit import publish_init_submit
 
 
+def _target_for_explicit_skill(env_id: str) -> Optional[object]:
+    from packaging.runtimes import get_target
+
+    try:
+        return get_target(env_id)
+    except ValueError:
+        return None
+
+
 def _run_publish_init(
     *,
     env_id: str,
@@ -33,16 +43,21 @@ def _run_publish_init(
     skill_dir: Optional[str] = None,
     agent_id: Optional[str] = None,
     selections_json: Optional[str] = None,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     env = prepare_environment(env_id, runtime_dir=runtime_dir)
 
     resolved_env_id = env["env_id"]
     explicit_skill: Optional[dict[str, Any]] = None
     if skill_dir:
+        explicit_skill_env_id = str(env.get("resolved_target", "") or resolved_env_id)
         try:
             explicit_skill = resolve_explicit_skill(
                 skill_dir,
-                env_id=str(env.get("resolved_target", "") or resolved_env_id),
+                env_id=explicit_skill_env_id,
+                target=_target_for_explicit_skill(explicit_skill_env_id),
             )
         except ValueError as exc:
             return build_publish_error(
@@ -59,11 +74,21 @@ def _run_publish_init(
 
     if selections_json is None:
         if explicit_skill:
-            return discovery_payload_from_explicit_skill(explicit_skill), 1
+            payload = discovery_payload_from_explicit_skill(explicit_skill)
+            payload = format_discovery_payload(
+                payload,
+                brief=brief,
+                title=title,
+                description=description,
+            )
+            return _selection_discovery_soft_action(payload), 0
         return _build_selection_discovery_payload(
             resolved_env_id=resolved_env_id,
             discovery_target=str(env.get("resolved_target", "")).strip() or resolved_env_id,
             runtime_dir=str(env.get("runtime_dir", "")).strip(),
+            brief=brief,
+            title=title,
+            description=description,
         )
 
     payload, code = publish_init_submit(
@@ -89,11 +114,17 @@ def _build_selection_discovery_payload(
     resolved_env_id: str,
     discovery_target: str,
     runtime_dir: str,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     try:
         discovery_payload = resolve_skills_for_target(
             target_name=discovery_target,
             runtime_dir=runtime_dir,
+            brief=brief,
+            title=title,
+            description=description,
         )
     except ValueError as exc:
         return build_publish_error(
@@ -126,7 +157,21 @@ def _build_selection_discovery_payload(
             env_id=resolved_env_id,
         ), 1
 
-    return discovery_payload, 1
+    return _selection_discovery_soft_action(discovery_payload), 0
+
+
+def _selection_discovery_soft_action(discovery_payload: dict[str, Any]) -> dict[str, Any]:
+    return build_soft_action(
+        status="needs_selection",
+        action_type="llm_selection",
+        next_step="build_confirmed_selections_then_rerun_publish_init",
+        developer_next_steps=[
+            "Show the candidate selection groups to the creator.",
+            "Build a confirmed selections JSON object from real Phase A candidates.",
+            "Rerun publish-init with --selections-file using the same --env, --runtime-dir, and --skill-dir values.",
+        ],
+        **discovery_payload,
+    )
 
 
 def publish_init(
@@ -137,6 +182,9 @@ def publish_init(
     agent_id: Optional[str] = None,
     selections_json: Optional[str] = None,
     reset_local_state: bool = False,
+    brief: bool = False,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> int:
     login_error = platform_login_error()
     if login_error is not None:
@@ -195,6 +243,9 @@ def publish_init(
         skill_dir=skill_dir,
         agent_id=agent_id,
         selections_json=selections_json,
+        brief=brief,
+        title=title,
+        description=description,
     )
     if code == 0 and payload.get("status") == "submitted":
         write_init_completed_manifest(payload, work_dir=DEVELOPER_WORK_DIR_PATH)

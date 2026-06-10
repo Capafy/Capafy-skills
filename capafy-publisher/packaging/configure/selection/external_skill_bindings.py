@@ -10,7 +10,7 @@ from packaging._shared.contracts.stage_plan import StagePlan, StageTreeSource
 from packaging._shared.contracts.selectable import (
     candidate_path_for_logical_path as _candidate_path_for_logical_path,
 )
-from packaging.configure.selection.unit_types import infer_selection_unit_type
+from packaging._shared.selection.unit_types import infer_selection_unit_type
 from packaging.configure.selection.external_skill_payload import load_external_skill_sources_payload
 from packaging.configure.selection.external_skill_snapshot import compute_skill_snapshot_digest
 
@@ -88,7 +88,7 @@ def _missing_external_skill_sources_message(unresolved_paths: list[str]) -> str:
     suffix = f" (+{extra_count} more)" if extra_count > 0 else ""
     return (
         "selected skill paths could not be resolved from the current workspace or selection_groups.skills[].source_path: "
-        f"{sample}{suffix}; rerun the upstream selection confirmation step and regenerate skills_plan with "
+        f"{sample}{suffix}; rerun the upstream selection confirmation step and regenerate confirmed selections with "
         "selection_groups.skills[].source_path. Local scan/stage no longer rebuild these sources automatically."
     )
 
@@ -96,7 +96,7 @@ def _missing_external_skill_sources_message(unresolved_paths: list[str]) -> str:
 def _invalid_external_skill_source_message(logical_path: str, detail: str) -> str:
     return (
         f"selection_groups.skills source_path for selected skill {logical_path} {detail}; rerun the upstream selection confirmation "
-        "step and regenerate skills_plan"
+        "step and regenerate confirmed selections"
     )
 
 

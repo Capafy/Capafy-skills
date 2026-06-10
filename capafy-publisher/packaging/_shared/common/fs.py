@@ -12,7 +12,7 @@ from .constants import TEXT_ENCODINGS, TEXT_SAMPLE_BYTES, VIRTUALENV_BIN_DIRS, V
 from .exclusion_rules import SYSTEM_DIRS, SYSTEM_SUFFIXES
 
 
-def _classify_cleanup_error(exc: OSError) -> str:
+def classify_cleanup_error(exc: OSError) -> str:
     if isinstance(exc, PermissionError):
         return "permission_denied"
     if isinstance(exc, FileNotFoundError):
@@ -44,7 +44,7 @@ def cleanup_bundle_file(bundle_file: str) -> dict[str, object]:
         bundle_path.unlink()
     except OSError as exc:
         summary["bundle_error"] = str(exc)
-        summary["bundle_error_kind"] = _classify_cleanup_error(exc)
+        summary["bundle_error_kind"] = classify_cleanup_error(exc)
     else:
         summary["bundle_removed"] = True
     return summary
@@ -66,7 +66,7 @@ def cleanup_staging_root(staging_root: Optional[Union[str, Path]]) -> dict[str, 
         shutil.rmtree(staging_path)
     except OSError as exc:
         summary["staging_error"] = str(exc)
-        summary["staging_error_kind"] = _classify_cleanup_error(exc)
+        summary["staging_error_kind"] = classify_cleanup_error(exc)
     else:
         summary["staging_removed"] = True
     return summary
@@ -218,6 +218,7 @@ def iter_workspace_files(root: Path, skip_system: bool) -> Iterable[Path]:
 
 
 __all__ = [
+    "classify_cleanup_error",
     "cleanup_bundle_file",
     "cleanup_staging_root",
     "display_stage_path",

@@ -13,7 +13,7 @@ from packaging._shared.contracts.selection_groups import (
 from packaging._shared.platform import create_agent_from_draft, create_version_from_draft
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 from packaging.runtimes import get_target
-from packaging.init.explicit_skill import (
+from packaging._shared.selection.explicit_skill import (
     external_skill_bindings_for_manifest,
     merge_explicit_skill_into_top_level_selections,
 )

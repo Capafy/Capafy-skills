@@ -25,12 +25,11 @@ def prepare_environment(
     if not profile_env_name:
         raise ValueError(f"{normalized_env_name} does not declare a profile environment id")
 
-    profile = load_profile(profile_env_name)
+    load_profile(profile_env_name)
     normalized_runtime_dir = target.prepare_runtime_dir(normalized_runtime_dir)
 
     payload = {
         "env_id": normalized_env_name,
-        "display_name": str(profile.get("display_name", normalized_env_name)),
         "runtime_dir": normalized_runtime_dir,
     }
     payload.update(build_runtime_metadata(normalized_env_name))

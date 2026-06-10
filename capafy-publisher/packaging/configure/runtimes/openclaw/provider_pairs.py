@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.openclaw.official_providers import OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME
+from packaging.configure.runtimes.openclaw.official_providers import OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import PlanField, SourceKind, UrlProxyPair
 from packaging.configure.sensitive.placeholders import build_placeholder
+from packaging.configure.url_proxy.pair_builder import (
+    first_candidate_extra_value,
+    usable_provider_key_candidates,
+)
 
 
 _CONFIG_REL = ".openclaw/openclaw.json"
@@ -25,13 +29,7 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
 
     pairs: list[UrlProxyPair] = []
     for provider_name, group in by_provider.items():
-        keys = [
-            candidate
-            for candidate in group["keys"]
-            if str(candidate.value or "").strip()
-            or bool(candidate.extra.get("placeholder_provider"))
-            or candidate.source_kind == SourceKind.SYNTHESIZED
-        ]
+        keys = usable_provider_key_candidates(group["keys"])
         urls = group["urls"]
         if not keys:
             continue
@@ -43,8 +41,9 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
             continue
         if spec is None and url_c is None:
             continue
-        model = _candidate_metadata(keys, urls, "model")
-        api_format = _candidate_metadata(keys, urls, "api_format") or (spec.api if spec else "")
+        provider_candidates = [*keys, *urls]
+        model = first_candidate_extra_value(provider_candidates, "model")
+        api_format = first_candidate_extra_value(provider_candidates, "api_format") or (spec.api if spec else "")
         if not api_format:
             raise ValueError(
                 f"OpenClaw provider {provider_name} is missing api; "
@@ -97,6 +96,7 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
                 is_synthesized=bool(key_c.extra.get("placeholder_provider")) or key_c.source_kind == SourceKind.SYNTHESIZED,
                 model=model,
                 api_format=api_format,
+                provider_name=provider_name,
             ))
 
     return pairs
@@ -108,18 +108,6 @@ def _candidate_key_index(candidate: Candidate, fallback: int) -> int:
         return int(raw)
     except (TypeError, ValueError):
         return fallback
-
-
-def _candidate_metadata(
-    keys: list[Candidate],
-    urls: list[Candidate],
-    field: str,
-) -> str:
-    for candidate in [*keys, *urls]:
-        value = str(candidate.extra.get(field, "") or "").strip()
-        if value:
-            return value
-    return ""
 
 
 __all__ = ["pair_openclaw_provider_candidates"]

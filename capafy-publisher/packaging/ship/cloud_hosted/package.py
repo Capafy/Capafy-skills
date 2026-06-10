@@ -10,14 +10,15 @@ from packaging._shared.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
 from packaging._shared.contracts.bundle_context import BUNDLE_CONTEXT_NAME
 from packaging._shared.contracts.reviewed_scan import (
     CLOUD_HOSTED_URL_PROXY_REQUIRED_MESSAGE,
-    load_reviewed_scan_payload,
+    load_reviewed_scan_object,
     normalize_reviewed_scan_payload,
+    required_list,
+    sanitize_reviewed_scan_payload,
     summarize_reviewed_scan_deploy_items,
 )
 from packaging._shared.env_profiles import list_profiles, load_profile
-from packaging.ship.cloud_hosted.scan_payload import build_cloud_hosted_scan_payload
 from packaging._shared.contracts.stage_manifest import STAGE_MANIFEST_NAME
-from packaging.ship.artifacts.runtimes.env_runtime_files import collect_required_runtime_paths
+from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
 from packaging.ship.cloud_hosted.effective_scan import EffectiveScanGroups
 
 
@@ -33,7 +34,14 @@ def build_cloud_hosted_artifact_package_payload(
     *,
     effective_scan_payload: dict,
 ) -> dict:
-    return build_cloud_hosted_scan_payload(effective_scan_payload)
+    sanitized = sanitize_reviewed_scan_payload(effective_scan_payload)
+    return {
+        "agent_type": "run_online",
+        "url_proxy": required_list(sanitized, "url_proxy", label="effective_scan_payload"),
+        "generic": required_list(sanitized, "generic", label="effective_scan_payload"),
+        "env_var": required_list(sanitized, "env_var", label="effective_scan_payload"),
+        "excludes": required_list(sanitized, "excludes", label="effective_scan_payload"),
+    }
 
 
 def build_cloud_hosted_validate_reviewed_scan_json(
@@ -110,11 +118,8 @@ def _required_runtime_relpaths(staging_root: Path, package_payload: dict) -> set
     env_id = _env_id_from_package_payload(package_payload) or _env_id_from_runtime_manifest(staging_root)
     if not env_id:
         return set()
-    try:
-        profile = load_profile(env_id)
-    except ValueError:
-        return set()
-    return set(collect_required_runtime_paths(profile))
+    profile = load_profile(env_id)
+    return set(collect_packaged_config_paths(profile))
 
 
 def _filter_required_runtime_excludes(
@@ -135,9 +140,7 @@ def package_cloud_hosted_staging(
     *,
     cleanup_staging: bool = False,
 ) -> dict:
-    package_payload = load_reviewed_scan_payload(package_json, label="package_json")
-    if not isinstance(package_payload, dict):
-        raise ValueError("package_json must be an object")
+    package_payload = load_reviewed_scan_object(package_json, label="package_json")
 
     key_items, runtime_values = normalize_reviewed_scan_payload(package_payload, label="package_json")
     excluded_relpaths = _filter_required_runtime_excludes(

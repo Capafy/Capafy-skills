@@ -3,49 +3,42 @@ from typing import Optional
 
 from pathlib import PurePosixPath
 
-from packaging._shared.common.constants import (
-    ANTHROPIC_OFFICIAL_URL,
-    OPENAI_OFFICIAL_URL_V1,
-)
+from packaging._shared.env_profiles import list_profiles
 
 
-PLATFORM_LLM_CONFIG_SOURCES = {
-    "claude_code": {
-        "config_files": (
-            ".claude/.claude.json",
-            ".claude/settings.json",
-            ".claude/settings.local.json",
-            ".claude/managed-settings.json",
-            "_scan_only/.claude/.claude.json",
-            "_scan_only/.claude/settings.json",
-            "_scan_only/.claude/settings.local.json",
-            "_scan_only/.claude/managed-settings.json",
-        ),
-        "env_vars": {
-            "ANTHROPIC_API_KEY": ("Anthropic", ANTHROPIC_OFFICIAL_URL),
-            "ANTHROPIC_AUTH_TOKEN": ("Anthropic", ANTHROPIC_OFFICIAL_URL),
-            "ANTHROPIC_BASE_URL": ("Anthropic", ANTHROPIC_OFFICIAL_URL),
-        },
-    },
-    "codex": {
-        "config_files": (
-            ".codex/config.toml",
-            "_scan_only/.codex/config.toml",
-        ),
-        "env_vars": {
-            "OPENAI_API_KEY": ("OpenAI", OPENAI_OFFICIAL_URL_V1),
-            "OPENAI_BASE_URL": ("OpenAI", OPENAI_OFFICIAL_URL_V1),
-        },
-    },
-    "openclaw": {
-        "config_files": (
-            ".openclaw/openclaw.json",
-            ".openclaw/agents/main/agent/auth-profiles.json",
-            "_scan_only/.openclaw/agents/main/agent/auth-profiles.json",
-        ),
-        "env_vars": {},
-    },
-}
+def _build_platform_llm_config_sources() -> dict[str, dict]:
+    sources: dict[str, dict] = {}
+    for profile in list_profiles():
+        env_id = str(profile.get("env_id", "")).strip()
+        if not env_id:
+            continue
+        raw_contract = profile.get("platform_contract", {})
+        if not isinstance(raw_contract, dict):
+            continue
+        config_files = tuple(
+            str(item).strip()
+            for item in raw_contract.get("config_files", ())
+            if isinstance(item, str) and item.strip()
+        )
+        env_vars: dict[str, tuple[str, str]] = {}
+        raw_env_vars = raw_contract.get("env_vars", {})
+        if isinstance(raw_env_vars, dict):
+            for env_name, raw_spec in raw_env_vars.items():
+                if not isinstance(raw_spec, dict):
+                    continue
+                normalized_env_name = str(env_name or "").strip()
+                service = str(raw_spec.get("service", "") or "").strip()
+                canonical_url = str(raw_spec.get("canonical_url", "") or "").strip()
+                if normalized_env_name and service and canonical_url:
+                    env_vars[normalized_env_name] = (service, canonical_url)
+        sources[env_id] = {
+            "config_files": config_files,
+            "env_vars": env_vars,
+        }
+    return sources
+
+
+PLATFORM_LLM_CONFIG_SOURCES = _build_platform_llm_config_sources()
 
 
 def _normalize_relpath(relpath: str) -> str:
