@@ -159,9 +159,9 @@ def _target_names(env_id: str) -> frozenset[str]:
     return frozenset(names)
 
 
-def _plugin_match_names(plugin) -> frozenset[str]:
-    names = {str(getattr(plugin, "runtime_id", "") or "").strip()}
-    descriptors = getattr(plugin, "descriptors", None)
+def _adapter_match_names(adapter) -> frozenset[str]:
+    names = {str(getattr(adapter, "runtime_id", "") or "").strip()}
+    descriptors = getattr(adapter, "descriptors", None)
     if callable(descriptors):
         for descriptor in descriptors():
             for value in (
@@ -187,14 +187,14 @@ def preprocess_runtime_env_sources(
     names = _target_names(env_id)
     consumed: set[str] = set()
 
-    from packaging.runtimes.plugins import list_runtime_plugins
+    from packaging.runtimes.adapters import list_runtime_adapters
 
-    for plugin in list_runtime_plugins():
-        if plugin.env_preprocess_hook is None:
+    for adapter in list_runtime_adapters():
+        if adapter.env_preprocess_hook is None:
             continue
-        if not (_plugin_match_names(plugin) & names):
+        if not (_adapter_match_names(adapter) & names):
             continue
-        consumed.update(plugin.env_preprocess_hook(staging_root, env_context=env_context))
+        consumed.update(adapter.env_preprocess_hook(staging_root, env_context=env_context))
 
     return frozenset(consumed)
 

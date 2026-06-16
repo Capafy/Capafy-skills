@@ -11,8 +11,8 @@ from packaging.configure.runtimes.claude_code.auth import (
 from packaging.configure.url_proxy.review_consistency import (
     PlaceholderReviewRequirement,
     append_placeholder_requirement_if_managed,
-    load_json_config_for_review,
-    validate_placeholder_review_requirements,
+    json_config_review_loader,
+    validate_config_placeholder_review_requirements,
 )
 
 
@@ -29,12 +29,20 @@ def validate_review_consistency(
     *,
     reviewed_scan: dict[str, Any],
 ) -> None:
-    payload = load_json_config_for_review(staging_root, SETTINGS_REL, label="Claude settings")
-    if payload is None:
-        return
+    validate_config_placeholder_review_requirements(
+        staging_root,
+        reviewed_scan=reviewed_scan,
+        relpath=SETTINGS_REL,
+        loader=json_config_review_loader("Claude settings"),
+        requirement_builder=_build_requirements,
+        error_prefix="Claude settings placeholders are missing url_proxy review entries",
+    )
+
+
+def _build_requirements(payload: dict[str, Any]) -> list[PlaceholderReviewRequirement]:
     env_payload = payload.get("env")
     if not isinstance(env_payload, dict):
-        return
+        return []
     requirements: list[PlaceholderReviewRequirement] = []
     for field in sorted(MANAGED_ENV_FIELDS):
         append_placeholder_requirement_if_managed(
@@ -45,11 +53,7 @@ def validate_review_consistency(
             side_name="",
             fields=frozenset({field}),
         )
-    validate_placeholder_review_requirements(
-        reviewed_scan,
-        requirements=requirements,
-        error_prefix="Claude settings placeholders are missing url_proxy review entries",
-    )
+    return requirements
 
 
 __all__ = ["validate_review_consistency"]

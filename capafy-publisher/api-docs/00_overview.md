@@ -74,8 +74,8 @@ This is an "axiomatic" rule; it is not repeated below — only "the returned `ur
 - Before reading this directory, you should first run `python3 self_update.py --check` to check the version.
 - Supports Python >= 3.8; Python 3.11+ uses the standard library `tomllib`, 3.8-3.10 use the built-in TOML fallback shipped with the Skill.
 - `self_update.py` currently determines the latest version via a remote install manifest and downloads the zip install package using the `downloadUrl` returned by the manifest.
-- If the install manifest carries `sha256` / `sha256Hex` / `sha256_hex`, `self_update.py` will verify the digest of the downloaded zip before extracting; if not carried, the update is still allowed to continue.
-- The release package does not carry `requirements.txt`; `self_update.py` skips dependency installation after completing the zip update.
+- The install manifest must carry the zip digest as `sha256`; `self_update.py` verifies the downloaded zip before extracting.
+- When the update bundle carries `requirements.txt`, `self_update.py` installs those Python dependencies after completing the zip update; otherwise dependency installation is skipped.
 - Windows install mode first copies the updater to the system temp directory and then has an external runner replace the formal skill directory, avoiding the running `self_update.py` locking its own directory.
 - Because the release package does not install Python dependencies, PEP 668 / externally-managed-environment should not block self-update.
 - The current local version is read preferentially from `.temp/self-update-state.json`; only if no install state file exists yet does it fall back to the `version` in `api-docs/index.json`.

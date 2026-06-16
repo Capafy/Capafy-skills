@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,7 +34,12 @@ def persist_access_token(
         "email": str(email or "").strip(),
         "name": str(name or "").strip(),
     }
-    store_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if store_path.exists():
+        safe_chmod(store_path, 0o600)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(store_path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
     safe_chmod(store_path, 0o600)
     return {
         "token_persisted": True,

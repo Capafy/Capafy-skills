@@ -10,11 +10,11 @@ def _normalize_relpath(value: object) -> str:
     return PurePosixPath(normalized).as_posix()
 
 
-def _config_files(profile: dict) -> list[str]:
+def _contract_config_files(profile: dict, key: str) -> list[str]:
     contract = profile.get("platform_contract", {})
     if not isinstance(contract, dict):
         return []
-    files = contract.get("config_files", [])
+    files = contract.get(key, [])
     if not isinstance(files, list):
         return []
     result: list[str] = []
@@ -31,9 +31,28 @@ def is_scan_only_config_path(path: object) -> bool:
 
 
 def collect_packaged_config_paths(profile: dict) -> list[str]:
+    result: list[str] = []
+    for path in (
+        collect_required_packaged_config_paths(profile)
+        + collect_optional_packaged_config_paths(profile)
+    ):
+        if path not in result:
+            result.append(path)
+    return result
+
+
+def collect_required_packaged_config_paths(profile: dict) -> list[str]:
     return [
         path
-        for path in _config_files(profile)
+        for path in _contract_config_files(profile, "config_files")
+        if not is_scan_only_config_path(path)
+    ]
+
+
+def collect_optional_packaged_config_paths(profile: dict) -> list[str]:
+    return [
+        path
+        for path in _contract_config_files(profile, "optional_config_files")
         if not is_scan_only_config_path(path)
     ]
 
@@ -41,7 +60,10 @@ def collect_packaged_config_paths(profile: dict) -> list[str]:
 def collect_scan_only_config_paths(profile: dict) -> list[str]:
     return [
         path
-        for path in _config_files(profile)
+        for path in (
+            _contract_config_files(profile, "config_files")
+            + _contract_config_files(profile, "optional_config_files")
+        )
         if is_scan_only_config_path(path)
     ]
 
@@ -72,8 +94,10 @@ def collect_redacted_config_files(profile: dict) -> list[dict[str, str]]:
 
 
 __all__ = [
+    "collect_optional_packaged_config_paths",
     "collect_packaged_config_paths",
     "collect_redacted_config_files",
+    "collect_required_packaged_config_paths",
     "collect_scan_only_config_paths",
     "is_scan_only_config_path",
     "redaction_strategy_for_config_path",

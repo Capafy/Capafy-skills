@@ -8,6 +8,24 @@ import argparse
 import sys
 from pathlib import Path
 
+
+def _ensure_local_packaging_not_shadowed() -> None:
+    loaded = sys.modules.get("packaging")
+    if loaded is None:
+        return
+    loaded_file = Path(str(getattr(loaded, "__file__", "") or "")).resolve()
+    expected_dir = (Path(__file__).resolve().parent / "packaging").resolve()
+    if loaded_file.parent != expected_dir:
+        raise RuntimeError(
+            "Python module name conflict: PyPI 'packaging' was imported before "
+            "capafy-publisher's local packaging package. Run packager.py as a script "
+            "from the capafy-publisher directory, or start a fresh Python process with "
+            "this skill directory first on PYTHONPATH."
+        )
+
+
+_ensure_local_packaging_not_shadowed()
+
 from packaging._shared.common.cli import fail
 from packaging.init.publish_init import publish_init
 from packaging.configure.publish_configure import publish_configure

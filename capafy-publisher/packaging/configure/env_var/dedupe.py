@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Iterable, Mapping
 
-from packaging.configure.contracts import EnvVar, GenericValue, ReviewedScanBuildInput
+from packaging.configure.contracts import GenericValue, ReviewedScanBuildInput
 from packaging.configure.sensitive.keywords import normalize_key_name
 
 

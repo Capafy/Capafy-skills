@@ -83,11 +83,11 @@ def _claimed_simple_identities(pairs: list[UrlProxyPair]) -> set[SimpleFieldIden
     return identities
 
 
-def _plugin_semantic_field_identities(field_obj) -> set[SemanticFieldIdentity]:
-    plugins_module = import_module("packaging.runtimes.plugins")
+def _adapter_semantic_field_identities(field_obj) -> set[SemanticFieldIdentity]:
+    adapters_module = import_module("packaging.runtimes.adapters")
     identities: set[SemanticFieldIdentity] = set()
-    for plugin in plugins_module.list_runtime_plugins():
-        hook = plugin.semantic_field_identity_hook
+    for adapter in adapters_module.list_runtime_adapters():
+        hook = adapter.semantic_field_identity_hook
         if hook is None:
             continue
         identity = hook(field_obj)
@@ -103,7 +103,7 @@ def _claimed_semantic_field_identities(
     identities: set[SemanticFieldIdentity] = set()
     for pair in pairs:
         for plan_field in (pair.key, pair.url):
-            identities.update(_plugin_semantic_field_identities(plan_field))
+            identities.update(_adapter_semantic_field_identities(plan_field))
     return identities
 
 
@@ -195,7 +195,7 @@ def _env_var_claimed_by_url_proxy(
 
 
 def _generic_semantic_field_identities(generic_value: GenericValue) -> set[SemanticFieldIdentity]:
-    return _plugin_semantic_field_identities(generic_value)
+    return _adapter_semantic_field_identities(generic_value)
 
 
 def _pair_identity(pair: UrlProxyPair) -> tuple[LocationIdentity, LocationIdentity]:

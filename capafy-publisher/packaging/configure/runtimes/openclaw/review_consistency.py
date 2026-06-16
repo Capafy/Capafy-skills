@@ -10,8 +10,8 @@ from packaging.configure.runtimes.openclaw.provider_usage import selected_opencl
 from packaging.configure.url_proxy.review_consistency import (
     PlaceholderReviewRequirement,
     append_key_url_placeholder_requirements,
-    load_json_config_for_review,
-    validate_placeholder_review_requirements,
+    json_config_review_loader,
+    validate_config_placeholder_review_requirements,
 )
 
 
@@ -24,13 +24,20 @@ def validate_review_consistency(
     *,
     reviewed_scan: dict[str, Any],
 ) -> None:
-    config = load_json_config_for_review(staging_root, CONFIG_REL, label="OpenClaw config")
-    if config is None:
-        return
+    validate_config_placeholder_review_requirements(
+        staging_root,
+        reviewed_scan=reviewed_scan,
+        relpath=CONFIG_REL,
+        loader=json_config_review_loader("OpenClaw config"),
+        requirement_builder=_build_requirements,
+        error_prefix="OpenClaw provider placeholders are missing url_proxy review entries",
+    )
 
+
+def _build_requirements(config: dict[str, Any]) -> list[PlaceholderReviewRequirement]:
     providers = _get_providers(config)
     if not providers:
-        return
+        return []
 
     selected_providers = selected_openclaw_provider_names(config)
     requirements: list[PlaceholderReviewRequirement] = []
@@ -49,11 +56,7 @@ def validate_review_consistency(
             url_label=f"{provider_name}.baseUrl",
             url_field=f"models.providers.{provider_name}.baseUrl",
         )
-    validate_placeholder_review_requirements(
-        reviewed_scan,
-        requirements=requirements,
-        error_prefix="OpenClaw provider placeholders are missing url_proxy review entries",
-    )
+    return requirements
 
 
 __all__ = ["validate_review_consistency"]

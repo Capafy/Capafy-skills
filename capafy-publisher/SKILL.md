@@ -26,7 +26,7 @@ Handle the response:
 - `update_available`: tell the creator and ask; on agreement run `python3 self_update.py`, then restart from the beginning after the update finishes.
 - `check_failed`: continue using the current version; if a later platform response header carries `X-Skill-Version-Status: outdated|deprecated`, remind the creator at the next human-confirmation point.
 
-`self_update.py` downloads a zip per the install manifest; if the manifest carries `sha256` / `sha256Hex` / `sha256_hex` it verifies the digest. When the update bundle does not carry `requirements.txt`, dependency installation is skipped. The Windows install mode first copies the updater into the system temp directory and lets an external runner replace the live skill directory, so the running script does not lock its own directory.
+`self_update.py` downloads a zip per the install manifest; the manifest must carry `sha256`, and the digest is verified before extraction. When the update bundle carries `requirements.txt`, Python dependencies are installed after the zip update; otherwise dependency installation is skipped. The Windows install mode first copies the updater into the system temp directory and lets an external runner replace the live skill directory, so the running script does not lock its own directory.
 
 ## Read Order
 

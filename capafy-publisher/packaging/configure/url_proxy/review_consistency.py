@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from packaging._shared.config_files.toml_loader import safe_toml_loads, tomllib
-from packaging._shared.config_files.yaml_loader import safe_yaml_loads
+from packaging._shared.config_files.yaml_loader import safe_yaml_mapping_loads
 from packaging._shared.reviewed_scan.query import reviewed_url_proxy_has_any_side_field
 from packaging.configure.config_errors import invalid_json_config_error, invalid_text_config_error
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
@@ -134,15 +134,22 @@ def load_toml_config_for_review(
 def load_yaml_config_for_review(
     staging_root: Path,
     relpath: str,
+    *,
+    label: str = "YAML config",
 ) -> Optional[dict[str, Any]]:
     config_path = Path(staging_root) / relpath
     if not config_path.is_file():
         return None
     try:
-        payload = safe_yaml_loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, RuntimeError, ValueError):
+        payload = safe_yaml_mapping_loads(
+            config_path.read_text(encoding="utf-8"),
+            label=label,
+        )
+    except OSError:
         return None
-    return payload if isinstance(payload, dict) else None
+    except (RuntimeError, ValueError) as exc:
+        raise invalid_text_config_error(label, "YAML", relpath, str(exc)) from exc
+    return payload
 
 
 def validate_placeholder_review_requirements(
@@ -166,6 +173,52 @@ def validate_placeholder_review_requirements(
         raise ValueError(f"{error_prefix}: {', '.join(sorted(missing))}")
 
 
+def validate_config_placeholder_review_requirements(
+    staging_root: Path,
+    *,
+    reviewed_scan: dict[str, Any],
+    relpath: str,
+    loader: Callable[[Path, str], Optional[dict[str, Any]]],
+    requirement_builder: Callable[[dict[str, Any]], list[PlaceholderReviewRequirement]],
+    error_prefix: str,
+) -> None:
+    payload = loader(Path(staging_root), relpath)
+    if payload is None:
+        return
+    requirements = requirement_builder(payload)
+    if not requirements:
+        return
+    validate_placeholder_review_requirements(
+        reviewed_scan,
+        requirements=requirements,
+        error_prefix=error_prefix,
+    )
+
+
+def json_config_review_loader(label: str) -> Callable[[Path, str], Optional[dict[str, Any]]]:
+    return lambda staging_root, relpath: load_json_config_for_review(
+        staging_root,
+        relpath,
+        label=label,
+    )
+
+
+def toml_config_review_loader(label: str) -> Callable[[Path, str], Optional[dict[str, Any]]]:
+    return lambda staging_root, relpath: load_toml_config_for_review(
+        staging_root,
+        relpath,
+        label=label,
+    )
+
+
+def yaml_config_review_loader(label: str) -> Callable[[Path, str], Optional[dict[str, Any]]]:
+    return lambda staging_root, relpath: load_yaml_config_for_review(
+        staging_root,
+        relpath,
+        label=label,
+    )
+
+
 __all__ = [
     "PlaceholderReviewRequirement",
     "append_key_url_placeholder_requirements",
@@ -174,5 +227,9 @@ __all__ = [
     "load_toml_config_for_review",
     "load_yaml_config_for_review",
     "placeholder_requirement_if_managed",
+    "json_config_review_loader",
+    "toml_config_review_loader",
+    "validate_config_placeholder_review_requirements",
     "validate_placeholder_review_requirements",
+    "yaml_config_review_loader",
 ]

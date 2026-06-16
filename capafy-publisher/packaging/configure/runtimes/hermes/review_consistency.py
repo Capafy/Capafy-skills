@@ -7,8 +7,8 @@ from packaging.configure.runtimes.hermes.provider_blocks import iter_hermes_prov
 from packaging.configure.url_proxy.review_consistency import (
     PlaceholderReviewRequirement,
     append_key_url_placeholder_requirements,
-    load_yaml_config_for_review,
-    validate_placeholder_review_requirements,
+    validate_config_placeholder_review_requirements,
+    yaml_config_review_loader,
 )
 
 
@@ -20,10 +20,17 @@ def validate_review_consistency(
     *,
     reviewed_scan: dict[str, Any],
 ) -> None:
-    payload = load_yaml_config_for_review(staging_root, CONFIG_REL)
-    if payload is None:
-        return
+    validate_config_placeholder_review_requirements(
+        staging_root,
+        reviewed_scan=reviewed_scan,
+        relpath=CONFIG_REL,
+        loader=yaml_config_review_loader("Hermes config.yaml"),
+        requirement_builder=_build_requirements,
+        error_prefix="Hermes provider placeholders are missing url_proxy review entries",
+    )
 
+
+def _build_requirements(payload: dict[str, Any]) -> list[PlaceholderReviewRequirement]:
     requirements: list[PlaceholderReviewRequirement] = []
     for provider_block in iter_hermes_provider_blocks(payload):
         group_path = provider_block.group_path
@@ -40,11 +47,7 @@ def validate_review_consistency(
             url_label=f"{group_path}.base_url",
             url_field=f"{group_path}.base_url",
         )
-    validate_placeholder_review_requirements(
-        reviewed_scan,
-        requirements=requirements,
-        error_prefix="Hermes provider placeholders are missing url_proxy review entries",
-    )
+    return requirements
 
 
 __all__ = ["validate_review_consistency"]

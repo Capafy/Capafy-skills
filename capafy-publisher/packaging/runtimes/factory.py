@@ -22,14 +22,14 @@ from packaging.runtimes.resolution import (
 def get_profile_target(env_id: str) -> tuple[dict, PackagingTarget]:
     profile, _ = get_profile_target_descriptor(env_id)
     try:
-        from packaging.runtimes.plugins import get_runtime_plugin_for_target
+        from packaging.runtimes.adapters import get_runtime_adapter_for_target
 
-        plugin = get_runtime_plugin_for_target(env_id)
+        adapter = get_runtime_adapter_for_target(env_id)
     except ValueError:
-        plugin = None
-    if plugin is not None and plugin.target_factory is not None:
+        adapter = None
+    if adapter is not None and adapter.target_factory is not None:
         descriptor = get_target_descriptor(env_id)
-        return profile, plugin.target_factory(descriptor, profile)
+        return profile, adapter.target_factory(descriptor, profile)
     raise ValueError(f"{env_id} does not have a concrete profile target class")
 
 
@@ -42,15 +42,15 @@ def build_target_instances() -> dict[str, PackagingTarget]:
     for descriptor in list_target_descriptors().values():
         if not _is_dispatch_target_descriptor(descriptor):
             continue
-        from packaging.runtimes.plugins import get_runtime_plugin_for_target
+        from packaging.runtimes.adapters import get_runtime_adapter_for_target
 
         try:
-            plugin = get_runtime_plugin_for_target(descriptor.target_id)
+            adapter = get_runtime_adapter_for_target(descriptor.target_id)
         except ValueError as exc:
             raise ValueError(f"{descriptor.target_id} does not have a registered target builder") from exc
-        if plugin.target_factory is None:
+        if adapter.target_factory is None:
             raise ValueError(f"{descriptor.target_id} does not have a registered target builder")
-        targets[descriptor.target_id] = plugin.target_factory(
+        targets[descriptor.target_id] = adapter.target_factory(
             descriptor,
             load_profile(descriptor.profile_env_id) if descriptor.profile_env_id else {},
         )
@@ -99,9 +99,15 @@ def get_runtime_validation_target(name: Optional[str]) -> tuple[PackagingTarget,
         raise ValueError(f"unknown packaging target: {name}") from exc
 
 
+def clear_target_cache() -> None:
+    get_profile_target.cache_clear()
+    _LazyTargetRegistry._targets.cache_clear()
+
+
 __all__ = [
     "TARGETS",
     "build_target_instances",
+    "clear_target_cache",
     "get_default_target",
     "get_profile_target",
     "get_runtime_validation_target",

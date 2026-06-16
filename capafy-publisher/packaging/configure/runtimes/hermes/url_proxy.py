@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from packaging._shared.config_files.yaml_loader import safe_yaml_dumps, safe_yaml_loads
+from packaging._shared.config_files.yaml_loader import safe_yaml_dumps, safe_yaml_mapping_loads
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import UrlProxyPair
 from packaging.configure.runtimes.hermes.auth_profile_materialize import ensure_hermes_official_providers
@@ -42,7 +42,7 @@ class HermesRuntime(RuntimeContract):
             config: dict[str, Any] = {}
         else:
             try:
-                config = safe_yaml_loads(config_path.read_text(encoding="utf-8"))
+                config = safe_yaml_mapping_loads(config_path.read_text(encoding="utf-8"))
             except (OSError, RuntimeError, ValueError):
                 return
         changed = False
@@ -61,7 +61,7 @@ class HermesRuntime(RuntimeContract):
         if not config_path.is_file():
             return []
         try:
-            config = safe_yaml_loads(config_path.read_text(encoding="utf-8"))
+            config = safe_yaml_mapping_loads(config_path.read_text(encoding="utf-8"))
         except (OSError, RuntimeError, ValueError):
             return []
         env_context = ctx.env_context or self._env_context or RuntimeEnvContext(process_env=ctx.process_env)
@@ -100,7 +100,7 @@ def _consume_pair_env_names(
     pairs: list[UrlProxyPair],
     env_context: RuntimeEnvContext,
 ) -> None:
-    from packaging._shared.config_files.yaml_loader import get_yaml_path_value, safe_yaml_loads
+    from packaging._shared.config_files.yaml_loader import get_yaml_path_value, safe_yaml_mapping_loads
     from packaging.configure.env_values import env_reference_name
 
     from packaging.configure.runtimes.hermes.provider_scan import (
@@ -113,7 +113,7 @@ def _consume_pair_env_names(
     names: set[str] = set()
     config_path = Path(staging_root) / CONFIG_REL
     try:
-        payload = safe_yaml_loads(config_path.read_text(encoding="utf-8"))
+        payload = safe_yaml_mapping_loads(config_path.read_text(encoding="utf-8"))
     except (OSError, RuntimeError, ValueError):
         payload = {}
     if isinstance(payload, dict):
@@ -155,6 +155,5 @@ def _consume_pair_env_names(
             relpaths=HERMES_DOTENV_RELPATHS,
             names=frozenset(names),
         )
-
 
 __all__ = ["HermesRuntime"]

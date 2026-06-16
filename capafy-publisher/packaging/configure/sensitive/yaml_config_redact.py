@@ -48,7 +48,7 @@ def redact_yaml_stage_config(path: Path, source: Optional[str] = None) -> int:
     relative_source = source or path.name
     try:
         payload = safe_yaml_loads(path.read_text(encoding="utf-8"))
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise ValueError(f"{relative_source} cannot be parsed as YAML: {exc}") from exc
     if not isinstance(payload, dict):
         return 0

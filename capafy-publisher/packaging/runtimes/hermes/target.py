@@ -50,12 +50,12 @@ class HermesTarget:
 
     def confirmed_workspace_document_prefix_roots(self) -> dict[str, Path]:
         return {
-            ".hermes": resolve_hermes_home(),
+            ".hermes": self.hermes_home,
         }
 
     def build_stage_plan(self, runtime_dir: str) -> StagePlan:
         plan = stage_plan_builder.build_stage_plan(self, runtime_dir)
-        hermes_home = resolve_hermes_home()
+        hermes_home = self.hermes_home
         scan_only_sources = [
             StageTreeSource(
                 source_root=hermes_home / rel,
@@ -156,7 +156,7 @@ def _is_loaded_profile(profile: Optional[dict]) -> bool:
 
 
 def _with_hermes_exclusions(source: StageTreeSource) -> StageTreeSource:
-    if not source.relative_target_root.as_posix().startswith(".hermes"):
+    if not _targets_packaged_hermes_root(source.relative_target_root):
         return source
     existing = tuple(source.excluded_relpath_prefixes)
     merged = tuple(dict.fromkeys([*existing, *_HERMES_EXCLUDED_PREFIXES]))
@@ -213,6 +213,11 @@ def _hermes_target_suffix(relpath: str) -> Optional[str]:
         if relpath.startswith(prefix):
             return relpath[len(prefix) :]
     return None
+
+
+def _targets_packaged_hermes_root(relpath: Path) -> bool:
+    parts = relpath.parts
+    return bool(parts) and parts[0] == ".hermes"
 
 
 __all__ = [

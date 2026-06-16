@@ -12,14 +12,27 @@ else:
 
 def _require_yaml():
     if yaml is None:
-        raise RuntimeError("Hermes runtime requires a YAML parser") from _YAML_IMPORT_ERROR
+        raise RuntimeError("YAML configuration support requires PyYAML") from _YAML_IMPORT_ERROR
     return yaml
 
 
-def safe_yaml_loads(text: str) -> dict:
+def safe_yaml_loads(text: str) -> Any:
     parser = _require_yaml()
-    payload = parser.safe_load(text) or {}
-    return payload if isinstance(payload, dict) else {}
+    try:
+        payload = parser.safe_load(text) or {}
+    except Exception as exc:
+        yaml_error = getattr(parser, "YAMLError", ())
+        if yaml_error and isinstance(exc, yaml_error):
+            raise ValueError(f"failed to parse YAML: {exc}") from exc
+        raise
+    return payload
+
+
+def safe_yaml_mapping_loads(text: str, *, label: str = "YAML document") -> dict:
+    payload = safe_yaml_loads(text)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{label} must be a YAML mapping")
+    return payload
 
 
 def safe_yaml_dumps(data: dict) -> str:
@@ -189,5 +202,6 @@ __all__ = [
     "remove_yaml_object_key_containing_string",
     "safe_yaml_dumps",
     "safe_yaml_loads",
+    "safe_yaml_mapping_loads",
     "set_yaml_path_value",
 ]

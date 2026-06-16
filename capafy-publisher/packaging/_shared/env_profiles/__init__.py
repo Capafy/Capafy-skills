@@ -45,6 +45,9 @@ def _validate_platform_contract(profile: dict, *, path: Path) -> None:
     for index, item in enumerate(_require_list(contract.get("config_files", []), label="platform_contract.config_files", path=path)):
         if not isinstance(item, str) or not item.strip():
             raise ValueError(f"{path}: platform_contract.config_files[{index}] must be a non-empty string")
+    for index, item in enumerate(_require_list(contract.get("optional_config_files", []), label="platform_contract.optional_config_files", path=path)):
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{path}: platform_contract.optional_config_files[{index}] must be a non-empty string")
 
     env_vars = _require_dict(contract.get("env_vars", {}), label="platform_contract.env_vars", path=path)
     for env_name, raw_spec in env_vars.items():

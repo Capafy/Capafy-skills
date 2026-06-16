@@ -55,23 +55,23 @@ def runtime_context_target_id(env_id: Optional[str]) -> Optional[str]:
     return resolved_target_id if resolved_target_id in match_names else str(env_id or "").strip()
 
 
-def _plugin_owns_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
+def _adapter_owns_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
     if not target_id:
         return False
     try:
-        from packaging.runtimes.plugins import get_runtime_plugin_for_target
+        from packaging.runtimes.adapters import get_runtime_adapter_for_target
 
-        plugin = get_runtime_plugin_for_target(target_id)
+        adapter = get_runtime_adapter_for_target(target_id)
     except ValueError:
         return False
-    if plugin.owns_structured_pair is not None:
-        return plugin.owns_structured_pair(pair)
+    if adapter.owns_structured_pair is not None:
+        return adapter.owns_structured_pair(pair)
     group = str(getattr(pair, "group", "") or "").strip()
-    return group.startswith(f"{plugin.runtime_id}/")
+    return group.startswith(f"{adapter.runtime_id}/")
 
 
 def runtime_owned_structured_pair(pair: "UrlProxyPair", *, target_id: Optional[str]) -> bool:
-    if _plugin_owns_structured_pair(pair, target_id=target_id):
+    if _adapter_owns_structured_pair(pair, target_id=target_id):
         return True
     return False
 

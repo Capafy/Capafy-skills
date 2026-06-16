@@ -2,10 +2,12 @@
   "platform_contract": {
     "config_files": [
       ".claude/settings.json",
+      "_scan_only/.claude/.claude.json",
+      "_scan_only/.claude/settings.json"
+    ],
+    "optional_config_files": [
       ".claude/settings.local.json",
       ".claude/managed-settings.json",
-      "_scan_only/.claude/.claude.json",
-      "_scan_only/.claude/settings.json",
       "_scan_only/.claude/settings.local.json",
       "_scan_only/.claude/managed-settings.json"
     ],

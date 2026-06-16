@@ -13,10 +13,10 @@ DEFAULT_TARGET = "openclaw"
 def build_target_descriptors() -> dict[str, TargetDescriptor]:
     descriptors: dict[str, TargetDescriptor] = {}
 
-    from packaging.runtimes.plugins import list_runtime_plugins
+    from packaging.runtimes.adapters import list_runtime_adapters
 
-    for plugin in list_runtime_plugins():
-        for descriptor in plugin.descriptors():
+    for adapter in list_runtime_adapters():
+        for descriptor in adapter.descriptors():
             descriptors[descriptor.target_id] = descriptor
     return descriptors
 

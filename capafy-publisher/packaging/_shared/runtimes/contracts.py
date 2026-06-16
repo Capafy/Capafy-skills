@@ -27,7 +27,7 @@ SpecialScanResult = Tuple[Dict[str, str], Dict[str, str], Dict[str, str], List[d
 
 
 @dataclass(frozen=True)
-class RuntimePlugin:
+class RuntimeAdapter:
     runtime_id: str
     descriptors: Callable[[], tuple[TargetDescriptor, ...]]
     target_factory: Optional[Callable[[TargetDescriptor, dict], "PackagingTarget"]] = None
@@ -87,7 +87,7 @@ __all__ = [
     "OPENCLAW_LEGACY_TARGET",
     "OPENCLAW_MODERN_TARGET",
     "PackagingTarget",
-    "RuntimePlugin",
+    "RuntimeAdapter",
     "SpecialScanResult",
     "TargetDescriptor",
     "call_optional_target_hook",

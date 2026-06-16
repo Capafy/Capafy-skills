@@ -9,7 +9,7 @@ from packaging.configure.env_var.process_env import collect_publish_process_env,
 from packaging.configure.staging.review import build_review_binding
 from packaging.configure.staging.source_boundary import filter_generic_values_for_packaged_sources
 from packaging.configure.reviewed_scan_builder import build_reviewed_scan_from_input
-from packaging.runtimes.plugins import get_runtime_plugin_for_target
+from packaging.runtimes.adapters import get_runtime_adapter_for_target
 
 
 def validate_runtime_placeholders_reviewed(
@@ -19,12 +19,12 @@ def validate_runtime_placeholders_reviewed(
     reviewed_scan: dict[str, Any],
 ) -> None:
     try:
-        plugin = get_runtime_plugin_for_target(env_id)
+        adapter = get_runtime_adapter_for_target(env_id)
     except ValueError:
         return
-    if plugin.review_consistency_hook is None:
+    if adapter.review_consistency_hook is None:
         return
-    plugin.review_consistency_hook(staging_root, reviewed_scan=reviewed_scan)
+    adapter.review_consistency_hook(staging_root, reviewed_scan=reviewed_scan)
 
 
 def build_cloud_hosted_reviewed_scan(

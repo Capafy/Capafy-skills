@@ -11,9 +11,6 @@ from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, PlanField, SourceKind, UrlProxyPair
 from packaging.configure.env_values import usable_process_env_value
 from packaging.configure.sensitive.placeholders import build_placeholder
-from packaging.configure.sensitive.literals import (
-    looks_like_platform_managed_placeholder_value,
-)
 from packaging.configure.staging.strip.fallback import replace_values_in_staging
 from packaging.configure.runtimes.claude_code.auth import (
     CLAUDE_AUTH_ENV_KEY,

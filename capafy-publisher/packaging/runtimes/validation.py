@@ -7,7 +7,7 @@ from pathlib import Path
 from packaging._shared.selection.inventory import build_skill_inventory
 from packaging._shared.common.constants import ENV_REF_PATTERN
 from packaging._shared.config_files.toml_loader import tomllib
-from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
+from packaging._shared.env_profiles.config_files import collect_required_packaged_config_paths
 from packaging._shared.runtimes.support import unique_non_empty_strings
 from packaging.runtimes.validation_files import (
     collect_present_runtime_paths,
@@ -107,7 +107,7 @@ def validate_env_runtime(
     warnings: list[str] = []
 
     present_paths = collect_present_runtime_paths(profile, runtime_root)
-    required_paths = collect_packaged_config_paths(profile)
+    required_paths = collect_required_packaged_config_paths(profile)
     missing_required_paths = [
         path for path in required_paths
         if path not in present_paths and not (runtime_root / path).exists()

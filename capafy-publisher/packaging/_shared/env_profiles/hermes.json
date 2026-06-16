@@ -2,14 +2,16 @@
   "platform_contract": {
     "config_files": [
       ".hermes/config.yaml",
-      ".hermes/.env",
       "_scan_only/.hermes/config.yaml",
-      "_scan_only/.hermes/.env",
       "_scan_only/.hermes/credentials",
       "_scan_only/.hermes/oauth",
       "_scan_only/.hermes/.anthropic_oauth.json",
       "_scan_only/.hermes/auth.json",
       "_scan_only/.hermes/auth/google_oauth.json"
+    ],
+    "optional_config_files": [
+      ".hermes/.env",
+      "_scan_only/.hermes/.env"
     ],
     "env_vars": {
       "ANTHROPIC_API_KEY": {

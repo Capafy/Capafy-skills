@@ -7,7 +7,7 @@ from packaging._shared.config_files.yaml_loader import (
     get_yaml_path_value,
     remove_yaml_object_key_at_path,
     safe_yaml_dumps,
-    safe_yaml_loads,
+    safe_yaml_mapping_loads,
     set_yaml_path_value,
 )
 from packaging._shared.llm.official_providers import find_official_provider_by_marker
@@ -29,10 +29,8 @@ def rewrite_hermes_confirmed_providers(
     if not config_path.is_file():
         return {"hermes_confirmed_provider_rewrites": 0}
     try:
-        payload = safe_yaml_loads(config_path.read_text(encoding="utf-8"))
+        payload = safe_yaml_mapping_loads(config_path.read_text(encoding="utf-8"))
     except (OSError, RuntimeError, ValueError):
-        return {"hermes_confirmed_provider_rewrites": 0}
-    if not isinstance(payload, dict):
         return {"hermes_confirmed_provider_rewrites": 0}
 
     rewrites = 0
@@ -60,6 +58,7 @@ def rewrite_hermes_confirmed_providers(
 
     pruned, removed = _prune_unconfirmed_custom_providers(payload, allowed_custom_names)
     rewrites += pruned
+    rewrites += _sync_custom_provider_reference_models(payload)
 
     if rewrites:
         config_path.write_text(safe_yaml_dumps(payload), encoding="utf-8")
@@ -221,6 +220,40 @@ def _provider_model_by_name(payload: dict[str, Any]) -> dict[str, str]:
         if model:
             result[name] = model
     return result
+
+
+def _sync_custom_provider_reference_models(payload: dict[str, Any]) -> int:
+    model_by_name = _provider_model_by_name(payload)
+    if not model_by_name:
+        return 0
+    custom_names = set(model_by_name)
+    rewrites = 0
+
+    block = payload.get("model")
+    if isinstance(block, dict):
+        rewrites += _sync_custom_provider_reference_model(
+            block,
+            custom_names=custom_names,
+            model_by_name=model_by_name,
+            model_field="default",
+        )
+
+    return rewrites
+
+
+def _sync_custom_provider_reference_model(
+    block: dict[str, Any],
+    *,
+    custom_names: set[str],
+    model_by_name: dict[str, str],
+    model_field: str,
+) -> int:
+    ref_name = _custom_reference_name(block.get("provider"), custom_names)
+    model = model_by_name.get(ref_name, "")
+    if not model or block.get(model_field) == model:
+        return 0
+    block[model_field] = model
+    return 1
 
 
 def _custom_provider_names(payload: dict[str, Any]) -> set[str]:

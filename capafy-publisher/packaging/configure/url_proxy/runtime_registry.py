@@ -5,12 +5,12 @@ from typing import Optional
 
 
 def _build_builtin_runtimes() -> tuple[object, ...]:
-    from packaging.runtimes.plugins import list_runtime_plugins
+    from packaging.runtimes.adapters import list_runtime_adapters
 
     runtimes = []
-    for plugin in list_runtime_plugins():
-        if plugin.url_proxy_runtime_factory is not None:
-            runtimes.append(plugin.url_proxy_runtime_factory())
+    for adapter in list_runtime_adapters():
+        if adapter.url_proxy_runtime_factory is not None:
+            runtimes.append(adapter.url_proxy_runtime_factory())
     return tuple(runtimes)
 
 

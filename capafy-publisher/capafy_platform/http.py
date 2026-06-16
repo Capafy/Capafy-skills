@@ -258,14 +258,14 @@ def request(
                     return text, status
         except urllib.error.HTTPError as exc:
             status = exc.code
-            headers = getattr(exc, "headers", None)
-            _maybe_log_skill_version_status(headers)
+            response_headers = getattr(exc, "headers", None)
+            _maybe_log_skill_version_status(response_headers)
             raw = exc.read().decode(errors="replace")
             try:
                 body = json.loads(raw)
             except json.JSONDecodeError:
                 body = raw
-            request_id = _request_id_from_headers(headers)
+            request_id = _request_id_from_headers(response_headers)
             _set_last_request_error(
                 endpoint=url,
                 http_status=status,
@@ -281,7 +281,13 @@ def request(
                 print(f"[http] request_id: {request_id}", file=sys.stderr)
             print(f"[http] response: {body}", file=sys.stderr)
             return body, status
-        except (urllib.error.URLError, http.client.RemoteDisconnected, ConnectionError, TimeoutError) as exc:
+        except (
+            urllib.error.URLError,
+            http.client.HTTPException,
+            http.client.RemoteDisconnected,
+            ConnectionError,
+            TimeoutError,
+        ) as exc:
             reason = _network_error_reason(exc)
             _set_last_request_error(
                 endpoint=url,

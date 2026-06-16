@@ -2,8 +2,11 @@
   "platform_contract": {
     "config_files": [
       ".codex/config.toml",
-      ".codex/.env",
       "_scan_only/.codex/config.toml"
+    ],
+    "optional_config_files": [
+      ".codex/.env",
+      "_scan_only/.codex/.env"
     ],
     "env_vars": {
       "OPENAI_API_KEY": {
