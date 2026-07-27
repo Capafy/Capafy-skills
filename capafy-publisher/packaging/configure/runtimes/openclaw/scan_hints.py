@@ -59,11 +59,16 @@ def should_scan_openclaw_structured_values(relpath: str) -> bool:
     return PurePosixPath(relpath).name.lower() not in {"openclaw.json", "auth-profiles.json"}
 
 
-def _find_value_line_number(text: str, value: str) -> Optional[int]:
-    index = text.find(value)
-    if index < 0:
-        return None
-    return text.count("\n", 0, index) + 1
+def _json_pointer(path_parts: list[str]) -> str:
+    escaped = [part.replace("~", "~0").replace("/", "~1") for part in path_parts]
+    return "/" + "/".join(escaped)
+
+
+def _json_candidate_source(path_parts: list[str]) -> dict[str, str]:
+    return {
+        "source": _OPENCLAW_CONFIG_REL_SOURCE,
+        "source_detail": f"json:{_json_pointer(path_parts)}",
+    }
 
 
 def _infer_openclaw_service_name(path_parts: list[str], node: dict, inherited_service: Optional[str]) -> Optional[str]:
@@ -138,7 +143,7 @@ def _collect_openclaw_scan_hints(
                                 "service": service_name or "unknown",
                                 "default_url": domain,
                                 "local_url": domain,
-                                "source": ".openclaw/openclaw.json",
+                                **_json_candidate_source(path_parts + [key_name]),
                                 "env_name": None,
                                 "url_proxy_group": url_proxy_group
                                 or build_config_url_proxy_group(_OPENCLAW_CONFIG_REL_SOURCE, path_parts),
@@ -173,8 +178,6 @@ def _collect_openclaw_scan_hints(
                     managed_url = extracted_value.strip()
                 if domain:
                     value_hints.setdefault(extracted_value, domain)
-                line_no = _find_value_line_number(text, value) or _find_value_line_number(text, extracted_value)
-                source = f".openclaw/openclaw.json line {line_no}" if line_no else ".openclaw/openclaw.json"
                 append_candidate(
                     explicit_candidates,
                     annotate_candidate(
@@ -186,7 +189,7 @@ def _collect_openclaw_scan_hints(
                             "service": service_name or "unknown",
                             "default_url": managed_url,
                             "local_url": managed_url,
-                            "source": source,
+                            **_json_candidate_source(path_parts + [key_name]),
                             "env_name": None,
                             "url_proxy_group": url_proxy_group_for_candidate,
                         },

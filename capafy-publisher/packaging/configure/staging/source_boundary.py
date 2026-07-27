@@ -16,7 +16,6 @@ _DEFAULT_SCAN_ONLY_PREFIXES = ("_scan_only",)
 PUBLISHER_GENERATED_SOURCE_REASONS = {
     STAGE_MANIFEST_NAME: "publisher_generated",
     BUNDLE_CONTEXT_NAME: "publisher_generated",
-    "agent.runtime_environment.json": "publisher_generated",
     "agent.runtime_dependencies.json": "publisher_generated",
     "agent.selected_units.json": "publisher_generated",
     "agent.workspace_documents.json": "publisher_generated",
@@ -74,13 +73,8 @@ def _final_zip_exclude_prefixes(staging_root: Path, *, agent_type: str) -> tuple
     return _DEFAULT_SCAN_ONLY_PREFIXES
 
 
-def _final_zip_exclude_paths(excluded_relpaths: Iterable[object], *, agent_type: str) -> set[str]:
-    excluded = {
-        normalized
-        for normalized in (normalize_packaged_source_relpath(item) for item in excluded_relpaths)
-        if normalized
-    }
-    excluded.add(STAGE_MANIFEST_NAME)
+def _final_zip_exclude_paths(*, agent_type: str) -> set[str]:
+    excluded = {STAGE_MANIFEST_NAME}
     if agent_type == "download":
         excluded.add(BUNDLE_CONTEXT_NAME)
     return excluded
@@ -102,14 +96,13 @@ def _staging_path(staging_root: Union[str, Path]) -> Path:
 def final_zip_source_relpaths(
     *,
     staging_root: Union[str, Path],
-    excluded_relpaths: Iterable[object],
     agent_type: str,
 ) -> frozenset[str]:
     resolved_agent_type = _normalize_agent_type(agent_type)
     staging_path = _staging_path(staging_root)
     return final_zip_staging_file_relpaths(
         staging_path,
-        exclude_paths=_final_zip_exclude_paths(excluded_relpaths, agent_type=resolved_agent_type),
+        exclude_paths=_final_zip_exclude_paths(agent_type=resolved_agent_type),
         exclude_prefixes=_final_zip_exclude_prefixes(staging_path, agent_type=resolved_agent_type),
     )
 
@@ -117,7 +110,6 @@ def final_zip_source_relpaths(
 def deep_scan_file_boundary(
     *,
     staging_root: Union[str, Path],
-    excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> dict[str, object]:
     resolved_agent_type = _normalize_agent_type(agent_type)
@@ -125,7 +117,6 @@ def deep_scan_file_boundary(
     scan_only_prefixes = _scan_only_prefixes(staging_path)
     final_sources = final_zip_source_relpaths(
         staging_root=staging_path,
-        excluded_relpaths=tuple(excluded_relpaths),
         agent_type=resolved_agent_type,
     )
 
@@ -171,34 +162,15 @@ def deep_scan_file_boundary(
     }
 
 
-def is_packaged_source_path(
-    source: object,
-    *,
-    staging_root: Union[str, Path],
-    excluded_relpaths: Iterable[object] = (),
-    agent_type: str,
-) -> bool:
-    normalized = normalize_packaged_source_relpath(source)
-    if not normalized or normalized == STAGE_MANIFEST_NAME:
-        return False
-    return normalized in final_zip_source_relpaths(
-        staging_root=staging_root,
-        excluded_relpaths=tuple(excluded_relpaths),
-        agent_type=agent_type,
-    )
-
-
 def filter_generic_payload_items(
     items: Iterable[object],
     *,
     staging_root: Union[str, Path],
-    excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> list[dict]:
     result: list[dict] = []
     final_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        excluded_relpaths=tuple(excluded_relpaths),
         agent_type=agent_type,
     )
     for item in items:
@@ -217,13 +189,11 @@ def filter_generic_values_for_packaged_sources(
     generic_values: Iterable[GenericValue],
     *,
     staging_root: Union[str, Path],
-    excluded_relpaths: Iterable[object] = (),
     agent_type: str,
 ) -> tuple[GenericValue, ...]:
     result: list[GenericValue] = []
     final_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        excluded_relpaths=tuple(excluded_relpaths),
         agent_type=agent_type,
     )
     for generic_value in generic_values:
@@ -239,6 +209,5 @@ __all__ = [
     "filter_generic_payload_items",
     "filter_generic_values_for_packaged_sources",
     "final_zip_source_relpaths",
-    "is_packaged_source_path",
     "normalize_packaged_source_relpath",
 ]

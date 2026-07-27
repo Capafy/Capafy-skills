@@ -11,24 +11,27 @@ from packaging.configure.url_proxy.pair_builder import (
 )
 
 
-_CONFIG_REL = ".openclaw/openclaw.json"
 _CONTRACT_ID = "openclaw"
 
 
 def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlProxyPair]:
-    by_provider: dict[str, dict[str, list[Candidate]]] = {}
+    by_provider: dict[tuple[str, str], dict[str, list[Candidate]]] = {}
     for c in candidates:
         pname = c.extra.get("provider_name", "")
         if not pname:
             continue
-        by_provider.setdefault(pname, {"keys": [], "urls": []})
+        source_relpath = str(c.source_relpath or c.extra.get("source_relpath", "") or "").strip()
+        if not source_relpath:
+            continue
+        provider_key = (source_relpath, str(pname))
+        by_provider.setdefault(provider_key, {"keys": [], "urls": []})
         if c.role == "api_key":
-            by_provider[pname]["keys"].append(c)
+            by_provider[provider_key]["keys"].append(c)
         elif c.role == "base_url":
-            by_provider[pname]["urls"].append(c)
+            by_provider[provider_key]["urls"].append(c)
 
     pairs: list[UrlProxyPair] = []
-    for provider_name, group in by_provider.items():
+    for (source_relpath, provider_name), group in by_provider.items():
         keys = usable_provider_key_candidates(group["keys"])
         urls = group["urls"]
         if not keys:
@@ -52,19 +55,27 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
 
         for idx, key_c in enumerate(keys):
             key_index = _candidate_key_index(key_c, idx)
-            base_group = f"{_CONFIG_REL}#models.providers.{provider_name}"
+            provider_group_suffix = first_candidate_extra_value(
+                provider_candidates,
+                "provider_group_suffix",
+            ) or f"models.providers.{provider_name}"
+            provider_field_prefix = first_candidate_extra_value(
+                provider_candidates,
+                "provider_field_prefix",
+            ) or "models.providers"
+            base_group = f"{source_relpath}#{provider_group_suffix}"
             grp = base_group if key_index == 0 else f"{base_group}.apiKey[{key_index}]"
             placeholder_field = key_c.field if key_index == 0 else f"{key_c.field}[{key_index}]"
             key_ph = build_placeholder(
                 service,
-                _CONFIG_REL,
+                source_relpath,
                 field=placeholder_field,
                 locator=base_url,
             )
-            url_field = f"models.providers.{provider_name}.baseUrl"
+            url_field = url_c.field if url_c else f"{provider_field_prefix}.{provider_name}.baseUrl"
             url_ph = build_placeholder(
                 service,
-                _CONFIG_REL,
+                source_relpath,
                 field=url_field,
                 locator=base_url,
                 value_type="url",
@@ -78,7 +89,7 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
                     field=key_c.field,
                     service=service,
                     source_kind=key_c.source_kind,
-                    source_relpath=_CONFIG_REL,
+                    source_relpath=key_c.source_relpath or source_relpath,
                     location=key_c.location,
                     original_value=key_c.value,
                     placeholder=key_ph,
@@ -88,7 +99,7 @@ def pair_openclaw_provider_candidates(candidates: list[Candidate]) -> list[UrlPr
                     field=url_field,
                     service=service,
                     source_kind=SourceKind.FILE if url_c else SourceKind.SYNTHESIZED,
-                    source_relpath=_CONFIG_REL,
+                    source_relpath=url_c.source_relpath if url_c else source_relpath,
                     location=url_c.location if url_c else None,
                     original_value=url_c.value if url_c else base_url,
                     placeholder=url_ph,

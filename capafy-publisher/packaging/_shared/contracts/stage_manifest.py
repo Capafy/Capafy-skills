@@ -12,13 +12,10 @@ def write_stage_manifest(
     staging_root: Path,
     *,
     scan_only_prefixes: tuple[str, ...],
-    excluded_credential_files: tuple[str, ...] = (),
 ) -> Path:
     payload = {
         "scan_only_prefixes": list(scan_only_prefixes),
     }
-    if excluded_credential_files:
-        payload["excluded_credential_files"] = list(excluded_credential_files)
     output_path = staging_root / STAGE_MANIFEST_NAME
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return output_path

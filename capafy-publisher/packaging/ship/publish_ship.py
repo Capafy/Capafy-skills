@@ -15,16 +15,17 @@ from packaging._shared.contracts.publish_work_state import (
     cleanup_shipped_publish_intermediates,
     write_publish_work_state_manifest,
 )
-from packaging._shared.contracts.reviewed_scan import credential_counts
+from packaging._shared.contracts.reviewed_scan import (
+    credential_counts,
+    require_cloud_hosted_url_proxy_entries,
+)
 from packaging._shared.platform import get_latest_version
-from packaging._shared.platform.runtime_mapping import parse_latest_version
-from packaging.ship.artifacts.package_pipeline import run_artifact_package
+from packaging.ship.artifacts.package import run_artifact_package
 from packaging.ship.artifacts.validate_runtime import run_artifact_validate
-from packaging.ship.cloud_hosted.package import require_cloud_hosted_url_proxy
-from packaging.ship.cloud_hosted.readback_safety import find_plaintext_required_credentials
-from packaging.ship.cloud_hosted.ship_prune import prune_cloud_hosted_reviewed_scan
-from packaging.ship.shipping.preflight import ShipContext, prepare_ship_context
-from packaging.ship.shipping.upload import publish_upload_and_report
+from packaging.ship.preflight import ShipContext, prepare_ship_context
+from packaging.ship.provider_confirmation import apply_provider_confirmation
+from packaging.ship.required_credentials_safety import find_plaintext_required_credentials
+from packaging.ship.upload import publish_upload_and_report
 
 
 def _build_ship_error(
@@ -73,8 +74,7 @@ def run_publish_ship(
     bundle_path = default_bundle_path
 
     if ctx.agent_type == "run_online":
-        latest_state = parse_latest_version(latest)
-        readback_findings = find_plaintext_required_credentials(latest_state.required_credentials_payload)
+        readback_findings = find_plaintext_required_credentials(ctx.required_credentials_payload)
         if readback_findings:
             return _build_ship_error(
                 ctx,
@@ -88,18 +88,17 @@ def run_publish_ship(
                 next_step="confirm_platform_required_credentials_readback",
                 platform_readback_findings=readback_findings,
             ), 1
-        prune_result, prune_code = prune_cloud_hosted_reviewed_scan(
+        effective_scan_payload = apply_provider_confirmation(
+            agent_version_id=ctx.agent_version_id,
             env_id=ctx.env_id,
             agent_type=ctx.agent_type,
             reviewed_scan=ctx.reviewed_scan,
             staging_root=ctx.staging_root,
-            required_credentials_payload=latest_state.required_credentials_payload,
+            required_credentials_payload=ctx.required_credentials_payload,
             developer_work_dir_path=developer_work_dir_path,
         )
-        if prune_code != 0:
-            return prune_result, prune_code
         try:
-            require_cloud_hosted_url_proxy(prune_result.effective_scan)
+            require_cloud_hosted_url_proxy_entries(effective_scan_payload)
         except ValueError as exc:
             return _build_ship_error(
                 ctx,
@@ -111,12 +110,11 @@ def run_publish_ship(
                     "Re-run publish-configure with at least one configured LLM provider, or re-confirm at least one provider on the platform page.",
                 ],
             ), 1
-        effective_scan_payload = prune_result.effective_scan.to_scan_groups_dict()
     else:
         effective_scan_payload = ctx.reviewed_scan
 
     try:
-        validate_exit, validate_payload = run_artifact_validate(
+        validate_payload = run_artifact_validate(
             staging_path=ctx.staging_root,
             env_id=ctx.env_id,
             reviewed_scan=effective_scan_payload,
@@ -133,7 +131,7 @@ def run_publish_ship(
 
     credential_totals = credential_counts(ctx.reviewed_scan)
 
-    if validate_exit != 0 or not validate_payload.get("ok"):
+    if not validate_payload.get("ok"):
         developer_next_steps = validate_payload.get("developer_next_steps")
         if not isinstance(developer_next_steps, list) or not developer_next_steps:
             developer_next_steps = ["Fix the validate-runtime failures, then rerun `publish-ship`."]
@@ -166,13 +164,10 @@ def run_publish_ship(
         agent_id,
         ctx.agent_version_id,
         bundle_path,
-        staging_root=ctx.staging_root,
-        cleanup=False,
-        latest_version=latest,
+        biz_type=ctx.agent_type,
     )
 
     upload_artifacts = upload_result.get("artifacts") or {}
-    cleanup_summary: dict[str, object] = {}
     package_url = upload_artifacts.get("package_url", "")
     review_url = upload_artifacts.get("review_url", "")
 
@@ -191,44 +186,47 @@ def run_publish_ship(
             stop_reason=str(upload_result.get("stop_reason", "")).strip(),
             package_url=package_url,
             review_url=review_url,
-            cleanup_summary=cleanup_summary,
         ), 1
-
-    if not str(review_url or "").strip():
-        return _build_ship_error(
-            ctx,
-            agent_id=agent_id,
-            error="platform-report-package did not return a review URL",
-            failed_step="upload_and_report",
-            blocking_category="missing_report_package_review_url",
-            developer_next_steps=[
-                "Retry publish-ship after confirming platform-report-package returns a review URL.",
-            ],
-            next_step="retry_platform_report_package",
-            package_url=package_url,
-            cleanup_summary=cleanup_summary,
-        ), 1
-
-    cleanup_summary.update(cleanup_bundle_file(bundle_path))
-    cleanup_summary.update(cleanup_staging_root(ctx.staging_root))
-    cleanup_summary.update(cleanup_shipped_publish_intermediates(developer_work_dir_path))
 
     extra = dict(ctx.manifest.extra or {})
-    extra["staging_path"] = ctx.review_staging_root
+    extra["staging_path"] = ctx.staging_root
     extra["reviewed_scan_path"] = ctx.reviewed_scan_path
     extra["bundle_path"] = bundle_path
     extra["package_url"] = package_url
-    extra["cleanup_summary"] = cleanup_summary
-    write_publish_work_state_manifest(
-        developer_work_dir_path,
-        agent_id=agent_id,
-        agent_version_id=str(ctx.agent_version_id or "").strip(),
-        env_id=ctx.env_id,
-        agent_type=ctx.agent_type,
-        stage=STAGE_SHIPPED,
-        review_url=review_url or None,
-        extra=extra,
-    )
+    try:
+        write_publish_work_state_manifest(
+            developer_work_dir_path,
+            agent_id=agent_id,
+            agent_version_id=str(ctx.agent_version_id or "").strip(),
+            env_id=ctx.env_id,
+            agent_type=ctx.agent_type,
+            stage=STAGE_SHIPPED,
+            review_url=review_url or None,
+            extra=extra,
+        )
+    except (OSError, ValueError) as exc:
+        return _build_ship_error(
+            ctx,
+            agent_id=agent_id,
+            error=f"platform package report succeeded but shipped state could not be persisted: {exc}",
+            failed_step="persist_shipped_state",
+            blocking_category="persist_shipped_state_failed",
+            developer_next_steps=[
+                "Open the returned review_url and complete the final confirmation page.",
+                "Then use `publish-remote-status --agent-id <agent_id>` to confirm the platform state.",
+                "If the platform confirms success, do not rerun `publish-ship`; automatic local reconciliation is unavailable, so keep the local bundle and staging until starting the next explicitly confirmed publish flow.",
+            ],
+            next_step="open_final_review_url_then_check_remote_status",
+            requires_user_confirmation=True,
+            automatic_local_reconciliation=False,
+            package_url=package_url,
+            review_url=review_url,
+        ), 1
+
+    cleanup_summary: dict[str, object] = {}
+    cleanup_summary.update(cleanup_bundle_file(bundle_path))
+    cleanup_summary.update(cleanup_staging_root(ctx.staging_root))
+    cleanup_summary.update(cleanup_shipped_publish_intermediates(developer_work_dir_path))
 
     return {
         "status": "shipped",
@@ -239,7 +237,7 @@ def run_publish_ship(
         "reviewed_scan_path": ctx.reviewed_scan_path,
         "credential_counts": credential_totals,
         "bundle_file": bundle_path,
-        "staging_root": ctx.review_staging_root,
+        "staging_root": ctx.staging_root,
         "cleanup_summary": cleanup_summary,
         "package_url": package_url,
         "review_url": review_url,

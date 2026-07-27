@@ -6,18 +6,17 @@ from typing import Any, Optional
 
 from packaging._shared.config_files.toml_loader import safe_toml_loads, tomllib
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.llm.api_formats import (
-    PLATFORM_API_FORMAT_OPENAI_COMPLETIONS,
-    PLATFORM_API_FORMAT_OPENAI_RESPONSES,
-)
+from packaging._shared.llm.api_formats import PLATFORM_API_FORMAT_OPENAI_RESPONSES
 from packaging.configure.runtimes.codex.auth import CODEX_AUTH_ENV_KEY, CODEX_AUTH_PROVIDER_NAME
+from packaging.configure.runtimes.codex.provider_validation import (
+    validate_codex_provider_capability,
+)
 from packaging.configure.sensitive.literals import looks_like_platform_managed_placeholder_value
 
 
 CONFIG_RELPATH = ".codex/config.toml"
 DEFAULT_CODEX_API_FORMAT = PLATFORM_API_FORMAT_OPENAI_RESPONSES
 CODEX_WIRE_API_FORMATS = {
-    "chat": PLATFORM_API_FORMAT_OPENAI_COMPLETIONS,
     "responses": PLATFORM_API_FORMAT_OPENAI_RESPONSES,
 }
 
@@ -40,14 +39,21 @@ class CodexProviderState:
 class CodexConfigState:
     exists: bool
     parse_failed: bool
-    payload: dict[str, Any]
     provider: Optional[CodexProviderState]
     parse_error: str = ""
 
 
 def api_format_for_wire_api(value: object) -> str:
     normalized = str(value or "").strip()
-    return CODEX_WIRE_API_FORMATS.get(normalized, DEFAULT_CODEX_API_FORMAT)
+    if not normalized:
+        return DEFAULT_CODEX_API_FORMAT
+    try:
+        return CODEX_WIRE_API_FORMATS[normalized]
+    except KeyError as exc:
+        supported = ", ".join(sorted(CODEX_WIRE_API_FORMATS))
+        raise ValueError(
+            f'unsupported Codex wire_api="{normalized}"; supported values: {supported}'
+        ) from exc
 
 
 def api_format_for_codex_provider_section(section: dict[str, Any]) -> str:
@@ -58,11 +64,11 @@ def api_format_for_codex_provider_section(section: dict[str, Any]) -> str:
 
 def load_codex_config_state(config_path: Path) -> CodexConfigState:
     if not config_path.is_file():
-        return CodexConfigState(False, False, {}, None)
+        return CodexConfigState(False, False, None)
     try:
         text = config_path.read_text(encoding="utf-8")
     except OSError as exc:
-        return CodexConfigState(True, True, {}, None, str(exc))
+        return CodexConfigState(True, True, None, str(exc))
     return load_codex_config_state_from_text(text, exists=True)
 
 
@@ -70,15 +76,33 @@ def load_codex_config_state_from_text(text: str, *, exists: bool = True) -> Code
     try:
         payload = safe_toml_loads(str(text or ""))
     except tomllib.TOMLDecodeError as exc:
-        return CodexConfigState(exists, True, {}, None, str(exc))
+        return CodexConfigState(exists, True, None, str(exc))
     if not isinstance(payload, dict):
-        return CodexConfigState(exists, True, {}, None, "root value is not a TOML table")
+        return CodexConfigState(exists, True, None, "root value is not a TOML table")
+    _validate_provider_sections(payload)
     return CodexConfigState(
         exists=exists,
         parse_failed=False,
-        payload=payload,
         provider=_provider_state_from_payload(payload),
     )
+
+
+def _validate_provider_sections(payload: dict[str, Any]) -> None:
+    sections = payload.get("model_providers")
+    if not isinstance(sections, dict):
+        return
+    for provider_name, section in sections.items():
+        if not isinstance(section, dict):
+            continue
+        try:
+            api_format = api_format_for_codex_provider_section(section)
+            validate_codex_provider_capability(
+                api_format=api_format,
+                provider_name=provider_name,
+                base_url=section.get("base_url", ""),
+            )
+        except ValueError as exc:
+            raise ValueError(f'invalid Codex model provider "{provider_name}": {exc}') from exc
 
 
 def _provider_state_from_payload(payload: dict[str, Any]) -> Optional[CodexProviderState]:

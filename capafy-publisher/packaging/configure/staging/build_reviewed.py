@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from packaging._shared.common.constants import DEFAULT_STAGING_PATH, DEVELOPER_WORK_DIR_PATH
 from packaging._shared.common.fs import cleanup_staging_root
+from packaging._shared.common.fs import read_text
 from packaging._shared.common.cli import build_publish_error
 from packaging.configure.staging.review import build_review_binding, build_reviewed_scan_from_scan
 from packaging._shared.reviewed_scan.io import load_reviewed_scan_path, persist_reviewed_scan
@@ -13,6 +14,7 @@ from packaging.configure.staging.selection_payload import skills_plan_from_selec
 from packaging.configure.staging.pipeline import StageBuildResult, run_stage_pipeline
 from packaging.configure.cloud_hosted.pipeline import build_cloud_hosted_reviewed_scan
 from packaging.configure.contracts import DeepScanFindingsInput
+from packaging.configure.scan.env_reference_scan import collect_referenced_env_names
 
 
 @dataclass(frozen=True)
@@ -23,7 +25,38 @@ class ReviewedScanResult:
     reviewed_scan: dict[str, Any]
     review_binding: dict[str, str]
     stage_payload: dict[str, Any]
+    suggested_environment_variable_names: tuple[str, ...] = ()
     stage_plan: Any = None
+
+
+def _selected_skill_environment_variable_names(
+    staging_root: Path,
+    stage_payload: dict[str, Any],
+) -> tuple[str, ...]:
+    raw_paths = stage_payload.get("selected_skill_paths")
+    if not isinstance(raw_paths, list):
+        return ()
+    root = staging_root.resolve()
+    names: set[str] = set()
+    for raw_path in raw_paths:
+        relpath = str(raw_path or "").strip().replace("\\", "/").strip("/")
+        if not relpath or relpath == ".." or relpath.startswith("../") or "/../" in relpath:
+            continue
+        skill_path = (root / relpath).resolve()
+        if skill_path != root and root not in skill_path.parents:
+            continue
+        files = [skill_path] if skill_path.is_file() else (
+            sorted(path for path in skill_path.rglob("*") if path.is_file())
+            if skill_path.is_dir()
+            else []
+        )
+        for path in files:
+            text, _encoding = read_text(path)
+            if text is None:
+                continue
+            referenced_names, _url_hints = collect_referenced_env_names(text)
+            names.update(referenced_names)
+    return tuple(sorted(names))
 
 
 def build_staging_and_reviewed_scan(
@@ -98,7 +131,7 @@ def build_staging_and_reviewed_scan(
             staging_root_p,
             target_name=env_id,
             platform_agent_type=agent_type,
-        ).raw_scan
+        )
         review_binding = build_review_binding(
             raw_scan=raw_scan,
             staging_root=staging_root,
@@ -111,6 +144,12 @@ def build_staging_and_reviewed_scan(
             staging_root=staging_root_p,
         )
 
+    suggested_environment_variable_names = (
+        _selected_skill_environment_variable_names(staging_root_p, stage_payload)
+        if is_run_online
+        else ()
+    )
+
     reviewed_scan_path = load_reviewed_scan_path(developer_work_dir_path=developer_work_dir_path)
     persist_reviewed_scan(reviewed_scan, developer_work_dir_path=developer_work_dir_path)
 
@@ -121,6 +160,7 @@ def build_staging_and_reviewed_scan(
         reviewed_scan=reviewed_scan,
         review_binding=review_binding,
         stage_payload=stage_payload,
+        suggested_environment_variable_names=suggested_environment_variable_names,
         stage_plan=stage_plan,
     ), None
 

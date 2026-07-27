@@ -16,7 +16,7 @@ from packaging.configure.sensitive.literals import looks_like_platform_managed_p
 
 if TYPE_CHECKING:
     from packaging.configure.contracts import PlanField, UrlProxyPair
-    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
+    from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 
 
 _CONFIG_REL = ".hermes/config.yaml"
@@ -52,9 +52,11 @@ def _rewrite_yaml_field(staging_root: Path, plan_field: "PlanField") -> bool:
     return True
 
 
-def rewrite_hermes_yaml_pair_fields(staging_root: Path, plan_field: "PlanField", pair: "UrlProxyPair") -> bool:
-    _ = pair
-    return _rewrite_yaml_field(staging_root, plan_field)
+def rewrite_hermes_provider_pairs(staging_root: Path, pairs: list["UrlProxyPair"]) -> None:
+    for pair in pairs:
+        _rewrite_yaml_field(staging_root, pair.key)
+        _rewrite_yaml_field(staging_root, pair.url)
+    finalize_hermes_yaml_rewrites(staging_root, pairs)
 
 
 def finalize_hermes_yaml_rewrites(staging_root: Path, pairs: list["UrlProxyPair"]) -> None:
@@ -64,7 +66,7 @@ def finalize_hermes_yaml_rewrites(staging_root: Path, pairs: list["UrlProxyPair"
     _remove_custom_provider_key_env_fields(staging_root, pairs)
 
 
-def resolve_hermes_staged_env_templates(staging_root: Path, *, env_context: "RuntimeEnvContext") -> frozenset[str]:
+def resolve_hermes_staged_env_templates(staging_root: Path, *, provider_config_context: "ProviderRuntimeConfigContext") -> frozenset[str]:
     config_path = Path(staging_root) / _CONFIG_REL
     if not config_path.is_file():
         return frozenset()
@@ -79,6 +81,10 @@ def resolve_hermes_staged_env_templates(staging_root: Path, *, env_context: "Run
                     env_name = env_reference_name(str(value or ""))
                     if env_name:
                         consumed.add(env_name)
+                elif str(key or "").strip() in {"key_env", "api_key_env"}:
+                    env_name = env_reference_name(str(value or ""))
+                    if env_name:
+                        consumed.add(env_name)
                 walk(value)
         elif isinstance(node, list):
             for item in node:
@@ -86,7 +92,7 @@ def resolve_hermes_staged_env_templates(staging_root: Path, *, env_context: "Run
 
     walk(payload)
     if consumed:
-        env_context.consume_staged_dotenv_names(
+        provider_config_context.consume_staged_dotenv_names(
             Path(staging_root),
             relpaths=_DOTENV_RELPATHS,
             names=frozenset(consumed),
@@ -117,6 +123,7 @@ def _remove_custom_provider_key_env_fields(staging_root: Path, pairs: list["UrlP
                 f"rewritten for custom_providers[{index}]"
             )
         changed = remove_yaml_object_key_at_path(payload, (f"custom_providers[{index}]", "key_env")) or changed
+        changed = remove_yaml_object_key_at_path(payload, (f"custom_providers[{index}]", "api_key_env")) or changed
     if changed:
         config_path.write_text(safe_yaml_dumps(payload), encoding="utf-8")
 
@@ -145,5 +152,5 @@ def _rewritten_custom_provider_indexes(pairs: list["UrlProxyPair"]) -> set[int]:
 __all__ = [
     "finalize_hermes_yaml_rewrites",
     "resolve_hermes_staged_env_templates",
-    "rewrite_hermes_yaml_pair_fields",
+    "rewrite_hermes_provider_pairs",
 ]

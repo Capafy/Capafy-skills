@@ -1,48 +1,13 @@
 from __future__ import annotations
-from typing import Optional
 
 from pathlib import PurePosixPath
+from typing import Optional
 
-from packaging._shared.runtimes.contracts import call_optional_target_hook
-
-from packaging._shared.contracts.path_shapes import is_plugin_unit_type
-from packaging._shared.selection.unit_types import infer_selection_unit_type, owning_selectable_paths
-
-
-def looks_like_plugin_related_display_path(display_path: str, *, target=None) -> bool:
-    normalized = _normalized_display_path(display_path)
-    return bool(
-        call_optional_target_hook(
-            target,
-            "looks_like_plugin_related_path",
-            normalized,
-            default=False,
-        )
-    )
+from packaging._shared.selection.unit_types import owning_selectable_paths
 
 
 def _normalized_display_path(display_path: str) -> str:
     return PurePosixPath(display_path.rstrip("/")).as_posix()
-
-
-def _selectable_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
-    return owning_selectable_paths(display_path, target=target)
-
-
-def _plugin_owning_paths(display_path: str, target=None) -> tuple[str, ...]:
-    selectable_paths = tuple(
-        call_optional_target_hook(
-            target,
-            "owning_selectable_paths",
-            display_path,
-            default=(),
-        )
-    )
-    return tuple(
-        path
-        for path in selectable_paths
-        if is_plugin_unit_type(infer_selection_unit_type(path, target=target))
-    )
 
 
 def _matches_selected_paths(
@@ -51,26 +16,15 @@ def _matches_selected_paths(
     owning_paths: tuple[str, ...],
     *,
     is_dir: Optional[bool] = None,
-    selected_path_filter=None,
-    match_descendants_for_files: bool = False,
 ) -> bool:
-    def selected_path_allowed(path: str) -> bool:
-        return selected_path_filter is None or selected_path_filter(path)
-
-    if owning_paths:
-        if any(path in selected_paths and selected_path_allowed(path) for path in owning_paths):
-            return True
-
-    if is_dir is False and not match_descendants_for_files:
+    if owning_paths and any(path in selected_paths for path in owning_paths):
+        return True
+    if is_dir is False:
         return False
-
     normalized = _normalized_display_path(display_path)
     if not normalized or normalized == ".":
         return True
-    return any(
-        selected_path.startswith(f"{normalized}/") and selected_path_allowed(selected_path)
-        for selected_path in selected_paths
-    )
+    return any(selected_path.startswith(f"{normalized}/") for selected_path in selected_paths)
 
 
 def matches_selected_skill_paths(
@@ -85,70 +39,9 @@ def matches_selected_skill_paths(
     return _matches_selected_paths(
         display_path,
         selected_skill_paths,
-        _selectable_owning_paths(display_path, target),
+        owning_selectable_paths(display_path, target=target),
         is_dir=is_dir,
     )
 
 
-def matches_selected_plugin_paths(
-    display_path: str,
-    selected_plugin_paths: Optional[set[str]],
-    *,
-    selected_skill_paths: Optional[set[str]] = None,
-    is_dir: Optional[bool] = None,
-    target=None,
-) -> bool:
-    if selected_plugin_paths is None:
-        return True
-    if _matches_selected_non_plugin_unit_paths(
-        display_path,
-        selected_skill_paths,
-        is_dir=is_dir,
-        target=target,
-    ):
-        return True
-    owning_paths = _plugin_owning_paths(display_path, target)
-    if _matches_selected_paths(
-        display_path,
-        selected_plugin_paths,
-        owning_paths,
-        is_dir=is_dir,
-        match_descendants_for_files=True,
-    ):
-        return True
-    normalized = _normalized_display_path(display_path)
-    if not owning_paths:
-        return not looks_like_plugin_related_display_path(normalized, target=target)
-    if is_dir is False:
-        return False
-    return False
-
-
-def _matches_selected_non_plugin_unit_paths(
-    display_path: str,
-    selected_skill_paths: Optional[set[str]],
-    *,
-    is_dir: Optional[bool] = None,
-    target=None,
-) -> bool:
-    if not selected_skill_paths:
-        return False
-    return _matches_selected_paths(
-        display_path,
-        selected_skill_paths,
-        _selectable_owning_paths(display_path, target),
-        is_dir=is_dir,
-        selected_path_filter=lambda path: _is_non_plugin_unit_path(path, target=target),
-    )
-
-
-def _is_non_plugin_unit_path(path: str, *, target=None) -> bool:
-    unit_type = infer_selection_unit_type(path, target=target)
-    return not is_plugin_unit_type(unit_type)
-
-
-__all__ = [
-    "looks_like_plugin_related_display_path",
-    "matches_selected_plugin_paths",
-    "matches_selected_skill_paths",
-]
+__all__ = ["matches_selected_skill_paths"]

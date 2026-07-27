@@ -27,7 +27,7 @@ def get_profile_target(env_id: str) -> tuple[dict, PackagingTarget]:
         adapter = get_runtime_adapter_for_target(env_id)
     except ValueError:
         adapter = None
-    if adapter is not None and adapter.target_factory is not None:
+    if adapter is not None:
         descriptor = get_target_descriptor(env_id)
         return profile, adapter.target_factory(descriptor, profile)
     raise ValueError(f"{env_id} does not have a concrete profile target class")
@@ -48,8 +48,6 @@ def build_target_instances() -> dict[str, PackagingTarget]:
             adapter = get_runtime_adapter_for_target(descriptor.target_id)
         except ValueError as exc:
             raise ValueError(f"{descriptor.target_id} does not have a registered target builder") from exc
-        if adapter.target_factory is None:
-            raise ValueError(f"{descriptor.target_id} does not have a registered target builder")
         targets[descriptor.target_id] = adapter.target_factory(
             descriptor,
             load_profile(descriptor.profile_env_id) if descriptor.profile_env_id else {},

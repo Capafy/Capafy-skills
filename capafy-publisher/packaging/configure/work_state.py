@@ -5,7 +5,6 @@ from typing import Any, Optional
 
 from packaging._shared.contracts.publish_work_state import (
     STAGE_BUNDLE_PREPARED,
-    STAGE_CONFIG_SUBMITTED,
     PublishWorkState,
     write_publish_work_state_manifest,
 )
@@ -14,7 +13,6 @@ from packaging._shared.contracts.publish_work_state import (
 CONFIGURE_RESET_EXTRA_FIELDS = (
     "bundle_path",
     "package_url",
-    "cleanup_summary",
     "configure_redaction_summary",
     "buyout_reviewed_scan_ready",
     "buyout_disposition_status",
@@ -45,74 +43,6 @@ def configure_extra_with_review_artifacts(
     payload["staging_path"] = staging_path
     payload["reviewed_scan_path"] = reviewed_scan_path
     return payload
-
-
-def cloud_hosted_configure_extra_with_review_artifacts(
-    extra: Any,
-    *,
-    staging_path: str,
-    reviewed_scan_path: str,
-) -> dict[str, Any]:
-    payload = configure_extra_with_review_artifacts(
-        extra,
-        staging_path=staging_path,
-        reviewed_scan_path=reviewed_scan_path,
-    )
-    for field in CLOUD_HOSTED_CONFIGURE_RESET_EXTRA_FIELDS:
-        payload.pop(field, None)
-    return payload
-
-
-def write_cloud_hosted_bundle_prepared_manifest(
-    work_dir: Path,
-    *,
-    manifest: PublishWorkState,
-    agent_id: str,
-    agent_version_id: str,
-    env_id: str,
-    agent_type: str,
-    staging_path: str,
-    reviewed_scan_path: str,
-) -> Path:
-    extra = cloud_hosted_configure_extra_with_review_artifacts(
-        manifest.extra,
-        staging_path=staging_path,
-        reviewed_scan_path=reviewed_scan_path,
-    )
-    return write_publish_work_state_manifest(
-        work_dir,
-        agent_id=agent_id,
-        agent_version_id=agent_version_id,
-        env_id=env_id,
-        agent_type=agent_type,
-        stage=STAGE_BUNDLE_PREPARED,
-        extra=extra,
-    )
-
-
-def write_cloud_hosted_config_submitted_manifest(
-    work_dir: Path,
-    *,
-    manifest: PublishWorkState,
-    agent_id: str,
-    agent_version_id: str,
-    env_id: str,
-    agent_type: str,
-    review_url: Optional[str],
-    reviewed_scan_path: str,
-) -> Path:
-    extra = dict(manifest.extra) if isinstance(manifest.extra, dict) else {}
-    extra["reviewed_scan_path"] = reviewed_scan_path
-    return write_publish_work_state_manifest(
-        work_dir,
-        agent_id=agent_id,
-        agent_version_id=agent_version_id,
-        env_id=env_id,
-        agent_type=agent_type,
-        stage=STAGE_CONFIG_SUBMITTED,
-        review_url=review_url,
-        extra=extra,
-    )
 
 
 def write_buyout_bundle_prepared_manifest(
@@ -156,10 +86,7 @@ def write_buyout_bundle_prepared_manifest(
 __all__ = [
     "CLOUD_HOSTED_CONFIGURE_RESET_EXTRA_FIELDS",
     "CONFIGURE_RESET_EXTRA_FIELDS",
-    "cloud_hosted_configure_extra_with_review_artifacts",
     "configure_extra_with_review_artifacts",
     "configure_extra_without_ship_outputs",
     "write_buyout_bundle_prepared_manifest",
-    "write_cloud_hosted_bundle_prepared_manifest",
-    "write_cloud_hosted_config_submitted_manifest",
 ]

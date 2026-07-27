@@ -27,11 +27,6 @@ INSTRUCTION_DOC_SUFFIXES = (".md", ".markdown", ".mdx", ".rst", ".txt")
 
 SKILL_REFERENCE_SKIP_FILES = {
     "agent.runtime_dependencies.json",
-    "agent.runtime_environment.json",
-    "system",
-    "tools",
-    "npm_global_packages",
-    "system_packages",
 }
 
 SKILL_REFERENCE_NOISE_DIR_NAMES = {

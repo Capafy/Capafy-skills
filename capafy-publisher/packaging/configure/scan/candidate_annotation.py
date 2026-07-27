@@ -45,7 +45,6 @@ TEMPLATE_NAME_MARKERS = (
 
 NON_RUNTIME_METADATA_BASENAMES = {
     "marketplace.json",
-    "plugin.json",
 }
 
 PUBLIC_CLIENT_WEB_KEY_MARKERS = (

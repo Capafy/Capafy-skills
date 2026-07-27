@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from packaging._shared.llm.official_providers import (
-    ALL_OFFICIAL_PROVIDER_SPECS_BY_NAME,
-    OfficialProviderSpec,
-    find_official_provider_by_marker,
+from packaging.configure.runtimes.hermes.official_providers import (
+    HERMES_OFFICIAL_PROVIDER_SPECS_BY_NAME,
+    HermesOfficialProviderSpec,
+    find_hermes_official_provider_by_marker,
 )
 from packaging.configure.runtimes.hermes.api_modes import hermes_api_mode_from_url, hermes_default_api_mode
 from packaging.configure.env_values import usable_env_value
@@ -91,7 +91,7 @@ def _ensure_oauth_custom_providers(
                 provider["api_key"] = keys[0]
                 changed = True
             continue
-        spec = ALL_OFFICIAL_PROVIDER_SPECS_BY_NAME.get(provider_name)
+        spec = HERMES_OFFICIAL_PROVIDER_SPECS_BY_NAME.get(provider_name)
         if spec is None:
             continue
         if provider_name.lower() in custom_groups:
@@ -134,7 +134,7 @@ def _has_materializable_oauth_keys(oauth_keys: dict[str, list[str]]) -> bool:
             continue
         if str(provider_name or "").strip().lower().startswith("custom:"):
             return True
-        if provider_name in ALL_OFFICIAL_PROVIDER_SPECS_BY_NAME:
+        if provider_name in HERMES_OFFICIAL_PROVIDER_SPECS_BY_NAME:
             return True
     return False
 
@@ -156,7 +156,7 @@ def _referenced_custom_provider_names(config: dict[str, Any]) -> set[str]:
 
 def _materialize_custom_provider(
     provider: dict[str, Any],
-    spec: OfficialProviderSpec,
+    spec: HermesOfficialProviderSpec,
     keys: list[str],
     *,
     base_url: str = "",
@@ -181,11 +181,11 @@ def _materialize_custom_provider(
     return changed
 
 
-def _resolve_official_spec(block: dict[str, Any]) -> Optional[OfficialProviderSpec]:
-    provider = _canonical_provider_marker(str(block.get("provider", "") or "").strip())
-    if provider in ALL_OFFICIAL_PROVIDER_SPECS_BY_NAME:
-        return ALL_OFFICIAL_PROVIDER_SPECS_BY_NAME[provider]
-    return find_official_provider_by_marker(provider)
+def _resolve_official_spec(block: dict[str, Any]) -> Optional[HermesOfficialProviderSpec]:
+    provider = str(block.get("provider", "") or "").strip().lower()
+    if provider in HERMES_OFFICIAL_PROVIDER_SPECS_BY_NAME:
+        return HERMES_OFFICIAL_PROVIDER_SPECS_BY_NAME[provider]
+    return find_hermes_official_provider_by_marker(provider)
 
 
 def _credential_base_url(
@@ -214,7 +214,7 @@ def _credential_source_env(
 
 def _credential_api_mode(
     provider_name: str,
-    spec: OfficialProviderSpec,
+    spec: HermesOfficialProviderSpec,
     credentials: Optional[dict[str, list[HermesAuthProfileCredential]]],
 ) -> str:
     if credentials:
@@ -222,13 +222,5 @@ def _credential_api_mode(
             if credential.api_mode:
                 return credential.api_mode
     return hermes_api_mode_from_url(_credential_base_url(provider_name, credentials)) or hermes_default_api_mode(spec)
-
-
-def _canonical_provider_marker(value: str) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized == "minimax-cn":
-        return "minimax"
-    return normalized
-
 
 __all__ = ["ensure_hermes_official_providers"]

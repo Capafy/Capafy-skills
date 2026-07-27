@@ -129,14 +129,6 @@ def collect_reviewed_scan_input_strip_targets(reviewed_scan_input: ReviewedScanB
             )
             for gv in reviewed_scan_input.generic_values
         ),
-        *(
-            StripTarget(
-                value=ev.process_value,
-                placeholder=ev.placeholder,
-                field=ev.name,
-            )
-            for ev in reviewed_scan_input.env_vars
-        ),
     ]
 
     targets_by_identity: dict[tuple[str, str, str, int, str], StripTarget] = {}

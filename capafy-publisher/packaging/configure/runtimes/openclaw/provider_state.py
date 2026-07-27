@@ -18,48 +18,12 @@ from packaging.configure.runtimes.openclaw.provider_usage import (
 )
 
 
-_LOGIN_PLUGIN_STATE_KEYS = frozenset({
-    "accessToken",
-    "access_token",
-    "apiKey",
-    "api_key",
-    "auth",
-    "credential",
-    "credentials",
-    "idToken",
-    "id_token",
-    "login",
-    "refreshToken",
-    "refresh_token",
-    "session",
-    "token",
-})
-_KNOWN_LOGIN_PLUGIN_ENTRIES = frozenset({
-    "anthropic",
-    "claude",
-    "gemini",
-    "github-copilot",
-    "google",
-    "openai",
-})
 _LOGIN_PROVIDER_SIGNAL_KEYS = frozenset({
     "api",
     "name",
     "provider",
     "service",
 })
-
-
-def _looks_like_login_plugin_entry(plugin_name: object, payload: object) -> bool:
-    normalized_name = str(plugin_name or "").strip().lower()
-    if not normalized_name:
-        return False
-    if normalized_name in _KNOWN_LOGIN_PLUGIN_ENTRIES or normalized_name.endswith("login"):
-        return True
-    if isinstance(payload, dict):
-        if any(str(key) in _LOGIN_PLUGIN_STATE_KEYS for key in payload):
-            return True
-    return False
 
 
 def _official_provider_name_from_login_value(value: object) -> str:
@@ -97,18 +61,6 @@ def official_provider_names_from_login_state(config: dict[str, Any]) -> list[str
     if isinstance(auth, dict):
         provider_names.update(_collect_login_payload_provider_names(auth))
 
-    plugins = config.get("plugins")
-    if isinstance(plugins, dict):
-        entries = plugins.get("entries")
-        if isinstance(entries, dict):
-            for plugin_name, payload in entries.items():
-                if not _looks_like_login_plugin_entry(plugin_name, payload):
-                    continue
-                provider_name = _official_provider_name_from_login_value(plugin_name)
-                if provider_name:
-                    provider_names.add(provider_name)
-                provider_names.update(_collect_login_payload_provider_names(payload))
-
     return [
         spec.provider_name
         for spec in OPENCLAW_OFFICIAL_PROVIDER_SPECS
@@ -117,23 +69,10 @@ def official_provider_names_from_login_state(config: dict[str, Any]) -> list[str
 
 
 def prune_openclaw_login_state(config: dict[str, Any]) -> bool:
-    changed = False
-    if "auth" in config:
-        config.pop("auth", None)
-        changed = True
-
-    plugins = config.get("plugins")
-    if not isinstance(plugins, dict):
-        return changed
-    entries = plugins.get("entries")
-    if not isinstance(entries, dict):
-        return changed
-
-    for plugin_name in list(entries):
-        if _looks_like_login_plugin_entry(plugin_name, entries.get(plugin_name)):
-            entries.pop(plugin_name, None)
-            changed = True
-    return changed
+    if "auth" not in config:
+        return False
+    config.pop("auth", None)
+    return True
 
 
 def ensure_official_provider_skeletons(config: dict[str, Any], provider_names: list[str]) -> bool:

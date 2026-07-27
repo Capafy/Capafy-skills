@@ -1,35 +1,8 @@
 {
-  "platform_contract": {
-    "config_files": [
-      ".claude/settings.json",
-      "_scan_only/.claude/.claude.json",
-      "_scan_only/.claude/settings.json"
-    ],
-    "optional_config_files": [
-      ".claude/settings.local.json",
-      ".claude/managed-settings.json",
-      "_scan_only/.claude/settings.local.json",
-      "_scan_only/.claude/managed-settings.json"
-    ],
-    "env_vars": {
-      "ANTHROPIC_API_KEY": {
-        "service": "Anthropic",
-        "canonical_url": "https://api.anthropic.com"
-      },
-      "ANTHROPIC_AUTH_TOKEN": {
-        "service": "Anthropic",
-        "canonical_url": "https://api.anthropic.com"
-      },
-      "ANTHROPIC_BASE_URL": {
-        "service": "Anthropic",
-        "canonical_url": "https://api.anthropic.com"
-      }
-    }
-  },
   "url_proxy_os_fallback_names": [
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_BASE_URL"
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_MODEL",
+    "CLAUDE_MODEL"
   ],
   "discovery_skill_precedence": [
     ".claude/skills"
@@ -48,31 +21,6 @@
   "fixed_scan_files": [
     {
       "base": "home",
-      "path": ".claude/.claude.json",
-      "display_path": ".claude/.claude.json"
-    },
-    {
-      "base": "home",
-      "path": ".claude/.credentials.json",
-      "display_path": ".claude/.credentials.json"
-    },
-    {
-      "base": "home",
-      "path": ".claude/settings.json",
-      "display_path": ".claude/settings.json"
-    },
-    {
-      "base": "home",
-      "path": ".claude/settings.local.json",
-      "display_path": ".claude/settings.local.json"
-    },
-    {
-      "base": "home",
-      "path": ".claude/managed-settings.json",
-      "display_path": ".claude/managed-settings.json"
-    },
-    {
-      "base": "home",
       "path": ".claude/CLAUDE.md",
       "display_path": ".claude/CLAUDE.md"
     },
@@ -86,12 +34,5 @@
       "path": ".claude/CLAUDE.md",
       "display_path": "workspace/.claude/CLAUDE.md"
     }
-  ],
-  "runtime_env": {
-    "field": "claude_code_version",
-    "command": [
-      "claude",
-      "--version"
-    ]
-  }
+  ]
 }

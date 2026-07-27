@@ -14,7 +14,7 @@ FINAL_DISPOSITIONS = (
 
 
 def iter_disposition_entries(reviewed_scan: dict[str, Any]) -> Iterator[dict[str, Any]]:
-    for bucket in ("url_proxy", "generic", "env_var"):
+    for bucket in ("url_proxy", "generic"):
         value = reviewed_scan.get(bucket, [])
         if not isinstance(value, list):
             continue
@@ -66,7 +66,7 @@ def apply_buyout_dispositions(
     overrides: dict[str, str],
 ) -> dict[str, Any]:
     updated = dict(reviewed_scan)
-    for bucket in ("url_proxy", "generic", "env_var"):
+    for bucket in ("url_proxy", "generic"):
         if isinstance(updated.get(bucket), list):
             updated[bucket] = list(updated[bucket])
     field_to_override = {str(key).strip(): str(value).strip() for key, value in overrides.items() if str(key).strip()}

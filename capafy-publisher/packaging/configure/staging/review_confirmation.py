@@ -89,7 +89,7 @@ def _merge_confirmed_url_proxy_fields(
         return dict(entry)
 
     merged = dict(entry)
-    for key in ("model", "api_format"):
+    for key in ("model", "api_format", "provider_name"):
         value = str(matching_confirmed.get(key, "") or "").strip()
         if value:
             merged[key] = value

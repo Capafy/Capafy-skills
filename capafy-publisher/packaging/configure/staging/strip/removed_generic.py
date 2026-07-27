@@ -13,6 +13,7 @@ from packaging._shared.config_files.yaml_loader import (
 )
 from packaging._shared.config_files.dotenv import remove_dotenv_key_containing_value_text
 from packaging.configure.staging.review_confirmation import (
+    GenericIdentity,
     confirmed_generic_identities,
     generic_entry_identities,
 )
@@ -136,34 +137,37 @@ def remove_unconfirmed_generic_config_values(
     *,
     reviewed_scan: dict[str, Any],
     required_credentials_payload: dict[str, Any],
+    baseline_reviewed_scan: Optional[dict[str, Any]] = None,
 ) -> RemovedGenericResult:
-    confirmed = confirmed_generic_identities(required_credentials_payload)
-    if confirmed is None:
-        return {"reviewed_scan": reviewed_scan, "summary": {"generic_config_entries_removed": 0}}
-    generic = reviewed_scan.get("generic", [])
+    baseline = baseline_reviewed_scan if isinstance(baseline_reviewed_scan, dict) else reviewed_scan
+    generic = baseline.get("generic", [])
     if not isinstance(generic, list):
         return {"reviewed_scan": reviewed_scan, "summary": {"generic_config_entries_removed": 0}}
 
+    confirmed = confirmed_generic_identities(required_credentials_payload)
+    if confirmed is None:
+        return {"reviewed_scan": reviewed_scan, "summary": {"generic_config_entries_removed": 0}}
+
     removed = 0
-    kept_generic: list[Any] = []
-    changed_reviewed_scan = False
+    removed_identities: set[GenericIdentity] = set()
     for entry in generic:
         if not isinstance(entry, dict):
-            kept_generic.append(entry)
             continue
         entry_identities = generic_entry_identities(entry)
-        should_keep = not entry_identities or bool(entry_identities & confirmed)
-        if should_keep:
-            kept_generic.append(entry)
+        if not entry_identities or entry_identities & confirmed:
             continue
         if _remove_supported_entry(staging_root, entry):
             removed += 1
-            changed_reviewed_scan = True
-        else:
-            kept_generic.append(entry)
+            removed_identities.update(entry_identities)
 
     updated_reviewed_scan = reviewed_scan
-    if changed_reviewed_scan:
+    current_generic = reviewed_scan.get("generic", [])
+    if removed_identities and isinstance(current_generic, list):
+        kept_generic = []
+        for entry in current_generic:
+            if isinstance(entry, dict) and (generic_entry_identities(entry) & removed_identities):
+                continue
+            kept_generic.append(entry)
         updated_reviewed_scan = dict(reviewed_scan)
         updated_reviewed_scan["generic"] = [dict(item) if isinstance(item, dict) else item for item in kept_generic]
     return {

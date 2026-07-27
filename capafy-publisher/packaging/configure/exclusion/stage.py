@@ -1,9 +1,7 @@
 from __future__ import annotations
-from typing import Optional
-
 from pathlib import Path
 
-from packaging._shared.common.exclusion_rules import exclude_reason_code_for_path, looks_like_high_risk_file
+from packaging._shared.common.exclusion_rules import looks_like_high_risk_file
 from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
 from packaging._shared.selection.unit_types import has_skill_owning_path
 
@@ -40,20 +38,25 @@ def should_skip_high_risk_stage_file(target, logical_path: str) -> bool:
     return looks_like_high_risk_file(normalized) is not None
 
 
-def scan_only_excluded_credential_relpath(target_relpath: str, *, target) -> Optional[str]:
-    normalized = str(target_relpath or "").strip().rstrip("/")
-    prefix = "_scan_only/"
-    if not normalized.startswith(prefix):
-        return None
-    logical_path = normalized[len(prefix) :]
-    if is_redacted_runtime_env_file(target, logical_path):
-        return None
-    return logical_path if exclude_reason_code_for_path(logical_path) is not None else None
+def validate_staging_high_risk_boundary(target, staging_root: Path) -> None:
+    violations = [
+        path.relative_to(staging_root).as_posix()
+        for path in sorted(staging_root.rglob("*"))
+        if path.is_file()
+        and should_skip_high_risk_stage_file(
+            target,
+            path.relative_to(staging_root).as_posix(),
+        )
+    ]
+    if violations:
+        raise ValueError(
+            "staging contains high-risk files: " + ", ".join(violations)
+        )
 
 
 __all__ = [
     "is_redacted_runtime_env_file",
     "is_selected_skill_env_file",
-    "scan_only_excluded_credential_relpath",
     "should_skip_high_risk_stage_file",
+    "validate_staging_high_risk_boundary",
 ]

@@ -29,10 +29,22 @@ from packaging.configure.sensitive.literals import looks_like_platform_managed_p
 from packaging.configure.url_proxy.base import ScanContext
 
 
-_CONFIG_REL = ".openclaw/openclaw.json"
+OPENCLAW_CONFIG_REL = ".openclaw/openclaw.json"
+OPENCLAW_MAIN_MODELS_REL = ".openclaw/agents/main/agent/models.json"
+_CONFIG_PROVIDER_FIELD_PREFIX = "models.providers"
+_CONFIG_PROVIDER_POINTER_PREFIX = "/models/providers"
+_MAIN_MODELS_PROVIDER_FIELD_PREFIX = "providers"
+_MAIN_MODELS_PROVIDER_POINTER_PREFIX = "/providers"
 
 
-def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) -> list[Candidate]:
+def scan_openclaw_provider_candidates(
+    ctx: ScanContext,
+    config: dict[str, Any],
+    *,
+    source_relpath: str = OPENCLAW_CONFIG_REL,
+    provider_field_prefix: str = _CONFIG_PROVIDER_FIELD_PREFIX,
+    provider_pointer_prefix: str = _CONFIG_PROVIDER_POINTER_PREFIX,
+) -> list[Candidate]:
     providers = get_openclaw_providers(config)
     if not providers:
         return []
@@ -62,6 +74,9 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
             api_key=api_key,
             model=provider_model,
             api_format=provider_api_format,
+            source_relpath=source_relpath,
+            provider_field_prefix=provider_field_prefix,
+            provider_pointer_prefix=provider_pointer_prefix,
         )
         if not key_candidates:
             key_candidates = [
@@ -71,6 +86,9 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
                     api_key=api_key,
                     model=provider_model,
                     api_format=provider_api_format,
+                    source_relpath=source_relpath,
+                    provider_field_prefix=provider_field_prefix,
+                    provider_pointer_prefix=provider_pointer_prefix,
                 )
             ]
 
@@ -85,6 +103,9 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
             value=url_value,
             model=provider_model,
             api_format=provider_api_format,
+            source_relpath=source_relpath,
+            provider_field_prefix=provider_field_prefix,
+            provider_pointer_prefix=provider_pointer_prefix,
         ))
 
     official_names = set(OPENCLAW_OFFICIAL_PROVIDER_SPECS_BY_NAME)
@@ -111,6 +132,9 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
                 value=resolved_api_key,
                 model=provider_model,
                 api_format=provider_api_format,
+                source_relpath=source_relpath,
+                provider_field_prefix=provider_field_prefix,
+                provider_pointer_prefix=provider_pointer_prefix,
             ))
         elif normalized_url and not looks_like_platform_managed_placeholder_value(base_url):
             candidates.append(_placeholder_provider_key_candidate(
@@ -119,6 +143,9 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
                 api_key=api_key,
                 model=provider_model,
                 api_format=provider_api_format,
+                source_relpath=source_relpath,
+                provider_field_prefix=provider_field_prefix,
+                provider_pointer_prefix=provider_pointer_prefix,
             ))
 
         if normalized_url and not looks_like_platform_managed_placeholder_value(base_url):
@@ -128,15 +155,23 @@ def scan_openclaw_provider_candidates(ctx: ScanContext, config: dict[str, Any]) 
                 value=normalized_url,
                 model=provider_model,
                 api_format=provider_api_format,
+                source_relpath=source_relpath,
+                provider_field_prefix=provider_field_prefix,
+                provider_pointer_prefix=provider_pointer_prefix,
             ))
 
     return candidates
 
 
-def _provider_json_location(provider_name: str, field_name: str) -> FieldLocation:
+def _provider_json_location(
+    provider_name: str,
+    field_name: str,
+    *,
+    provider_pointer_prefix: str,
+) -> FieldLocation:
     return FieldLocation(
         fmt="json",
-        json_pointer=f"/models/providers/{provider_name}/{field_name}",
+        json_pointer=f"{provider_pointer_prefix}/{provider_name}/{field_name}",
     )
 
 
@@ -146,6 +181,8 @@ def _provider_extra(
     service: str,
     model: str,
     api_format: str,
+    source_relpath: str,
+    provider_field_prefix: str,
     extra: Optional[dict[str, object]] = None,
 ) -> dict[str, object]:
     result: dict[str, object] = {
@@ -153,6 +190,9 @@ def _provider_extra(
         "service": service,
         "model": model,
         "api_format": api_format,
+        "source_relpath": source_relpath,
+        "provider_field_prefix": provider_field_prefix,
+        "provider_group_suffix": f"{provider_field_prefix}.{provider_name}",
     }
     if extra:
         result.update(extra)
@@ -169,6 +209,9 @@ def _api_key_candidate(
     source_kind: SourceKind = SourceKind.FILE,
     key_index: Optional[int] = None,
     env_name: str = "",
+    source_relpath: str = OPENCLAW_CONFIG_REL,
+    provider_field_prefix: str = _CONFIG_PROVIDER_FIELD_PREFIX,
+    provider_pointer_prefix: str = _CONFIG_PROVIDER_POINTER_PREFIX,
     extra: Optional[dict[str, object]] = None,
 ) -> Candidate:
     key_extra: dict[str, object] = {"env_name": env_name}
@@ -178,16 +221,26 @@ def _api_key_candidate(
         key_extra.update(extra)
     return Candidate(
         role="api_key",
-        field=f"models.providers.{provider_name}.apiKey",
+        field=f"{provider_field_prefix}.{provider_name}.apiKey",
         value=value,
         source_kind=source_kind,
-        source_relpath=_CONFIG_REL,
-        location=_provider_json_location(provider_name, "apiKey") if source_kind == SourceKind.FILE else None,
+        source_relpath=source_relpath,
+        location=(
+            _provider_json_location(
+                provider_name,
+                "apiKey",
+                provider_pointer_prefix=provider_pointer_prefix,
+            )
+            if source_kind == SourceKind.FILE
+            else None
+        ),
         extra=_provider_extra(
             provider_name=provider_name,
             service=service,
             model=model,
             api_format=api_format,
+            source_relpath=source_relpath,
+            provider_field_prefix=provider_field_prefix,
             extra=key_extra,
         ),
     )
@@ -200,6 +253,9 @@ def _placeholder_provider_key_candidate(
     api_key: str,
     model: str,
     api_format: str,
+    source_relpath: str = OPENCLAW_CONFIG_REL,
+    provider_field_prefix: str = _CONFIG_PROVIDER_FIELD_PREFIX,
+    provider_pointer_prefix: str = _CONFIG_PROVIDER_POINTER_PREFIX,
 ) -> Candidate:
     return _api_key_candidate(
         provider_name=provider_name,
@@ -208,6 +264,9 @@ def _placeholder_provider_key_candidate(
         model=model,
         api_format=api_format,
         env_name=env_reference_name(api_key),
+        source_relpath=source_relpath,
+        provider_field_prefix=provider_field_prefix,
+        provider_pointer_prefix=provider_pointer_prefix,
         extra={"placeholder_provider": True},
     )
 
@@ -219,19 +278,28 @@ def _base_url_candidate(
     value: str,
     model: str,
     api_format: str,
+    source_relpath: str = OPENCLAW_CONFIG_REL,
+    provider_field_prefix: str = _CONFIG_PROVIDER_FIELD_PREFIX,
+    provider_pointer_prefix: str = _CONFIG_PROVIDER_POINTER_PREFIX,
 ) -> Candidate:
     return Candidate(
         role="base_url",
-        field=f"models.providers.{provider_name}.baseUrl",
+        field=f"{provider_field_prefix}.{provider_name}.baseUrl",
         value=value,
         source_kind=SourceKind.FILE,
-        source_relpath=_CONFIG_REL,
-        location=_provider_json_location(provider_name, "baseUrl"),
+        source_relpath=source_relpath,
+        location=_provider_json_location(
+            provider_name,
+            "baseUrl",
+            provider_pointer_prefix=provider_pointer_prefix,
+        ),
         extra=_provider_extra(
             provider_name=provider_name,
             service=service,
             model=model,
             api_format=api_format,
+            source_relpath=source_relpath,
+            provider_field_prefix=provider_field_prefix,
         ),
     )
 
@@ -244,6 +312,9 @@ def _official_provider_key_candidates(
     api_key: str,
     model: str,
     api_format: str,
+    source_relpath: str = OPENCLAW_CONFIG_REL,
+    provider_field_prefix: str = _CONFIG_PROVIDER_FIELD_PREFIX,
+    provider_pointer_prefix: str = _CONFIG_PROVIDER_POINTER_PREFIX,
 ) -> list[Candidate]:
     key_items = collect_provider_api_key_items_by_priority(
         spec,
@@ -266,8 +337,15 @@ def _official_provider_key_candidates(
             source_kind=SourceKind.FILE if index == 0 else SourceKind.PROCESS_ENV,
             key_index=index,
             env_name=str(item.get("env_name", "") or ""),
+            source_relpath=source_relpath,
+            provider_field_prefix=provider_field_prefix,
+            provider_pointer_prefix=provider_pointer_prefix,
         ))
     return result
 
 
-__all__ = ["scan_openclaw_provider_candidates"]
+__all__ = [
+    "OPENCLAW_CONFIG_REL",
+    "OPENCLAW_MAIN_MODELS_REL",
+    "scan_openclaw_provider_candidates",
+]

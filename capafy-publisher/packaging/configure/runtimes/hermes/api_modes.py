@@ -10,8 +10,10 @@ from packaging._shared.llm.api_formats import (
     PLATFORM_API_FORMAT_GOOGLE_GENERATIVE_AI,
     PLATFORM_API_FORMAT_OPENAI_COMPLETIONS,
     PLATFORM_API_FORMAT_OPENAI_RESPONSES,
+    SUPPORTED_PLATFORM_API_FORMATS,
+    is_supported_platform_api_format,
 )
-from packaging._shared.llm.official_providers import OfficialProviderSpec
+from packaging.configure.runtimes.hermes.official_providers import HermesOfficialProviderSpec
 
 
 _HERMES_API_MODE_BY_PLATFORM_API = {
@@ -38,16 +40,23 @@ def platform_api_format_for_upload(value: object) -> str:
     normalized = str(value or "").strip()
     if not normalized:
         return ""
-    return _PLATFORM_API_BY_HERMES_API_MODE.get(normalized, normalized)
+    mapped = _PLATFORM_API_BY_HERMES_API_MODE.get(normalized, normalized)
+    if is_supported_platform_api_format(mapped):
+        return mapped
+    supported = ", ".join(SUPPORTED_PLATFORM_API_FORMATS)
+    raise ValueError(
+        f"Unsupported Hermes api_format/api_mode for upload: {normalized}. "
+        f"Supported platform api_format values: {supported}"
+    )
 
 
-def hermes_default_api_mode(spec: Optional[OfficialProviderSpec]) -> str:
+def hermes_default_api_mode(spec: Optional[HermesOfficialProviderSpec]) -> str:
     if spec is None:
         return hermes_api_mode_for_config(DEFAULT_PLATFORM_API_FORMAT)
     return hermes_api_mode_for_config(spec.api)
 
 
-def platform_default_api_format(spec: Optional[OfficialProviderSpec]) -> str:
+def platform_default_api_format(spec: Optional[HermesOfficialProviderSpec]) -> str:
     return platform_api_format_for_upload(hermes_default_api_mode(spec)) or DEFAULT_PLATFORM_API_FORMAT
 
 
@@ -74,7 +83,7 @@ def hermes_api_mode_from_block_url(block: dict[str, Any]) -> str:
     return hermes_api_mode_from_url(block.get("base_url"))
 
 
-def hermes_api_mode_from_block(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
+def hermes_api_mode_from_block(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
     value = hermes_api_mode_for_config(block.get("api_mode"))
     if value:
         return value
@@ -84,7 +93,7 @@ def hermes_api_mode_from_block(block: dict[str, Any], spec: Optional[OfficialPro
     return hermes_default_api_mode(spec)
 
 
-def platform_api_format_from_block(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
+def platform_api_format_from_block(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
     value = platform_api_format_for_upload(block.get("api_mode"))
     if value:
         return value

@@ -11,9 +11,11 @@ from packaging._shared.env_profiles.path_resolver import resolve_path_spec
 from packaging._shared.contracts.stage_plan import StageFileSource, StagePlan, StageTreeSource
 from packaging.runtimes.openclaw.workspace_common import (
     AGENTS_SKILLS_ROOT,
-    OPENCLAW_EXTENSIONS_DIRNAME,
+    OPENCLAW_OPTIONAL_STAGE_ROOT_FILES,
     OPENCLAW_ROOT,
     OPENCLAW_STAGE_ROOT_FILES,
+    resolve_openclaw_config_source,
+    resolve_openclaw_state_root,
 )
 from packaging.runtimes.openclaw.workspace_paths import (
     packaged_workspace_name,
@@ -22,7 +24,7 @@ from packaging.runtimes.openclaw.workspace_paths import (
 
 
 def _collect_extra_skill_dirs(openclaw_root: Path) -> list[Path]:
-    config_path = safe_expanduser_path(openclaw_root / "openclaw.json")
+    config_path = resolve_openclaw_config_source(openclaw_root=openclaw_root)
     if not config_path.is_file():
         return []
     try:
@@ -51,7 +53,30 @@ def _collect_extra_skill_dirs(openclaw_root: Path) -> list[Path]:
     return result
 
 
-def _fixed_scan_file_sources(openclaw_root: Path, workspace_root: Path) -> list[StageFileSource]:
+def _resolve_fixed_scan_source(
+    file_spec: dict,
+    *,
+    home_root: Path,
+    state_root: Path,
+    workspace_root: Path,
+) -> Path:
+    base = str(file_spec.get("base", "") or "").strip()
+    path = str(file_spec.get("path", "") or "").strip()
+    if base == "home" and path.startswith(".openclaw/"):
+        return safe_expanduser_path(state_root / path.removeprefix(".openclaw/"))
+    return resolve_path_spec(
+        file_spec,
+        home=home_root,
+        runtime_dir=str(workspace_root),
+    )
+
+
+def _fixed_scan_file_sources(
+    openclaw_root: Path,
+    workspace_root: Path,
+    *,
+    state_root: Path,
+) -> list[StageFileSource]:
     file_sources: list[StageFileSource] = []
     profile = load_profile("openclaw")
     home_root = safe_expanduser_path(openclaw_root).parent
@@ -66,10 +91,11 @@ def _fixed_scan_file_sources(openclaw_root: Path, workspace_root: Path) -> list[
         display_parts = PurePosixPath(display_path).parts
         file_sources.append(
             StageFileSource(
-                source_file=resolve_path_spec(
+                source_file=_resolve_fixed_scan_source(
                     file_spec,
-                    home=home_root,
-                    runtime_dir=str(workspace_root),
+                    home_root=home_root,
+                    state_root=state_root,
+                    workspace_root=workspace_root,
                 ),
                 relative_target_path=Path("_scan_only").joinpath(*display_parts),
                 source_key=display_path,
@@ -87,7 +113,7 @@ def build_stage_plan(
     openclaw_root: Path = OPENCLAW_ROOT,
     agents_skills_root: Path = AGENTS_SKILLS_ROOT,
     stage_root_files: tuple[str, ...] = OPENCLAW_STAGE_ROOT_FILES,
-    extensions_dirname: str = OPENCLAW_EXTENSIONS_DIRNAME,
+    optional_stage_root_files: tuple[str, ...] = OPENCLAW_OPTIONAL_STAGE_ROOT_FILES,
 ) -> StagePlan:
     normalized_runtime_dir = str(runtime_dir or "").strip()
     if not normalized_runtime_dir:
@@ -101,6 +127,8 @@ def build_stage_plan(
         normalized_runtime_dir,
         openclaw_root=openclaw_root,
     )
+    state_root = resolve_openclaw_state_root(openclaw_root=openclaw_root)
+    config_source_file = resolve_openclaw_config_source(openclaw_root=openclaw_root)
     tree_sources.append(
         StageTreeSource(
             source_root=workspace_root,
@@ -111,12 +139,27 @@ def build_stage_plan(
         )
     )
     for filename in stage_root_files:
+        source_file = safe_expanduser_path(openclaw_root / filename)
+        target_filename = filename
+        if filename == "openclaw.json":
+            source_file = config_source_file
+            target_filename = "openclaw.json"
         file_sources.append(
             StageFileSource(
-                source_file=safe_expanduser_path(openclaw_root / filename),
+                source_file=source_file,
+                relative_target_path=Path(".openclaw") / target_filename,
+                source_key=f".openclaw/{target_filename}",
+                source_value="copied",
+            )
+        )
+    for filename in optional_stage_root_files:
+        file_sources.append(
+            StageFileSource(
+                source_file=safe_expanduser_path(state_root / filename),
                 relative_target_path=Path(".openclaw") / filename,
                 source_key=f".openclaw/{filename}",
                 source_value="copied",
+                required=False,
             )
         )
 
@@ -131,19 +174,6 @@ def build_stage_plan(
             required=False,
         )
     )
-    extensions_root = safe_expanduser_path(openclaw_root / extensions_dirname)
-    if extensions_root.is_dir():
-        tree_sources.append(
-            StageTreeSource(
-                source_root=extensions_root,
-                relative_target_root=Path(".openclaw") / extensions_dirname,
-                display_prefix=".openclaw/extensions",
-                source_key=".openclaw/extensions",
-                source_value="copied",
-                skip_skill_runtime_outputs=True,
-            )
-        )
-
     tree_sources.append(
         StageTreeSource(
             source_root=safe_expanduser_path(agents_skills_root),
@@ -169,7 +199,7 @@ def build_stage_plan(
             )
         )
 
-    file_sources.extend(_fixed_scan_file_sources(openclaw_root, workspace_root))
+    file_sources.extend(_fixed_scan_file_sources(openclaw_root, workspace_root, state_root=state_root))
 
     return StagePlan(
         tree_sources=tree_sources,

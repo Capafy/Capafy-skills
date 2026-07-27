@@ -6,7 +6,6 @@ from packaging.configure.sensitive.strategy_registry import apply_redaction_stra
 from packaging._shared.env_profiles.config_files import collect_redacted_config_files
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging._shared.runtimes.contracts import call_optional_target_hook
-from packaging._shared.runtimes.support import collect_optional_command_first_line
 
 
 def _apply_profile_redactions(target, staging_root: Path) -> int:
@@ -46,18 +45,6 @@ def finalize_packaging(
     return result
 
 
-def collect_runtime_environment_fields(target) -> dict:
-    runtime_env = target.profile.get("runtime_env", {})
-    if not isinstance(runtime_env, dict):
-        return {}
-    field = runtime_env.get("field")
-    command = runtime_env.get("command")
-    if not field or not isinstance(command, list) or not command:
-        return {}
-    return {str(field): collect_optional_command_first_line([str(item) for item in command])}
-
-
 __all__ = [
-    "collect_runtime_environment_fields",
     "finalize_packaging",
 ]

@@ -57,17 +57,6 @@ def collect_optional_packaged_config_paths(profile: dict) -> list[str]:
     ]
 
 
-def collect_scan_only_config_paths(profile: dict) -> list[str]:
-    return [
-        path
-        for path in (
-            _contract_config_files(profile, "config_files")
-            + _contract_config_files(profile, "optional_config_files")
-        )
-        if is_scan_only_config_path(path)
-    ]
-
-
 def redaction_strategy_for_config_path(path: object) -> str:
     normalized = _normalize_relpath(path)
     suffix = PurePosixPath(normalized).suffix.lower()
@@ -98,7 +87,6 @@ __all__ = [
     "collect_packaged_config_paths",
     "collect_redacted_config_files",
     "collect_required_packaged_config_paths",
-    "collect_scan_only_config_paths",
     "is_scan_only_config_path",
     "redaction_strategy_for_config_path",
 ]

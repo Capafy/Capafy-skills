@@ -27,16 +27,26 @@ GENERIC_API_KEY_PATTERNS = (
 )
 ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,127}$")
 FIELD_BEFORE_VALUE_PATTERN = re.compile(
-    r"(?:^|[\s,{;])(?:export\s+)?(?:const\s+|let\s+|var\s+)?"
-    r"(?P<field>[A-Za-z_][A-Za-z0-9_.-]{0,120})\s*[:=]\s*['\"]?\s*$"
+    r"^\s*(?:[,{]\s*)?(?:export\s+)?(?:const\s+|let\s+|var\s+)?['\"]?"
+    r"(?P<field>[A-Za-z_][A-Za-z0-9_.-]{0,120})['\"]?\s*[:=]\s*['\"]?\s*$"
 )
+VAGUE_FIELD_NAMES = {
+    "credential",
+    "credentials",
+    "key",
+    "secret",
+    "token",
+    "value",
+}
 
 
 def _field_before_match(line: str, start_col: int, service: str) -> str:
     prefix = line[:start_col]
-    match = FIELD_BEFORE_VALUE_PATTERN.search(prefix)
+    match = FIELD_BEFORE_VALUE_PATTERN.match(prefix)
     if match:
-        return match.group("field")
+        field = match.group("field")
+        if field.lower() not in VAGUE_FIELD_NAMES:
+            return field
     return f"{service.upper()}_API_KEY"
 
 
@@ -99,5 +109,6 @@ def collect_generic_key_candidates(text: str, relpath: str) -> list[dict]:
 
 __all__ = [
     "GENERIC_API_KEY_PATTERNS",
+    "VAGUE_FIELD_NAMES",
     "collect_generic_key_candidates",
 ]

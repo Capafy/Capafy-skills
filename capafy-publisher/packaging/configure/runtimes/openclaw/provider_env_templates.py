@@ -17,7 +17,7 @@ from packaging.configure.runtimes.openclaw.provider_keys import collect_provider
 from packaging.configure.runtimes.openclaw.provider_usage import path_likely_contains_openclaw_model_ref
 
 if TYPE_CHECKING:
-    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
+    from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 
 
 OPENCLAW_CONFIG_REL_SOURCE = ".openclaw/openclaw.json"
@@ -220,7 +220,7 @@ def collect_openclaw_staged_dotenv_env(
     staging_root: Path,
     config_text: str,
     *,
-    env_context: "RuntimeEnvContext",
+    provider_config_context: "ProviderRuntimeConfigContext",
 ) -> dict[str, str]:
     try:
         payload = json.loads(config_text)
@@ -233,7 +233,7 @@ def collect_openclaw_staged_dotenv_env(
     if not names:
         return {}
 
-    return env_context.staged_dotenv_values_for_consumer(
+    return provider_config_context.staged_dotenv_values_for_consumer(
         Path(staging_root),
         consumer_relpath=OPENCLAW_CONFIG_REL_SOURCE,
         names=frozenset(names),
@@ -243,7 +243,7 @@ def collect_openclaw_staged_dotenv_env(
 def resolve_openclaw_staged_env_templates(
     staging_root: Path,
     *,
-    env_context: "RuntimeEnvContext",
+    provider_config_context: "ProviderRuntimeConfigContext",
 ) -> frozenset[str]:
     root = Path(staging_root)
     config_path = root / OPENCLAW_CONFIG_REL_SOURCE
@@ -255,10 +255,11 @@ def resolve_openclaw_staged_env_templates(
     if not isinstance(payload, dict):
         return frozenset()
 
-    dotenv_relpaths = env_context.staged_dotenv_relpaths_for_consumer(OPENCLAW_CONFIG_REL_SOURCE)
-    dotenv_env = collect_openclaw_staged_dotenv_env(root, config_text, env_context=env_context)
+    claimed_env_names = set(_openclaw_config_env(payload))
+    dotenv_relpaths = provider_config_context.staged_dotenv_relpaths_for_consumer(OPENCLAW_CONFIG_REL_SOURCE)
+    dotenv_env = collect_openclaw_staged_dotenv_env(root, config_text, provider_config_context=provider_config_context)
     template_env_names = frozenset(_OPENCLAW_ENV_TEMPLATE_RE.findall(config_text))
-    merged_process_env = env_context.env_for_names(template_env_names)
+    merged_process_env = provider_config_context.env_for_names(template_env_names)
     config_env = resolve_openclaw_config_env(
         payload=payload,
         dotenv_env=dotenv_env,
@@ -271,16 +272,16 @@ def resolve_openclaw_staged_env_templates(
         consumed_env_names,
     )
     if rewrites <= 0:
-        return frozenset()
+        return frozenset(claimed_env_names)
 
     drop_consumed_config_env(payload, consumed_env_names)
-    env_context.consume_staged_dotenv_names(
+    provider_config_context.consume_staged_dotenv_names(
         root,
         relpaths=dotenv_relpaths,
         names=frozenset(consumed_env_names),
     )
     config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return frozenset(consumed_env_names)
+    return frozenset(claimed_env_names | consumed_env_names)
 
 
 __all__ = [

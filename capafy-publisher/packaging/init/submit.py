@@ -10,6 +10,7 @@ from packaging._shared.contracts.selection_groups import (
     is_selected_selection_group_item,
     normalize_documented_selection_groups,
 )
+from packaging._shared.platform.runtime_mapping import normalize_default_language_code
 from packaging._shared.platform import create_agent_from_draft, create_version_from_draft
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 from packaging.runtimes import get_target
@@ -26,7 +27,7 @@ def _invalid_publish_init_input(error: str) -> tuple[dict[str, Any], int]:
         failed_step="parse_selections_json",
         blocking_category="invalid_publish_init_input",
         developer_next_steps=[
-            "Pass selections_json with top-level skills, plugins, and crons arrays.",
+            "Pass selections_json with a top-level skills array.",
             "Rerun publish-init after fixing the selections payload.",
         ],
         next_step="fix_publish_init_input_then_retry",
@@ -128,7 +129,7 @@ def _normalize_runtime_selection_groups(
             f"{', '.join(context_keys)} are not accepted in publish-init selections; "
             "they are discovered after runtime selection and confirmed on the platform page"
         )
-    allowed_selection_keys = {"agent_id", "title", "description", *RUNTIME_SELECTION_GROUP_KEYS}
+    allowed_selection_keys = {"agent_id", "title", "description", "lang", *RUNTIME_SELECTION_GROUP_KEYS}
     unsupported_keys = sorted(key for key in selections if key not in allowed_selection_keys)
     if unsupported_keys:
         return None, _invalid_publish_init_input(
@@ -137,7 +138,7 @@ def _normalize_runtime_selection_groups(
     missing_runtime_keys = [key for key in RUNTIME_SELECTION_GROUP_KEYS if key not in selections]
     if missing_runtime_keys:
         return None, _invalid_publish_init_input(
-            "selections_json must include top-level skills, plugins, and crons arrays"
+            "selections_json must include a top-level skills array"
         )
 
     raw_runtime_groups: dict[str, Any] = {}
@@ -183,6 +184,10 @@ def publish_init_submit(
     final_agent_id = explicit_agent_id or selection_agent_id
     title = str(selections.get("title", "") or "").strip()
     description = str(selections.get("description", "") or "").strip()
+    try:
+        default_language_code = normalize_default_language_code(selections.get("lang"))
+    except ValueError as exc:
+        return _invalid_publish_init_input(str(exc))
 
     selection_groups, error = _normalize_runtime_selection_groups(selections)
     if error is not None:
@@ -228,6 +233,8 @@ def publish_init_submit(
         },
         "selection_groups": selection_groups,
     }
+    if default_language_code:
+        card_draft["lang"] = default_language_code
     if final_agent_id:
         result = create_version_from_draft(final_agent_id, card_draft)
     else:

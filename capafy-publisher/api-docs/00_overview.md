@@ -89,7 +89,8 @@ This is an "axiomatic" rule; it is not repeated below — only "the returned `ur
 - `--env` is the target runtime; if the subject being published is a `metadata.openclaw` skill, `openclaw` must be passed.
 - `--runtime-dir` is the project root / workspace root opened in the host session; do not pass the user home, the publisher skill root, the directory of the skill being published itself, or the parent `skills` directory. Claude Code / Codex passes the current session's project root; OpenClaw passes the current OpenClaw workspace.
 - `--skill-dir` is the optional single source directory of the skill being published; it must contain `SKILL.md`; it does not change the semantics of `--runtime-dir`, and cannot be the parent `skills` directory.
-- When `publish-init` submits selections, it is recommended to use `--selections-file .temp/confirmed-selections.json` to avoid multi-line JSON being damaged by shell quoting. Selections must be top-level `{ "title", "description", "skills", "plugins", "crons" }`; when updating an existing Agent, also add top-level `agent_id`; do not wrap inside `selection_groups`, and do not pass `workflow_intent`.
+- When `publish-init` submits selections, it is recommended to use `--selections-file .temp/confirmed-selections.json` to avoid multi-line JSON being damaged by shell quoting. Selections must be top-level `{ "title", "description", "skills" }`; when updating an existing Agent, also add top-level `agent_id`; do not wrap inside `selection_groups`, and do not pass `workflow_intent`.
+- Optional top-level `lang` sets the new listing's default language code (saved to the card's `defaultLanguageCode`); only applied on the create path (new Agent), ignored on the version-update path. Accepted values: `en` / `es` / `fr` / `de` / `it` / `ja` / `zh` / `zh-TW` / `ar` / `nl` / `ko` / `pt` (matched case-insensitively); an unsupported value fails `publish-init` with `invalid_publish_init_input`. Set it from the language the creator has been conversing in (Claude Code / Codex / Hermes chat); omit it to let the platform apply its own default.
 - `publish-configure` only accepts a dispositions file path via `--dispositions-file <dispositions.json>` when buyout mode needs the creator to choose how to handle sensitive items; do not pass inline JSON.
 - Copyable command form: `python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter --selections-file .temp/confirmed-selections.json`. Example paths must be replaced with the actual paths on the local machine.
 - `publish-init` first verifies platform login state; if not logged in or the token has expired, it returns `platform_login_required` / `platform_login_invalid` and does not continue local candidate discovery or submission.
@@ -169,7 +170,7 @@ Common S05 account fields:
 | `agentStatus` | `draft` / `under_review` / `review_rejected` / `online` / `offline` / `banned` | List view status |
 | `status` | `0` / `1` / `2` / `3` / `4` / `5` / `6` | The overall agent lifecycle status of the **latest version**: draft, under review, review rejected, review passed/pending listing, listed, expired, delisted. `0` = draft (not submitted); do not misread as "submitted / processing" |
 | `auditStatus` | `0` / `1` / `2` / `3` / `4` | Review sub-status of the **latest version** (only meaningful when `status` is in the review-flow segment): review not started, auto-review in progress, manual review in progress, review failed, review passed. `0` = review not started; not "pending review / under review" |
-| `agentRuntime` | `openclaw` / `codex` / `opencode` / `claude` | Runtime identifier returned by the platform; this skill currently only maps `claude` / `codex` / `openclaw` to local runtimes |
+| `agentRuntime` | `openclaw` / `codex` / `claude` / `hermes` | Runtime identifier returned by the platform; this skill maps `claude` / `codex` / `openclaw` / `hermes` to local runtimes |
 
 `status in (0, 2)` is the baseline gate for subsequent publish write operations; the specific next step is determined by the JSON payload returned by `publish-*` commands.
 
@@ -240,6 +241,8 @@ Detail fields:
 | `categoryId` | number/null | Category ID. |
 | `categoryName` | string/null | Category display name. |
 | `workflowInfo` | object/string/null | Workflow description and structured selection information saved by the platform; confirmed skill selection is based on the `selection_groups` inside. |
+
+When `publish-init` creates a new Agent or version, every candidate in the uploaded `workflowInfo.selection_groups` is initialized with `selection: "excluded"`. The first web confirmation page therefore starts with no candidate selected; the creator must explicitly check the skills and workspace documents to publish.
 | `requiredCredentials` | array/object/null | Credential declarations required for hosted running. |
 | `securityPrivacy` | object/null | Security and privacy declarations. |
 | `billings` | array | All billing plans for the current version. |

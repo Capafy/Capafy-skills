@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 from typing import Optional
 
-from packaging._shared.llm.official_providers import find_official_provider_by_marker
 from packaging.configure.runtimes.hermes.provider_blocks import HermesProviderBlock
+from packaging.configure.runtimes.hermes.official_providers import find_hermes_official_provider_by_marker
 
 
 def find_custom_provider(custom_providers: list[Any], name: object) -> Optional[dict[str, Any]]:
@@ -54,7 +54,7 @@ def referenced_custom_provider_group(
 
 def provider_block_has_inline_credentials(provider_block: HermesProviderBlock) -> bool:
     block = provider_block.block
-    for field in ("api_key", "key_env", "base_url"):
+    for field in ("api_key", "key_env", "api_key_env", "base_url", "api_base"):
         value = block.get(field)
         if isinstance(value, str) and value.strip():
             return True
@@ -70,7 +70,7 @@ def _normalize_provider_name(value: object) -> str:
 def _is_builtin_provider_name(value: str) -> bool:
     if value == "openrouter":
         return True
-    return find_official_provider_by_marker(value) is not None
+    return find_hermes_official_provider_by_marker(value) is not None
 
 
 __all__ = [

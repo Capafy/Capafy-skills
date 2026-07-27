@@ -6,21 +6,22 @@ from pathlib import Path
 
 from packaging._shared.common.constants import STRUCTURED_ASSIGNMENT_PATTERNS
 from packaging.configure.contracts import (
-    PROCESS_ENV_SOURCE,
     DeepScanFinding,
     DeepScanFindingsInput,
-    EnvVar,
     FieldLocation,
     GenericValue,
 )
 from packaging.configure.scan.structured_scan_policy import infer_assignment_service
-from packaging.configure.sensitive.literals import infer_managed_value_type, looks_like_platform_managed_placeholder_value
+from packaging.configure.sensitive.literals import (
+    infer_managed_value_type,
+    looks_like_placeholder_value,
+    looks_like_platform_managed_placeholder_value,
+)
 from packaging.configure.sensitive.placeholders import build_placeholder, split_source
 from packaging.configure.staging.source_boundary import final_zip_source_relpaths, normalize_packaged_source_relpath
 
 
 _SOURCE_FIELD_TOKEN_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*")
-_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _load_generic_findings(payload: object) -> tuple[DeepScanFinding, ...]:
@@ -37,7 +38,14 @@ def _load_generic_findings(payload: object) -> tuple[DeepScanFinding, ...]:
         source = str(item.get("source", "") or "").strip()
         if not value or not source:
             continue
-        if looks_like_platform_managed_placeholder_value(value):
+        # Deep-scan findings are supplied by the host review pass.  Do not
+        # turn masked / illustrative snippets from prose (for example
+        # ``4d30a001...``) into hosted credentials.  These are placeholders,
+        # not values that can be safely rewritten or configured.
+        if (
+            looks_like_placeholder_value(value)
+            or looks_like_platform_managed_placeholder_value(value)
+        ):
             continue
         field = str(item.get("field", "") or "").strip()
         value_type = str(item.get("value_type", "") or "").strip() or "value"
@@ -52,51 +60,19 @@ def _load_generic_findings(payload: object) -> tuple[DeepScanFinding, ...]:
     return tuple(findings)
 
 
-def _load_env_var_findings(payload: object) -> tuple[EnvVar, ...]:
-    if payload is None:
-        return ()
-    if not isinstance(payload, list):
-        raise ValueError("deep_scan_findings.env_var must be an array")
-
-    env_vars: list[EnvVar] = []
-    for index, item in enumerate(payload):
-        if not isinstance(item, dict):
-            raise ValueError(f"deep_scan_findings.env_var[{index}] must be an object")
-        value = str(item.get("value", "") or "").strip()
-        field = str(item.get("field", "") or "").strip()
-        if not value or not field:
-            raise ValueError(f"deep_scan_findings.env_var[{index}] must include non-empty value and field")
-        if looks_like_platform_managed_placeholder_value(value):
-            continue
-        if not _ENV_NAME_PATTERN.fullmatch(field):
-            raise ValueError(f"deep_scan_findings.env_var[{index}].field must be a valid env var name")
-        value_type = str(item.get("value_type", "") or "").strip() or infer_managed_value_type(field, value)
-        service = infer_assignment_service(PROCESS_ENV_SOURCE, field, value)
-        env_vars.append(
-            EnvVar(
-                name=field,
-                referenced_in=(),
-                process_value=value,
-                placeholder=build_placeholder(
-                    service,
-                    "\n".join((PROCESS_ENV_SOURCE, field)),
-                    field=field,
-                    locator="",
-                    value_type=value_type,
-                ),
-            )
-        )
-    return tuple(env_vars)
-
-
 def load_deep_scan_findings(payload: object) -> DeepScanFindingsInput:
     if payload is None:
         return DeepScanFindingsInput()
     if not isinstance(payload, dict):
-        raise ValueError("deep_scan_findings must be an object with generic and env_var arrays")
+        raise ValueError("deep_scan_findings must be an object with a generic array")
+    unexpected_fields = sorted(set(payload) - {"generic"})
+    if unexpected_fields:
+        raise ValueError(
+            "deep_scan_findings only supports the generic array; unexpected fields: "
+            + ", ".join(unexpected_fields)
+        )
     generic = _load_generic_findings(payload.get("generic"))
-    env_var = _load_env_var_findings(payload.get("env_var"))
-    return DeepScanFindingsInput(generic=generic, env_var=env_var)
+    return DeepScanFindingsInput(generic=generic)
 
 
 def load_deep_scan_findings_json(raw_json: Optional[str]) -> DeepScanFindingsInput:
@@ -182,7 +158,6 @@ def _generic_findings_to_values(
     seen_generic: set[tuple[str, str, str]] = set()
     packaged_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        excluded_relpaths=(),
         agent_type=agent_type,
     )
     for finding in findings:
@@ -261,26 +236,9 @@ def deep_scan_findings_to_generic_values_for_staging(
     )
 
 
-def deep_scan_findings_to_reviewed_inputs_for_staging(
-    staging_root: Path,
-    findings: DeepScanFindingsInput,
-    *,
-    agent_type: str = "run_online",
-    verify_sources: bool = True,
-) -> tuple[tuple[GenericValue, ...], tuple[EnvVar, ...]]:
-    generic_values = deep_scan_findings_to_generic_values_for_staging(
-        staging_root,
-        findings,
-        verify_sources=verify_sources,
-        agent_type=agent_type,
-    )
-    return generic_values, tuple(findings.env_var)
-
-
 __all__ = [
     "DeepScanFinding",
     "deep_scan_findings_to_generic_values_for_staging",
-    "deep_scan_findings_to_reviewed_inputs_for_staging",
     "load_deep_scan_findings",
     "load_deep_scan_findings_file",
     "load_deep_scan_findings_json",

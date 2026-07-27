@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Optional
 
 from packaging.configure.env_values import usable_env_value
@@ -20,11 +21,12 @@ _AUTH_PROFILE_NON_PROVIDER_TOKENS = frozenset({
 
 
 def load_auth_profile_keys(ctx: Any) -> dict[str, list[str]]:
-    for base in (ctx.scan_only_root, ctx.staging_root):
-        path = base / OPENCLAW_AUTH_PROFILE_REL
-        if path.is_file():
-            break
-    else:
+    path = _scan_only_source_file(
+        ctx,
+        f"_scan_only/{OPENCLAW_AUTH_PROFILE_REL}",
+        OPENCLAW_AUTH_PROFILE_REL,
+    )
+    if path is None:
         return {}
 
     try:
@@ -59,6 +61,14 @@ def load_auth_profile_keys(ctx: Any) -> dict[str, list[str]]:
 
     walk(payload, [])
     return result
+
+
+def _scan_only_source_file(ctx: Any, *relpaths: str) -> Optional[Path]:
+    resolver = getattr(ctx, "scan_only_source_file", None)
+    if not callable(resolver):
+        return None
+    path = resolver(*relpaths)
+    return Path(path) if path is not None else None
 
 
 def _normalize_auth_profile_provider_name(value: object) -> str:

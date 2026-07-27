@@ -4,19 +4,14 @@ from pathlib import PurePosixPath
 from typing import List, Optional, TypedDict
 
 from .selectable import is_absolute_like_path, normalize_text
-from .path_shapes import is_cron_unit_type, is_plugin_unit_type
 
 
 SELECTION_GROUP_KEYS = (
     "skills",
-    "plugins",
-    "crons",
     "workspace_documents",
 )
 RUNTIME_SELECTION_GROUP_KEYS = (
     "skills",
-    "plugins",
-    "crons",
 )
 _DEFAULT_SELECTION = "selected"
 
@@ -24,25 +19,6 @@ _DEFAULT_SELECTION = "selected"
 
 
 
-
-
-class CronSchedule(TypedDict, total=False):
-    kind: str
-    expr: str
-    tz: str
-
-
-class CronPayload(TypedDict, total=False):
-    prompt: str
-
-
-class CronGroupItem(TypedDict, total=False):
-    id: str
-    name: str
-    selection: str
-    schedule: CronSchedule
-    payload: CronPayload
-    decision: str
 
 
 class GroupItem(TypedDict, total=False):
@@ -67,8 +43,6 @@ class GroupItem(TypedDict, total=False):
 
 class SelectionGroups(TypedDict, total=False):
     skills: List[GroupItem]
-    plugins: List[GroupItem]
-    crons: List[CronGroupItem]
     workspace_documents: List[GroupItem]
 
 
@@ -103,6 +77,8 @@ def _explicit_purpose(item: dict) -> str:
 
 def _document_purpose(path: str) -> str:
     filename = PurePosixPath(path).name.lower()
+    if filename == "claude.md":
+        return "Usually contains private project instructions and local context"
     if filename == "agents.md":
         return "Workflow instructions and behavioral constraints"
     if filename == "soul.md":
@@ -122,11 +98,6 @@ def _unit_purpose(item: dict) -> str:
     explicit = _explicit_purpose(item)
     if explicit:
         return explicit
-    unit_type = normalize_text(item.get("unit_type"))
-    if is_plugin_unit_type(unit_type):
-        return "Workflow plugin extension"
-    if is_cron_unit_type(unit_type):
-        return "Workflow scheduled task"
     return "Workflow execution unit"
 
 
@@ -175,53 +146,6 @@ def _base_group_item(
     return payload
 
 
-def _cron_schedule_payload(schedule: object) -> CronSchedule:
-    if not isinstance(schedule, dict):
-        return {}
-    normalized: CronSchedule = {}
-    for key in ("kind", "expr", "tz"):
-        value = normalize_text(schedule.get(key))
-        if value:
-            normalized[key] = value  # type: ignore[literal-required]
-    return normalized
-
-
-def _cron_prompt_payload(payload: object) -> CronPayload:
-    if not isinstance(payload, dict):
-        return {}
-    prompt = normalize_text(payload.get("prompt"))
-    if not prompt:
-        return {}
-    return {"prompt": prompt}
-
-
-def _cron_group_item(
-    item: dict,
-    *,
-    preserve_selection: bool = False,
-) -> Optional[CronGroupItem]:
-    cron_id = normalize_text(item.get("id"))
-    name = normalize_text(item.get("name"))
-    schedule = _cron_schedule_payload(item.get("schedule"))
-    payload = _cron_prompt_payload(item.get("payload"))
-    if not cron_id or not name or not schedule or not payload:
-        return None
-    result: CronGroupItem = {
-        "id": cron_id,
-        "name": name,
-        "selection": _DEFAULT_SELECTION,
-        "schedule": schedule,
-        "payload": payload,
-    }
-    selection = normalize_text(item.get("selection"))
-    if preserve_selection and selection and selection.lower() != _DEFAULT_SELECTION:
-        result["selection"] = selection
-    decision = normalize_text(item.get("decision"))
-    if decision:
-        result["decision"] = decision
-    return result
-
-
 
 
 
@@ -234,8 +158,6 @@ def _group_selected_units(
 ) -> dict:
     grouped: dict = {
         "skills": [],
-        "plugins": [],
-        "crons": [],
     }
     for item in selected_units:
         selection = normalize_text(item.get("selection")).lower()
@@ -246,18 +168,7 @@ def _group_selected_units(
             continue
         if is_absolute_like_path(path):
             raise ValueError("selected_units item path must be a logical path, not an absolute path")
-        unit_type = normalize_text(item.get("unit_type"))
-        target_key = "skills"
-        if is_plugin_unit_type(unit_type):
-            target_key = "plugins"
-        elif is_cron_unit_type(unit_type):
-            target_key = "crons"
-        if target_key == "crons":
-            cron_item = _cron_group_item(item)
-            if cron_item:
-                grouped[target_key].append(cron_item)
-            continue
-        grouped[target_key].append(
+        grouped["skills"].append(
             _base_group_item(
                 item,
                 purpose=_unit_purpose(item),
@@ -329,11 +240,6 @@ def normalize_documented_selection_groups(raw: object) -> SelectionGroups:
         for item in value:
             if not isinstance(item, dict):
                 continue
-            if key == "crons":
-                normalized_cron = _cron_group_item(item, preserve_selection=True)
-                if normalized_cron is not None:
-                    items.append(normalized_cron)
-                continue
             path = normalize_text(item.get("path"))
             if not path:
                 continue
@@ -380,9 +286,6 @@ def validate_buyout_skill_count(raw: object) -> SelectionGroups:
 __all__ = [
     "RUNTIME_SELECTION_GROUP_KEYS",
     "SELECTION_GROUP_KEYS",
-    "CronGroupItem",
-    "CronPayload",
-    "CronSchedule",
     "GroupItem",
     "SelectionGroups",
     "build_selected_selection_groups",

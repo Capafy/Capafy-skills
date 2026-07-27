@@ -42,6 +42,20 @@ _PASSWORD_SAMPLE_VALUES = {
     "123456",
 }
 
+_MASKED_VALUE_EXACT = {
+    "hidden",
+    "masked",
+    "redacted",
+}
+_HORIZONTAL_ELLIPSIS = re.escape(chr(0x2026))
+_BULLET = re.escape(chr(0x2022))
+_MASKED_VALUE_PATTERN = re.compile(
+    rf"(?:\.{{3,}}|{_HORIZONTAL_ELLIPSIS}|\*{{3,}}|{_BULLET}{{3,}})"
+)
+_ONLY_MASK_CHARS_PATTERN = re.compile(
+    rf"[xX*._\-{_BULLET}{_HORIZONTAL_ELLIPSIS}]{{4,}}"
+)
+
 
 def extract_secret_value(key: str, value: str) -> Optional[str]:
     stripped = value.strip()
@@ -174,6 +188,13 @@ def strip_literal_value(raw: str) -> str:
 def looks_like_placeholder_value(value: str) -> bool:
     lowered = value.strip().lower()
     if not lowered:
+        return True
+    if lowered in _MASKED_VALUE_EXACT:
+        return True
+    if (
+        _MASKED_VALUE_PATTERN.search(value)
+        or _ONLY_MASK_CHARS_PATTERN.fullmatch(value.strip())
+    ):
         return True
     if lowered == "platform_managed_key":
         return True

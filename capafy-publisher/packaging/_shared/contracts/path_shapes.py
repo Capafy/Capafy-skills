@@ -11,28 +11,6 @@ from packaging._shared.contracts.selectable import INSTRUCTION_DOC_BASENAMES, IN
 
 SUSPICIOUS_SKILL_SUFFIXES = tuple(sorted(CREDENTIAL_EXCLUDED_SUFFIXES))
 SKILL_UNIT_TYPE = "skill"
-PLUGIN_UNIT_TYPE = "plugin"
-OPENCLAW_PLUGIN_UNIT_TYPE = "openclaw_plugin"
-CRON_UNIT_TYPE = "cron"
-
-
-
-PLUGIN_UNIT_TYPES = frozenset(
-    {
-        PLUGIN_UNIT_TYPE,
-        OPENCLAW_PLUGIN_UNIT_TYPE,
-    }
-)
-
-
-def is_plugin_unit_type(unit_type: str) -> bool:
-    return str(unit_type).strip() in PLUGIN_UNIT_TYPES
-
-
-def is_cron_unit_type(unit_type: str) -> bool:
-    return str(unit_type).strip() == CRON_UNIT_TYPE
-
-
 def normalized_parts(display_path: str) -> list[str]:
     pure = PurePosixPath(display_path.rstrip("/"))
     return [part for part in pure.parts if part and part != "."]

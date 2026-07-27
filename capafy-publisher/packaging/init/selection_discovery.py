@@ -15,11 +15,9 @@ from .runtime_units import discover_units
 
 
 CANDIDATE_REASON_LIMIT = 3
-CANDIDATE_GROUP_KEYS = ("skills", "plugins", "crons")
+CANDIDATE_GROUP_KEYS = ("skills",)
 DEFAULT_UNIT_PURPOSES = {
     "Workflow execution unit",
-    "Workflow plugin extension",
-    "Workflow scheduled task",
 }
 BRIEF_ITEM_KEYS = (
     "path",
@@ -85,10 +83,6 @@ def _is_self_publisher_candidate(entry: DiscoveryUnit) -> bool:
     return False
 
 
-def _is_plugin_skill_path(path: str) -> bool:
-    return "/plugins/" in f"/{_normalize_discovery_path(path)}/"
-
-
 def _suppress_nested_skill_copies(candidates: list[DiscoveryUnit]) -> list[DiscoveryUnit]:
     parent_paths = {
         _normalize_discovery_path(item.get("path"))
@@ -103,9 +97,6 @@ def _suppress_nested_skill_copies(candidates: list[DiscoveryUnit]) -> list[Disco
             filtered.append(item)
             continue
         path = _normalize_discovery_path(item.get("path"))
-        if _is_plugin_skill_path(path):
-            filtered.append(item)
-            continue
         if any(_path_is_nested_under(parent, path) for parent in parent_paths):
             continue
         filtered.append(item)
@@ -282,8 +273,6 @@ def _skill_dedupe_key(entry: DiscoveryUnit) -> Optional[str]:
     path = _normalize_discovery_path(entry.get("path", ""))
     if not path:
         return None
-    if "/plugins/" in f"/{path}/" and "/skills/" in path:
-        return path
     return rootless_skill_path(path) or path
 
 

@@ -15,13 +15,11 @@ BUYOUT_FORBIDDEN_DIRS = {
     ".codex",
     ".config",
     ".openclaw",
-    "plugins",
     "skills",
     "workspace",
 }
 BUYOUT_FORBIDDEN_FILES = {
     "agent.runtime_dependencies.json",
-    "agent.runtime_environment.json",
 }
 
 

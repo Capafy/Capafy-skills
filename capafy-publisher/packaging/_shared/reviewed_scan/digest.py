@@ -54,12 +54,7 @@ def compute_staging_digest(staging_root: Union[str, Path]) -> str:
     return _compute_file_digest(staging_root, include_scan_only=False)
 
 
-def compute_scan_only_digest(staging_root: Union[str, Path]) -> str:
-    return _compute_file_digest(staging_root, include_scan_only=True)
-
-
 __all__ = [
     "compute_scan_digest",
-    "compute_scan_only_digest",
     "compute_staging_digest",
 ]

@@ -30,6 +30,19 @@ _DEFAULT_MODEL_TEMPLATE = {
         "Content-Type": "application/json",
     },
 }
+_PROVIDER_RUNTIME_METADATA_KEYS = frozenset({"agentRuntime", "agent_runtime"})
+
+
+def strip_provider_runtime_metadata(providers: dict[str, object]) -> int:
+    removed = 0
+    for provider in providers.values():
+        if not isinstance(provider, dict):
+            continue
+        for key in _PROVIDER_RUNTIME_METADATA_KEYS:
+            if key in provider:
+                provider.pop(key, None)
+                removed += 1
+    return removed
 
 
 def official_provider_placeholder(
@@ -289,4 +302,5 @@ __all__ = [
     "official_provider_placeholder",
     "provider_name_for_spec",
     "provider_payload_matches_spec",
+    "strip_provider_runtime_metadata",
 ]

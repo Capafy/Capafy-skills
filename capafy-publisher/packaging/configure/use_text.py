@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from packaging.configure.exclusion import EXCLUDE_FILE_SUFFIXES
-
-
 def _label_or_fallback(value: str, fallback: str) -> str:
     label = str(value or "").strip()
     return label or fallback
@@ -28,24 +25,6 @@ def use_for_generic_value(
     return f"Runtime value for {label}" if label else "Runtime value"
 
 
-def use_for_env_var(name: str) -> str:
-    return f"Environment variable {_label_or_fallback(name, 'value')}"
-
-
-def use_for_excluded_file(source: str, reason: str) -> str:
-    normalized_source = str(source or "").strip().lower()
-    reason_code = str(reason or "").strip()
-    if reason_code == "private_key":
-        return "Private key file excluded from package"
-    if reason_code == "cert":
-        return "Certificate or keystore file excluded from package"
-    if any(normalized_source.endswith(suffix) for suffix in EXCLUDE_FILE_SUFFIXES):
-        return "Login credential file excluded from package"
-    return "Credential file excluded from package"
-
-
 __all__ = [
-    "use_for_env_var",
-    "use_for_excluded_file",
     "use_for_generic_value",
 ]

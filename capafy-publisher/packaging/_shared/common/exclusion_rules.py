@@ -18,14 +18,6 @@ STAGE_EXCLUDED_DIRS = SYSTEM_DIRS | {
     ".purple",
 }
 
-_NO_AUTH_NEUTRAL_EXCLUDED_DIRS = SYSTEM_DIRS | {
-    "memory",
-    ".temp",
-    ".temp-fallback",
-}
-
-CREDENTIAL_EXCLUDED_DIRS = STAGE_EXCLUDED_DIRS - _NO_AUTH_NEUTRAL_EXCLUDED_DIRS
-
 STAGE_EXCLUDED_SUFFIXES = {
     ".pyc", ".pyo", ".log",
     ".pem",
@@ -48,23 +40,15 @@ _NON_CREDENTIAL_EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".log"}
 
 CREDENTIAL_EXCLUDED_SUFFIXES = STAGE_EXCLUDED_SUFFIXES - _NON_CREDENTIAL_EXCLUDED_SUFFIXES
 
-_SCAN_EXCLUDED_FILE_EXTENSIONS = tuple(sorted(CREDENTIAL_EXCLUDED_SUFFIXES))
-_CERT_OR_KEYSTORE_SUFFIXES = (".jks", ".keystore", ".p12", ".pem", ".pfx")
-
-_COMMON_CREDENTIAL_FILE_BASENAMES: set[str] = set()
-
-STAGE_EXCLUDED_FILES = _COMMON_CREDENTIAL_FILE_BASENAMES
-
 PRIVATE_KEY_FILE_BASENAMES = {
     "id_dsa",
     "id_ecdsa",
     "id_ed25519",
     "id_rsa",
 }
-_SCAN_EXCLUDED_FILE_BASENAMES = _COMMON_CREDENTIAL_FILE_BASENAMES | PRIVATE_KEY_FILE_BASENAMES
-
-STAGE_EXCLUDED_NAME_PATTERNS: tuple = ()
-
+HIGH_RISK_FILE_BASENAMES = PRIVATE_KEY_FILE_BASENAMES | {
+    ".credentials.json",
+}
 SPECIAL_SCAN_PATH_SUFFIXES = (
     ".aws/credentials",
     ".docker/config.json",
@@ -126,7 +110,7 @@ def looks_like_high_risk_file(relpath: str) -> Optional[str]:
     lowered_basename = basename.lower()
     lowered = relpath.lower()
 
-    if lowered_basename in PRIVATE_KEY_FILE_BASENAMES:
+    if lowered_basename in HIGH_RISK_FILE_BASENAMES:
         return f"Filename matches {basename}"
 
     for suffix in EXCLUDE_FILE_SUFFIXES:
@@ -138,58 +122,16 @@ def looks_like_high_risk_file(relpath: str) -> Optional[str]:
     return None
 
 
-def exclude_reason_code_for_path(relpath: str, *, reason: str = "") -> Optional[str]:
-    normalized = str(relpath or "").strip().rstrip("/")
-    if not normalized:
-        return None
-    pure = PurePosixPath(normalized)
-    basename = pure.name.lower()
-    lowered = normalized.lower()
-    lowered_reason = str(reason or "").strip().lower()
-
-    if "private key" in lowered_reason:
-        return "private_key"
-
-    if basename.endswith(_SCAN_EXCLUDED_FILE_EXTENSIONS):
-        if basename.endswith((".key", ".ppk")):
-            return "private_key"
-        if basename.endswith(_CERT_OR_KEYSTORE_SUFFIXES):
-            return "cert"
-        return "known_credential_file"
-
-    if basename in _SCAN_EXCLUDED_FILE_BASENAMES:
-        return "known_credential_file"
-    if any(lowered.endswith(suffix) for suffix in EXCLUDE_FILE_SUFFIXES):
-        return "known_credential_file"
-    if looks_like_high_risk_file(normalized):
-        return "known_credential_file"
-    return None
-
-
-def default_exclude_use(relpath: str, *, reason_code: str) -> str:
-    if reason_code == "private_key":
-        return "Private key file excluded from package"
-    if reason_code == "cert":
-        return "Certificate or keystore file excluded from package"
-    if any(str(relpath or "").strip().lower().endswith(suffix) for suffix in EXCLUDE_FILE_SUFFIXES):
-        return "Login credential file excluded from package"
-    return "Credential file excluded from package"
-
-
 __all__ = [
-    "CREDENTIAL_EXCLUDED_DIRS",
     "CREDENTIAL_EXCLUDED_SUFFIXES",
-    "default_exclude_use",
-    "exclude_reason_code_for_path",
     "EXCLUDE_FILE_SUFFIXES",
+    "HIGH_RISK_FILE_BASENAMES",
     "looks_like_high_risk_file",
     "make_skip_scan_predicate",
     "PRIVATE_KEY_FILE_BASENAMES",
     "SOURCE_CODE_SUFFIXES",
     "SPECIAL_SCAN_PATH_SUFFIXES",
     "STAGE_EXCLUDED_DIRS",
-    "STAGE_EXCLUDED_FILES",
-    "STAGE_EXCLUDED_NAME_PATTERNS",
     "STAGE_EXCLUDED_SUFFIXES",
     "SYSTEM_DIRS",
     "SYSTEM_SUFFIXES",

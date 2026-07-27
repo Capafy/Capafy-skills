@@ -65,28 +65,6 @@ def _selected_group_items(
     ]
 
 
-def _target_from_payload(payload: object):
-    if not isinstance(payload, dict):
-        return None
-    env_id = str(payload.get("env_id", "") or payload.get("resolved_target", "") or "").strip()
-    if not env_id:
-        return None
-    return get_target(env_id)
-
-
-def _selected_cron_path(item: dict, *, target=None) -> str:
-    path = str(
-        call_optional_target_hook(
-            target,
-            "selected_cron_path_from_selection_item",
-            item,
-            default="",
-        )
-        or ""
-    ).strip()
-    return path
-
-
 def selected_skill_paths_from_payload(
     payload: object,
 ) -> set[str]:
@@ -94,30 +72,6 @@ def selected_skill_paths_from_payload(
         str(item.get("path", "")).strip()
         for item in _selected_group_items(payload, key="skills")
         if str(item.get("path", "")).strip()
-    }
-
-
-def selected_plugin_paths_from_payload(
-    payload: object,
-) -> set[str]:
-    return {
-        str(item.get("path", "")).strip()
-        for item in _selected_group_items(payload, key="plugins")
-        if str(item.get("path", "")).strip()
-    }
-
-
-def selected_cron_paths_from_payload(
-    payload: object,
-    *,
-    target=None,
-) -> set[str]:
-    active_target = target if target is not None else _target_from_payload(payload)
-    return {
-        path
-        for item in _selected_group_items(payload, key="crons")
-        for path in (_selected_cron_path(item, target=active_target),)
-        if path
     }
 
 
@@ -156,8 +110,6 @@ __all__ = [
     "has_explicit_selection_groups",
     "load_skills_plan_payload",
     "normalize_skills_plan_payload_for_target",
-    "selected_cron_paths_from_payload",
-    "selected_plugin_paths_from_payload",
     "selected_skill_paths_from_payload",
     "selection_groups_from_payload",
     "skills_plan_from_selection_groups",

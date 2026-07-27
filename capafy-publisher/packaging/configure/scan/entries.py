@@ -22,9 +22,9 @@ def _occurrence_identity(entry: dict) -> tuple[str, str, str]:
     )
 
 
-def _assign_scan_entry_occurrence_indexes(entries: dict[str, dict]) -> None:
+def _assign_scan_entry_occurrence_indexes(entries: list[dict]) -> None:
     counters: dict[tuple[str, str, str], int] = {}
-    for entry in entries.values():
+    for entry in entries:
         key = _occurrence_identity(entry)
         counters[key] = counters.get(key, 0) + 1
         entry["occurrence_index"] = counters[key]
@@ -35,10 +35,10 @@ def build_scan_entries(
     env_url_hints: dict[str, str],
     service_url_hints: dict[str, str],
     value_url_hints: dict[str, str],
-) -> dict[str, dict]:
-    entries: dict[str, dict] = {}
+) -> list[dict]:
+    entries: list[dict] = []
 
-    for candidate_index, candidate in enumerate(candidates):
+    for candidate in candidates:
         value = candidate["value"]
 
         resolved_url = resolve_candidate_url(candidate, env_url_hints, service_url_hints, value_url_hints)
@@ -50,7 +50,6 @@ def build_scan_entries(
         source_seed = source.strip()
         source_path = source_seed.split("#", 1)[0].strip()
         role = _candidate_role(candidate)
-
 
         entry: dict = {
             "value": value,
@@ -68,32 +67,10 @@ def build_scan_entries(
         if candidate.get("field"):
             entry["field"] = candidate["field"]
 
-        url_proxy_group = str(candidate.get("url_proxy_group", "") or "").strip()
-        if url_proxy_group:
-            entry["url_proxy_group"] = url_proxy_group
-
-
-
-
-
-        entry_key = f"{url_proxy_group}\0{value}\0{candidate_index}" if url_proxy_group else f"{value}\0{candidate_index}"
-        entries[entry_key] = entry
+        entries.append(entry)
 
     _assign_scan_entry_occurrence_indexes(entries)
     return entries
 
 
-def build_scan_groups(url_proxy: list[dict], generic: list[dict]) -> dict[str, list[dict]]:
-
-    for index, entry in enumerate(url_proxy, start=1):
-        entry["index"] = index
-    for index, entry in enumerate(generic, start=1):
-        entry["index"] = index
-
-    return {
-        "url_proxy": url_proxy,
-        "generic": generic,
-    }
-
-
-__all__ = ["build_scan_entries", "build_scan_groups"]
+__all__ = ["build_scan_entries"]

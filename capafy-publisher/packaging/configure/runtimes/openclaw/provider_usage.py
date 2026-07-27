@@ -164,14 +164,17 @@ def used_openclaw_provider_names(config: dict[str, Any]) -> set[str]:
     providers = set(get_openclaw_providers(config))
     if not providers:
         return set()
-    return {
-        provider
-        for provider in (
-            provider_from_openclaw_model_ref(value)
-            for value in iter_openclaw_model_ref_values(config)
-        )
-        if provider in providers
-    }
+    builtin_map = builtin_openclaw_provider_map(providers)
+    result: set[str] = set()
+    for value in iter_openclaw_model_ref_values(config):
+        provider = provider_from_openclaw_model_ref(value)
+        if provider in providers:
+            result.add(provider)
+            continue
+        mapped_provider = builtin_map.get(provider, "")
+        if mapped_provider in providers:
+            result.add(mapped_provider)
+    return result
 
 
 def selected_openclaw_provider_names(config: dict[str, Any]) -> set[str]:

@@ -14,25 +14,79 @@ from packaging.configure.runtimes.hermes.auth_profiles import (
 from packaging.configure.runtimes.hermes.provider_pairs import pair_hermes_provider_candidates
 from packaging.configure.runtimes.hermes.provider_normalize import normalize_hermes_provider_blocks
 from packaging.configure.runtimes.hermes.provider_rewrite import (
-    finalize_hermes_yaml_rewrites,
-    rewrite_hermes_yaml_pair_fields,
+    rewrite_hermes_provider_pairs,
 )
 from packaging.configure.runtimes.hermes.provider_scan import CONFIG_REL, scan_hermes_provider_candidates
-from packaging.configure.staging.env_preprocess import RuntimeEnvContext
+from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 from packaging.configure.url_proxy.base import RuntimeContract, ScanContext
-from packaging.configure.url_proxy.rewriter import apply_url_proxy_to_staging
 
 
 class HermesRuntime(RuntimeContract):
     runtime_id = "hermes"
-    applicable_targets = frozenset({"hermes"})
+    carries_provider_runtime_config = True
 
     def __init__(self) -> None:
-        self._env_context: Optional[RuntimeEnvContext] = None
+        self._provider_config_context: Optional[ProviderRuntimeConfigContext] = None
+
+    def prepare_provider_runtime_config(
+        self,
+        staging_root: Path,
+        *,
+        provider_config_context: ProviderRuntimeConfigContext,
+    ) -> frozenset[str]:
+        from packaging.configure.runtimes.hermes.provider_rewrite import (
+            resolve_hermes_staged_env_templates,
+        )
+
+        return frozenset(
+            resolve_hermes_staged_env_templates(
+                staging_root,
+                provider_config_context=provider_config_context,
+            )
+        )
+
+    def os_fallback_environment_names(self) -> frozenset[str]:
+        from packaging.configure.runtimes.hermes.official_providers import (
+            HERMES_OFFICIAL_PROVIDER_SPECS,
+        )
+
+        return frozenset(
+            name
+            for spec in HERMES_OFFICIAL_PROVIDER_SPECS
+            for name in spec.primary_env_names
+            if name
+        )
+
+    def validate_review_consistency(
+        self,
+        staging_root: Path,
+        *,
+        reviewed_scan: dict[str, Any],
+    ) -> None:
+        from packaging.configure.runtimes.hermes.review_consistency import (
+            validate_review_consistency,
+        )
+
+        validate_review_consistency(staging_root, reviewed_scan=reviewed_scan)
+
+    def semantic_field_identity(self, field_obj: Any) -> tuple[str, str, str]:
+        source_identity = getattr(field_obj, "source_identity", None)
+        source = str(
+            source_identity()
+            if callable(source_identity)
+            else getattr(field_obj, "source_relpath", "")
+            or ""
+        ).strip()
+        field = str(getattr(field_obj, "field", "") or "").strip()
+        semantic_field = field.rsplit(".", 1)[-1]
+        if source != ".hermes/config.yaml" or semantic_field not in {"api_key", "base_url"}:
+            return ("", "", "")
+        value = str(getattr(field_obj, "original_value", "") or "").strip()
+        return (source, semantic_field, value) if value else ("", "", "")
 
     def prepare(self, ctx: ScanContext) -> None:
         config_path = ctx.staging_root / CONFIG_REL
-        self._env_context = ctx.env_context or RuntimeEnvContext(process_env=ctx.process_env)
+        self._provider_config_context = ctx.provider_config_context or ProviderRuntimeConfigContext(process_env=ctx.process_env)
         auth_credentials = load_hermes_auth_profile_credentials(ctx)
         oauth_keys = hermes_oauth_keys_from_credentials(auth_credentials)
         if not config_path.is_file():
@@ -64,12 +118,12 @@ class HermesRuntime(RuntimeContract):
             config = safe_yaml_mapping_loads(config_path.read_text(encoding="utf-8"))
         except (OSError, RuntimeError, ValueError):
             return []
-        env_context = ctx.env_context or self._env_context or RuntimeEnvContext(process_env=ctx.process_env)
-        self._env_context = env_context
+        provider_config_context = ctx.provider_config_context or self._provider_config_context or ProviderRuntimeConfigContext(process_env=ctx.process_env)
+        self._provider_config_context = provider_config_context
         return scan_hermes_provider_candidates(
             config,
             staging_root=ctx.staging_root,
-            env_context=env_context,
+            provider_config_context=provider_config_context,
             process_env=dict(ctx.process_env or {}),
         )
 
@@ -77,17 +131,12 @@ class HermesRuntime(RuntimeContract):
         return pair_hermes_provider_candidates(candidates)
 
     def rewrite(self, staging_root: Path, pairs: list[UrlProxyPair]) -> None:
-        if self._env_context is not None:
+        if self._provider_config_context is not None:
             from packaging.configure.runtimes.hermes.provider_rewrite import resolve_hermes_staged_env_templates
 
-            resolve_hermes_staged_env_templates(staging_root, env_context=self._env_context)
-            _consume_pair_env_names(staging_root, pairs, self._env_context)
-        apply_url_proxy_to_staging(
-            staging_root,
-            pairs,
-            field_rewrite_hook=rewrite_hermes_yaml_pair_fields,
-            finalize_hook=finalize_hermes_yaml_rewrites,
-        )
+            resolve_hermes_staged_env_templates(staging_root, provider_config_context=self._provider_config_context)
+            _consume_pair_env_names(staging_root, pairs, self._provider_config_context)
+        rewrite_hermes_provider_pairs(staging_root, pairs)
 
     def rewrite_confirmed(self, staging_root: Path, reviewed_scan: dict[str, Any]) -> dict[str, Any]:
         from packaging.configure.runtimes.hermes.provider_confirmation import rewrite_hermes_confirmed_providers
@@ -98,7 +147,7 @@ class HermesRuntime(RuntimeContract):
 def _consume_pair_env_names(
     staging_root: Path,
     pairs: list[UrlProxyPair],
-    env_context: RuntimeEnvContext,
+    provider_config_context: ProviderRuntimeConfigContext,
 ) -> None:
     from packaging._shared.config_files.yaml_loader import get_yaml_path_value, safe_yaml_mapping_loads
     from packaging.configure.env_values import env_reference_name
@@ -129,7 +178,7 @@ def _consume_pair_env_names(
             block = get_yaml_path_value(payload, location.key_path[:-1])
             if not isinstance(block, dict):
                 continue
-            env_name = env_reference_name(block.get("key_env", ""))
+            env_name = env_reference_name(block.get("key_env", "") or block.get("api_key_env", ""))
             if env_name:
                 names.add(env_name)
                 continue
@@ -141,7 +190,7 @@ def _consume_pair_env_names(
             original_value = str(pair.key.original_value or "").strip()
             if not original_value:
                 continue
-            dotenv_values = env_context.staged_dotenv_values(
+            dotenv_values = provider_config_context.staged_dotenv_values(
                 staging_root,
                 relpaths=HERMES_DOTENV_RELPATHS,
                 names=default_names,
@@ -150,7 +199,7 @@ def _consume_pair_env_names(
                 if str(value or "").strip() == original_value:
                     names.add(name)
     if names:
-        env_context.consume_staged_dotenv_names(
+        provider_config_context.consume_staged_dotenv_names(
             staging_root,
             relpaths=HERMES_DOTENV_RELPATHS,
             names=frozenset(names),

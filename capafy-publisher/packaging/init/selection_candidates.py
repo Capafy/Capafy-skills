@@ -10,7 +10,6 @@ from packaging._shared.contracts.selection_groups import (
     strip_default_selection_fields,
 )
 from packaging._shared.contracts.selectable import normalize_text
-from packaging._shared.contracts.path_shapes import is_cron_unit_type, is_plugin_unit_type
 from packaging._shared.runtimes.contracts import call_optional_target_hook
 
 
@@ -43,9 +42,6 @@ class DiscoveryUnit(TypedDict, total=False):
 
 
 def _candidate_unit_is_supported(entry: DiscoveryUnit, *, target=None) -> bool:
-    unit_type = str(entry.get("unit_type", "")).strip()
-    if is_plugin_unit_type(unit_type) or is_cron_unit_type(unit_type):
-        return bool(call_optional_target_hook(target, "allows_bundle_units", default=False))
     return True
 
 

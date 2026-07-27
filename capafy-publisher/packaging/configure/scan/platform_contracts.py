@@ -15,25 +15,30 @@ def _build_platform_llm_config_sources() -> dict[str, dict]:
         raw_contract = profile.get("platform_contract", {})
         if not isinstance(raw_contract, dict):
             continue
-        config_files = tuple(
-            str(item).strip()
-            for item in raw_contract.get("config_files", ())
-            if isinstance(item, str) and item.strip()
-        )
-        env_vars: dict[str, tuple[str, str]] = {}
-        raw_env_vars = raw_contract.get("env_vars", {})
-        if isinstance(raw_env_vars, dict):
-            for env_name, raw_spec in raw_env_vars.items():
+        config_files: list[str] = []
+        for key in ("config_files", "optional_config_files"):
+            for item in raw_contract.get(key, ()):
+                if not isinstance(item, str) or not item.strip():
+                    continue
+                normalized = item.strip()
+                if normalized.startswith("_scan_only/"):
+                    normalized = normalized[len("_scan_only/"):]
+                if normalized not in config_files:
+                    config_files.append(normalized)
+        provider_environment: dict[str, tuple[str, str]] = {}
+        raw_provider_environment = raw_contract.get("provider_environment", {})
+        if isinstance(raw_provider_environment, dict):
+            for env_name, raw_spec in raw_provider_environment.items():
                 if not isinstance(raw_spec, dict):
                     continue
                 normalized_env_name = str(env_name or "").strip()
                 service = str(raw_spec.get("service", "") or "").strip()
                 canonical_url = str(raw_spec.get("canonical_url", "") or "").strip()
                 if normalized_env_name and service and canonical_url:
-                    env_vars[normalized_env_name] = (service, canonical_url)
+                    provider_environment[normalized_env_name] = (service, canonical_url)
         sources[env_id] = {
-            "config_files": config_files,
-            "env_vars": env_vars,
+            "config_files": tuple(config_files),
+            "provider_environment": provider_environment,
         }
     return sources
 
@@ -87,7 +92,7 @@ def collect_platform_env_url_hints(
     if require_referenced_env_names and not known_names:
         return {}
     hints: dict[str, str] = {}
-    for env_name, spec in target_contract.get("env_vars", {}).items():
+    for env_name, spec in target_contract.get("provider_environment", {}).items():
         if (known_names or require_referenced_env_names) and env_name not in known_names:
             continue
         if not isinstance(spec, tuple) or len(spec) != 2:

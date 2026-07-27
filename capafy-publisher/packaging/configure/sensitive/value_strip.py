@@ -53,6 +53,40 @@ def _strip_candidates(key_value: str, extra_candidates: Optional[Iterable[str]] 
     return candidates
 
 
+def _replace_json_scalar_values(
+    text: str,
+    key_value: str,
+    replacement: str,
+) -> Optional[tuple[str, int]]:
+    """Replace exact JSON scalar values while preserving valid JSON syntax."""
+    try:
+        payload = json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+    replacements = 0
+
+    def visit(node: object) -> object:
+        nonlocal replacements
+        if isinstance(node, dict):
+            return {key: visit(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [visit(value) for value in node]
+        if node == key_value or (
+            isinstance(node, (int, float))
+            and not isinstance(node, bool)
+            and str(node) == key_value
+        ):
+            replacements += 1
+            return replacement
+        return node
+
+    updated_payload = visit(payload)
+    if not replacements:
+        return text, 0
+    return json.dumps(updated_payload, ensure_ascii=False, indent=2) + "\n", replacements
+
+
 def strip_value_from_staging(
     staging_root: Path,
     key_value: str,
@@ -76,6 +110,16 @@ def strip_value_from_staging(
     replaced_in: list[str] = []
     total_replacements = 0
     for path, text, encoding in _iter_text_files(staging_root):
+        if path.suffix.lower() in {".json", ".jsonc"}:
+            json_result = _replace_json_scalar_values(text, key_value, replacement)
+            if json_result is not None:
+                updated_json, occurrences = json_result
+                if occurrences:
+                    path.write_text(updated_json, encoding=encoding)
+                    replaced_in.append(relpath(path, staging_root))
+                    total_replacements += occurrences
+                continue
+
         updated_text = text
         occurrences = 0
         for candidate in candidates:

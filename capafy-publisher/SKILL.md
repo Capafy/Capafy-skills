@@ -72,7 +72,7 @@ Login:
 publish-init → web confirmation → publish-configure → handle per JSON output → publish-ship → web confirmation
 ```
 
-The three web confirmation pages are: after `publish-init`, **confirm the file contents to upload**; after `publish-configure`, **confirm the keys / environment variables etc. to be hosted**; after `publish-ship`, **final confirmation and submit for review**.
+The three web confirmation pages are: after `publish-init`, **confirm the file contents to upload**; after `publish-configure`, **confirm hosted provider keys and other secrets, and manually add any hinted environment variable names if needed**; after `publish-ship`, **final confirmation and submit for review**.
 
 What comes next after `publish-configure` / `publish-ship` is decided entirely by the structured payload: `status`, `review_url`, `developer_next_steps`, `blocking_category`, `failed_step`, and similar fields take precedence over this document.
 
@@ -99,7 +99,7 @@ CLI exit codes only separate true command failures from normal workflow pauses. 
 | `selections` / `selection_groups` / `workflowInfo.selection_groups` | "the skill selection for this release" |
 | `Phase A` / `discover_units` | "local scan" |
 | `manifest` / `.temp/` working state | "local draft" |
-| `review_url` | Paste the link verbatim plus a one-line note about what the page is for; differentiate by source: `publish-init` = "confirm the file contents to upload", `publish-configure` = "confirm the keys / environment variables etc. to be hosted", `publish-ship` = "final confirmation and submit for review" |
+| `review_url` | Paste the link verbatim plus a one-line note about what the page is for; differentiate by source: `publish-init` = "confirm the file contents to upload", `publish-configure` = "confirm hosted provider keys and other secrets; add hinted environment variable names on the page if needed", `publish-ship` = "final confirmation and submit for review" |
 | `publish-init` / `publish-configure` / `publish-ship` | "publish step one / configure / submit for review", or just speak the command name |
 
 Translate fields not in this table by the same principle; when uncertain, prefer plain language describing what it does instead of inventing new terminology.
@@ -108,9 +108,9 @@ When reporting credentials after `publish-configure`, keep the credential bucket
 
 - `url_proxy` means cloud-hosted LLM provider configuration: model API key plus endpoint / base URL.
 - `generic` means other standalone secrets or sensitive configuration values.
-- `env_var` means runtime environment variables required by the Agent.
+- Environment-variable values are never collected or uploaded. If `environment_variable_hint` is present, show its message, names, and `conflicts` to the creator; a name in `conflicts` is also used by `url_proxy` and may collide if the creator enters a different value. Values must be entered by the creator on the web page, never collected in chat.
 
-Never say "no API key is needed" only because `generic: 0` and `env_var: 0`. If `url_proxy > 0`, say the Agent has no extra third-party service keys, but still needs cloud LLM provider configuration to be confirmed. If the CLI response includes `credential_summary.creator_message`, use that message as the source of truth for user-facing wording.
+Never say "no API key is needed" only because `generic: 0`. If `url_proxy > 0`, say the Agent has no extra third-party service keys, but still needs cloud LLM provider configuration to be confirmed. If the CLI response includes `credential_summary.creator_message`, use that message as the source of truth for user-facing wording.
 
 Configuration confirmation belongs on the platform web page, not in chat, and only in the `run_online` configure flow. Do not introduce cloud endpoint reachability checks in `download` / buyout, `publish-init`, or `publish-ship`. Do not inspect, judge, or ask the creator to manually edit LLM provider entries in chat because an endpoint is localhost / LAN / private-network / otherwise likely unavailable from the cloud. Do not generate or recommend an alternate provider such as OpenRouter as a chat-side fallback for a local endpoint. Submit the discovered provider key and endpoint candidates to the Run Online configuration confirmation page; the creator confirms, removes, or edits them there.
 
@@ -120,7 +120,7 @@ No matter which step of the main chain you are on, or which error has interrupte
 
 1. **Anything that needs creator action: send a visible message first, then pause.** When the CLI JSON returns a `review_url`, paste it to the creator verbatim (all of them if multiple) along with a note about what the page is for; questions to the creator (deep-scan consent / `agent_id` confirmation / skill reselection / whether to abandon the agent, etc.) follow the same rule — send a top-level chat message, do not silently wait inside a thinking / processing block. **`review_url` is valid for one hour and then expires**: if some time later the creator says "continue publishing / try again" or anything that requires opening a web page, do not re-paste an old `review_url` from earlier in the session — run `publish-refresh-url --agent-id <agent_id> --step <init|configure|ship>` first, then paste the fresh URL. Do not rerun `publish-init` / `publish-configure` / `publish-ship` solely to refresh an expired link.
    - `review_url` returned by `publish-init`: the creator should **confirm the file contents to upload**.
-   - `review_url` returned by `publish-configure`: the creator should **confirm the keys / environment variables etc. to be hosted** (filled in on the web page; do not let the creator send secrets in chat).
+   - `review_url` returned by `publish-configure`: the creator should **confirm hosted provider keys and other secrets**. If the payload contains `environment_variable_hint`, repeat its Chinese message, names, and any conflicts, then tell the creator to add or reconcile those names on the page if needed; never ask for their values in chat.
    - `review_url` returned by `publish-ship`: the creator should **make the final confirmation and submit for review**. `status: shipped` only means the package has been uploaded to the platform and the final-page URL has been issued; **the actual "submit for review" action must be performed by the creator on the final page**. Until the creator explicitly tells you the final page has been clicked through, never say "submitted / under review / approved" or anything else carrying "submitted for review / review process started" semantics.
 2. **After a web page, you must reconcile with the platform.** When the creator returns from a web page with a signal like "confirm / done / fixed / price set", first call `capafy_platform.api.get_latest_version_raw(agent_id)` and read the returned `agentType` / status / `agentVersionId` before answering — do not infer from the local manifest. When you need to check whether the confirmation page already has selected skills, do not look at the raw response's top-level `selectionGroups`; that field may be empty. Look only at `workflowInfo.selection_groups`, or the `selection_groups` exposed by `packaging._shared.platform.get_latest_version()` in code. After the web confirmation page, **the platform is the source of truth**.
 3. **Review status comes from the platform only.** Questions like "how far has the review gone / did it pass / is it listed?" must call `publish-remote-status --agent-id <agent_id>` or `get_latest_version_raw(agent_id)`. `publish-status` only reads the local `.temp/`; `publish-ship`'s `status: shipped` only means the package has been uploaded — **it does not mean submitted for review, under review, or approved**. The full chain is: `shipped` → the creator clicks submit on the final page → platform latest-version readback actually shows "under review" → only then does the platform progress to "approved / rejected". Until every link has been satisfied, do not say "submitted / under review / approved" in chat. **`status` and `auditStatus` are both states of the latest version, not aggregates across the whole agent history; do not mix them up**: `status` is the **agent lifecycle state** of the latest version overall (draft → review → listed → delisted, the main axis); `auditStatus` is only the **review sub-state** during the "under review" segment of `status` (automated / manual / passed / failed). **Real meaning of the two `0` values**: `status: 0` = **draft (not submitted)**, `auditStatus: 0` = **review not started**; when you see these two `0`s you must report "draft / review not started" and **never** misread them as "submitted / under review / approved". Full enums (`status` 0=draft / 1=under review / 2=review failed / 3=review passed pending listing / 4=listed / 5=expired / 6=delisted; `auditStatus` 0=not started / 1=auto review in progress / 2=manual review in progress / 3=review failed / 4=review passed) are in `api-docs/00_overview.md`.
@@ -137,6 +137,7 @@ No matter which step of the main chain you are on, or which error has interrupte
    - **Triggers and handling**:
      a. If the creator opens with "ship these skills for me / publish all skills in this directory / do them one by one", pause first and confirm intent in plain language per the table — is this one Agent containing multiple skills (a bundle), or multiple independent Agents? If bundle, proceed normally to `publish-init`; if independent Agents, tell the creator explicitly that they will be processed **one chain at a time, sequentially** (no auto-loop), and have the creator pick which one to publish **this time** — the others will be handled as separate chains afterward.
      b. After a `publish-ship` has finished and the creator wants to publish another Agent, start a new publish main chain to handle it — there is no need to open a new session; but still run only this one chain — do not roll later ones into it "for convenience".
+10. **`persist_shipped_state_failed` is a remote-success exception, not a retry signal.** The platform has already accepted package report and returned the final `review_url`, but the local shipped manifest could not be written. Paste that `review_url` to the creator immediately and let them complete the final page, then call `publish-remote-status --agent-id <agent_id>`. If the platform confirms success, **do not rerun `publish-ship`**: remote status is read-only and cannot reconcile the local manifest automatically. Keep the local bundle / staging while remote state is uncertain. Only after remote success is confirmed and the creator explicitly starts the next publish chain may the preserved prior local state be cleared; a version update must still carry the original `agent_id`.
 
 ## publish-init
 
@@ -147,7 +148,7 @@ Before running, confirm with the creator whether this is a **brand-new publish**
 
 Once an `agent_id` has been obtained in this session, any block defaults to resume — do not rebuild the agent:
 
-- Any error from `publish-configure` / `publish-ship`: first read the payload's `developer_next_steps` / `failed_step` / `blocking_category`, then decide whether to retry the same step, run the supplementary sensitive-info scan, or wait for the creator to finish the `review_url` web confirmation. **Do not** rerun `publish-init` to recreate just because something failed.
+- Any error from `publish-configure` / `publish-ship`: first read the payload's `developer_next_steps` / `failed_step` / `blocking_category`, then decide whether to retry the same step, run the supplementary sensitive-info scan, or wait for the creator to finish the `review_url` web confirmation. `persist_shipped_state_failed` follows Core Iron Rule #10 and must not retry ship after remote success is confirmed. **Do not** rerun `publish-init` to recreate just because something failed.
 - If `publish-configure` reads the platform back and finds the first page (the file-contents confirmation) had `skills[]` empty after confirmation, the creator removed all skills on the web page. Halt; have the creator return to the first page and pick at least one skill, or rerun the publish first step with the correct project root / skill directory. Do not continue to configure / ship.
 - Web confirmation page will not open / is stuck / the creator is offline: pause and wait for the creator. Do not rerun `publish-init`.
 - Seeing the `existing_local_publish_state` blocking error: this is a guard, not an error. The first choice is `publish-status` to inspect local state, then `publish-configure` / `publish-ship` to continue — **not** straight to `--reset-local-state`.
@@ -195,11 +196,11 @@ Then write `.temp/confirmed-selections.json` based on the Phase A candidates. `s
       "name": "skill-vetter",
       "purpose": "Reviews skill source for credential leaks, network exfiltration, permission overreach, and other security risks"
     }
-  ],
-  "plugins": [],
-  "crons": []
+  ]
 }
 ```
+
+Optionally add a top-level `lang` to set the new listing's default language (e.g. `"lang": "zh"`). Set it to the language the creator has been conversing with you in (the Claude Code / Codex / Hermes chat language), not the language of the skill's code or files — it controls the card's default display language for buyers. Accepted values: `en` / `es` / `fr` / `de` / `it` / `ja` / `zh` / `zh-TW` / `ar` / `nl` / `ko` / `pt`. Omit it when unsure and the platform applies its own default. `lang` only takes effect on the create path; on a version update (with `agent_id`) it is ignored, so do not rely on it to change an existing listing's language.
 
 When submitting the first-page draft, you must reuse the same `--env` / `--runtime-dir` / `--skill-dir`:
 
@@ -220,13 +221,11 @@ When updating an existing Agent, the request body simply adds `agent_id` at the 
       "name": "skill-vetter",
       "purpose": "Reviews skill source for credential leaks, network exfiltration, permission overreach, and other security risks"
     }
-  ],
-  "plugins": [],
-  "crons": []
+  ]
 }
 ```
 
-When `publish-init` is run without `--selections`, it returns the top-level `skills` / `plugins` / `crons` candidate arrays directly; when `--skill-dir` is given, the candidates only include that explicit skill. Candidate entries do not carry a `selection` field — they only count as "selected" once they appear in the `--selections` of the second submission. The host LLM combines candidates with user context to produce `title`, `description`, and a per-unit `purpose`, confirms with the creator, then submits.
+When `publish-init` is run without `--selections`, it returns the top-level `skills` candidate array directly. When `--skill-dir` is given, the candidates only include that explicit skill. Candidate entries do not carry a `selection` field — they only count as "selected" once they appear in the `--selections` of the second submission. The host LLM combines candidates with user context to produce `title`, `description`, and a per-unit `purpose`, confirms with the creator, then submits.
 
 This Phase A response is a soft action: the command exits `0`, `status` is `needs_selection`, and `requires_action` is `true`. Do not report it as an error just because the workflow paused for candidate selection.
 
@@ -263,7 +262,7 @@ If Phase A returns an empty `skills[]`, or none of the candidates match the crea
 Two hard rules — break either and stop right away to rerun Phase A or ask the creator:
 
 - **Phase A is mandatory**: before constructing `--selections`, you must have already executed `publish-init` (without `--selections`) in this session with the same `--env` / `--runtime-dir` / `--skill-dir` and obtained a candidate JSON; or you must have passed `--skill-dir` to lock down a single skill. If neither is satisfied, you may not construct selections from memory, previous sessions, or guesses.
-- **No making things up**: every `skills[].path`, `skills[].name`, `plugins[].path`, and `crons[].id` in `--selections` must correspond item-by-item to a Phase A candidate (or to the explicit skill from `--skill-dir`). Any path / name / description / purpose of unknown origin must go back to Phase A for a rescan, or be asked to the creator first. The moment you find yourself thinking "I remember there is...", "there should be...", "there is usually one...", stop.
+- **No making things up**: every `skills[].path` and `skills[].name` in `--selections` must correspond item-by-item to a Phase A candidate (or to the explicit skill from `--skill-dir`). Any path / name / description / purpose of unknown origin must go back to Phase A for a rescan, or be asked to the creator first. The moment you find yourself thinking "I remember there is...", "there should be...", "there is usually one...", stop.
 
 `--selections` must not be wrapped in `selection_groups`, and must not carry `workflow_intent` / step index structures; when updating an existing Agent, add `agent_id` at the top level (source per Core Iron Rule #5).
 
@@ -273,18 +272,19 @@ Two hard rules — break either and stop right away to rerun Phase A or ask the 
 
 Send this question as a visible chat message and then pause, per Core Iron Rule #1.
 
-- Creator agrees: run `publish-configure --agent-id <agent_id> --deep-scan`; once `needs_deep_scan` comes back, produce a findings JSON object per the "Sensitive Deep Scan" section of `publish-workflow.md` (top level has only `generic` / `env_var` arrays), then submit via `publish-configure --agent-id <agent_id> --deep-scan-findings-file <path>`.
+- Creator agrees: run `publish-configure --agent-id <agent_id> --deep-scan`; once `needs_deep_scan` comes back, produce a findings JSON object per the "Sensitive Deep Scan" section of `publish-workflow.md` (top level has only a `generic` array), then submit via `publish-configure --agent-id <agent_id> --deep-scan-findings-file <path>`.
 - Creator declines or chooses the fast path: run `publish-configure --agent-id <agent_id>` without `--deep-scan` — the code runs only the regular rule scan.
 - Download mode (`agentType: download`) does not need this consent step; the platform does not host runtime keys, so go straight to the regular `publish-configure`.
 
 Hard rules (details about sources, fields, and submission live in `publish-workflow.md`'s "Sensitive Deep Scan" section):
 
 - Misses cannot be resolved by hand-patching buckets, nor by having the host LLM proactively collect new variables from the host environment.
-- Generic secrets go into `generic` (each item has `value` + staging-relative `source`); environment variables go into `env_var` (each item has `value` + `field`); `url_proxy` can still only be produced by the rule scan, runtime contract, or source config.
+- Generic file secrets go into `generic` (each item has `value` + staging-relative `source`). Do not collect host environment variable values; only the publisher's name-only Skill reference hint is allowed. `url_proxy` can only be produced by the selected target runtime from that target's routing/provider configuration.
+- Uploaded and locally persisted `url_proxy.api_key.value` is always empty for every runtime, so the creator supplies the key on the platform page. Codex and Claude Code only read local routing metadata and do not package local provider configuration. Hermes and OpenClaw still package their managed provider configuration files after replacing API keys with platform-managed placeholders.
 - Do not edit `.temp/reviewed-scan.json` directly, and do not use already-generated buckets as review input.
-- When `--deep-scan-findings-file` validation fails, fix the findings' `value` / `source` / `field` and rerun — do not change the scan rules at this step.
+- When `--deep-scan-findings-file` validation fails, fix the findings' `value` / `source` and rerun — do not change the scan rules at this step.
 - Once you have confirmed there are no misses, rerun `publish-configure` without `--deep-scan` to continue with the platform configuration.
-- **Host-required config files must not be excluded wholesale**: files already recognized as host-required runtime config such as `.claude/settings.json` / `.claude/settings.local.json` only go through `strip` (their keys have already been replaced by the code with `PLATFORM_MANAGED_*` placeholders). When the deep scan flags secrets in such files, do not suggest excluding the file outright — the file shell is required for running Claude Code in the cloud; top-level local `permissions` allowlists in Claude settings files are removed by the main flow. See the rule about not excluding host-required config files wholesale in `publish-workflow.md`.
+- **Host-required config files must not be excluded wholesale** for Hermes and OpenClaw. Their runtime config shells may be required after plaintext values are stripped. Codex and Claude Code global configuration files are outside the package boundary and are never deep-scan inputs.
 
 ## Other Requests
 

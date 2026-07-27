@@ -15,7 +15,7 @@ from packaging._shared.common.packaged_files import (
     should_skip_packaged_path,
 )
 from packaging.configure.exclusion.stage import should_skip_high_risk_stage_file
-from packaging.configure.staging.selection_filters import matches_selected_plugin_paths, matches_selected_skill_paths
+from packaging.configure.staging.selection_filters import matches_selected_skill_paths
 from packaging.configure.staging.markdown_references import stage_direct_markdown_file_references
 from packaging.configure.staging.tree_copy import copy_tree
 
@@ -25,13 +25,12 @@ class StageTreeCopyRequest:
 
     source_root: Path
     target_root: Path
+    staging_root: Path
     display_prefix: str
     skip_skill_runtime_outputs: bool = False
     skill_runtime_prefixes: tuple[str, ...] = ()
     excluded_relpath_prefixes: tuple[str, ...] = ()
     selected_paths: Optional[set[str]] = None
-    selected_skill_paths: Optional[set[str]] = None
-    selected_plugin_paths: Optional[set[str]] = None
     workspace_allowlist: Optional[set[str]] = None
     apply_selection_filters: bool = True
     skip_high_risk_files: bool = True
@@ -44,7 +43,6 @@ class StageCopyState:
 
     skipped: list[str] = field(default_factory=list)
     skipped_seen: set[str] = field(default_factory=set)
-    excluded_credential_files: set[str] = field(default_factory=set)
 
 
 def _is_exact_allowlisted_file(
@@ -99,6 +97,12 @@ def copy_stage_tree(
             is_dir=is_dir,
         ):
             return True
+        if (
+            not is_dir
+            and request.skip_high_risk_files
+            and should_skip_high_risk_stage_file(request.target, display_path)
+        ):
+            return True
         if _is_exact_allowlisted_file(
             display_path,
             request.workspace_allowlist,
@@ -108,33 +112,15 @@ def copy_stage_tree(
         if not request.apply_selection_filters:
 
             return bool(packaged_skip and not is_dir)
-        if (
-            not matches_selected_skill_paths(
-                display_path,
-                request.selected_paths,
-                is_dir=is_dir,
-                target=request.target,
-            )
-            or not matches_selected_plugin_paths(
-                display_path,
-                request.selected_plugin_paths,
-                selected_skill_paths=request.selected_skill_paths,
-                is_dir=is_dir,
-                target=request.target,
-            )
+        if not matches_selected_skill_paths(
+            display_path,
+            request.selected_paths,
+            is_dir=is_dir,
+            target=request.target,
         ):
             return True
         if not is_dir:
-            high_risk_skip = (
-                request.skip_high_risk_files
-                and should_skip_high_risk_stage_file(request.target, display_path)
-            )
-            if high_risk_skip:
-                state.excluded_credential_files.add(display_path)
-                return True
             if packaged_skip:
-                if should_skip_high_risk_stage_file(request.target, display_path):
-                    state.excluded_credential_files.add(display_path)
                 return True
         return False
 
@@ -145,6 +131,8 @@ def copy_stage_tree(
         one_hop_markdown_reference_files += stage_direct_markdown_file_references(
             source_file,
             target_file,
+            staging_root=request.staging_root,
+            target=request.target,
             stage_plan=request.stage_plan,
         )
 

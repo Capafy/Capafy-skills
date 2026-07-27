@@ -18,14 +18,10 @@ from packaging.runtimes.registry import (
     list_target_descriptors,
 )
 from packaging.runtimes.resolution import (
-    OPENCLAW_LEGACY_TARGET,
-    OPENCLAW_MODERN_MIN_VERSION,
-    OPENCLAW_MODERN_TARGET,
-    TargetResolutionRule,
+    OPENCLAW_MIN_VERSION,
     TargetResolution,
     build_runtime_metadata,
     detect_openclaw_target_resolution,
-    get_target_resolution_rule,
     resolve_runtime_validation_target,
     resolve_target_name,
     resolve_target_request,
@@ -34,11 +30,8 @@ from packaging.runtimes.validation import validate_env_runtime
 
 __all__ = [
     "DEFAULT_TARGET",
-    "OPENCLAW_LEGACY_TARGET",
-    "OPENCLAW_MODERN_MIN_VERSION",
-    "OPENCLAW_MODERN_TARGET",
+    "OPENCLAW_MIN_VERSION",
     "TARGETS",
-    "TargetResolutionRule",
     "TargetResolution",
     "build_runtime_metadata",
     "build_target_descriptors",
@@ -48,7 +41,6 @@ __all__ = [
     "get_profile_target",
     "get_runtime_validation_target",
     "get_target",
-    "get_target_resolution_rule",
     "get_target_descriptor",
     "list_target_descriptors",
     "resolve_runtime_validation_target",

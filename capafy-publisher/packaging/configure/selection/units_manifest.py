@@ -9,14 +9,10 @@ def write_selected_units_manifest(
     staging_root: Path,
     *,
     selected_skill_paths: Optional[set[str]],
-    selected_plugin_paths: Optional[set[str]],
-    selected_cron_paths: Optional[set[str]],
     runtime_validation: Optional[dict] = None,
 ) -> Path:
     payload = {
         "selected_skill_paths": sorted(set(selected_skill_paths or set())),
-        "selected_plugin_paths": sorted(set(selected_plugin_paths or set())),
-        "selected_cron_paths": sorted(set(selected_cron_paths or set())),
     }
     if runtime_validation is not None:
         payload["runtime_validation"] = runtime_validation

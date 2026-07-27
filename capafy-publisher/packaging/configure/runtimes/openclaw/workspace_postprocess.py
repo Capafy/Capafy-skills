@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 from packaging._shared.contracts.stage_plan import StagePlan
-from packaging._shared.runtimes.support import collect_optional_command_first_line
 from packaging.configure.runtimes.openclaw.config import (
     rewrite_packaged_extra_skill_dirs,
     rewrite_packaged_workspace_document_refs,
@@ -16,9 +15,7 @@ from packaging.configure.runtimes.openclaw.config import (
 from packaging.configure.runtimes.openclaw.provider_rewrite import (
     rewrite_openclaw_builtin_models_as_explicit_providers,
 )
-from packaging.configure.staging.env_preprocess import RuntimeEnvContext
-from packaging.configure.runtimes.openclaw.cron_postprocess import clean_cron_jobs, filter_selected_cron_jobs
-from .plugin_config import prune_unbundled_local_plugin_config
+from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 from .redaction import redact_openclaw_local_configs
 
 
@@ -32,7 +29,6 @@ def postprocess_stage(
     openclaw_config = staging_root / ".openclaw" / "openclaw.json"
     redactions = 0
     builtin_provider_rewrites = 0
-    pruned_plugin_configs = 0
     overlay_trimmed_fields = 0
     extra_skill_dir_rewrites = 0
     packaged_workspace_name = None
@@ -40,13 +36,13 @@ def postprocess_stage(
         redactions = redact_openclaw_local_configs(openclaw_config)
         if agent_type == "run_online":
             original_text = openclaw_config.read_text(encoding="utf-8")
-            env_context = RuntimeEnvContext(process_env={})
+            provider_config_context = ProviderRuntimeConfigContext(process_env={})
             updated_text, builtin_provider_rewrites = rewrite_openclaw_builtin_models_as_explicit_providers(
                 original_text,
                 staging_root=staging_root,
-                env_context=env_context,
+                provider_config_context=provider_config_context,
             )
-            env_context.apply_staged_dotenv_consumption(staging_root)
+            provider_config_context.apply_staged_dotenv_consumption(staging_root)
             if builtin_provider_rewrites:
                 openclaw_config.write_text(updated_text, encoding="utf-8")
     for tree_source in stage_plan.tree_sources:
@@ -62,19 +58,7 @@ def postprocess_stage(
         workspace_documents_manifest_payload=workspace_documents_manifest_payload,
     )
     extra_skill_dir_rewrites = rewrite_packaged_extra_skill_dirs(staging_root, stage_plan)
-    source_extensions_root = None
-    for tree_source in stage_plan.tree_sources:
-        if tree_source.source_key != ".openclaw/extensions":
-            continue
-        source_extensions_root = tree_source.source_root
-        break
-    pruned_plugin_configs = prune_unbundled_local_plugin_config(
-        staging_root,
-        source_extensions_root=source_extensions_root,
-    )
     overlay_trimmed_fields = rewrite_packaged_openclaw_config_as_overlay(staging_root)
-    selected_cron_jobs_filtered = filter_selected_cron_jobs(staging_root, stage_plan)
-    cron_cleaned = clean_cron_jobs(staging_root)
     document_ref_errors = validate_packaged_workspace_document_refs(
         staging_root,
         workspace_documents_manifest_payload=workspace_documents_manifest_payload,
@@ -87,11 +71,8 @@ def postprocess_stage(
     return {
         "openclaw_redactions": redactions,
         "openclaw_builtin_provider_rewrites": builtin_provider_rewrites,
-        "openclaw_pruned_plugin_configs": pruned_plugin_configs,
         "openclaw_overlay_trimmed_fields": overlay_trimmed_fields,
         "openclaw_extra_skill_dir_rewrites": extra_skill_dir_rewrites,
-        "openclaw_selected_cron_jobs_filtered": selected_cron_jobs_filtered,
-        "openclaw_cron_jobs_cleaned": cron_cleaned,
     }
 
 
@@ -185,16 +166,7 @@ def sync_confirmed_skill_entries(
     }
 
 
-def collect_runtime_environment_fields() -> dict[str, Optional[str]]:
-    return {
-        "openclaw_version": collect_optional_command_first_line(["openclaw", "--version"]),
-    }
-
-
 __all__ = [
-    "clean_cron_jobs",
-    "collect_runtime_environment_fields",
-    "filter_selected_cron_jobs",
     "postprocess_stage",
     "sync_confirmed_skill_entries",
 ]

@@ -148,35 +148,16 @@ class DeepScanFinding:
 
 
 @dataclass(frozen=True)
-class EnvVar:
-    name: str
-    referenced_in: tuple[str, ...]
-    process_value: str
-    placeholder: str
-
-
-@dataclass(frozen=True)
 class DeepScanFindingsInput:
     generic: tuple[DeepScanFinding, ...] = ()
-    env_var: tuple[EnvVar, ...] = ()
-
-
-@dataclass(frozen=True)
-class ExcludedFile:
-    source: str
-    reason: str
 
 
 @dataclass(frozen=True)
 class ReviewedScanBuildInput:
     url_proxy_pairs: tuple[UrlProxyPair, ...]
     generic_values: tuple[GenericValue, ...]
-    env_vars: tuple[EnvVar, ...]
-    excludes: tuple[ExcludedFile, ...]
 
 __all__ = [
-    "EnvVar",
-    "ExcludedFile",
     "FieldLocation",
     "DeepScanFinding",
     "DeepScanFindingsInput",

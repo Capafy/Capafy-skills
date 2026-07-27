@@ -16,7 +16,7 @@ def build_target_descriptors() -> dict[str, TargetDescriptor]:
     from packaging.runtimes.adapters import list_runtime_adapters
 
     for adapter in list_runtime_adapters():
-        for descriptor in adapter.descriptors():
+        for descriptor in adapter.descriptors:
             descriptors[descriptor.target_id] = descriptor
     return descriptors
 

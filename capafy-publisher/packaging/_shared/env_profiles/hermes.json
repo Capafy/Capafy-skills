@@ -1,19 +1,19 @@
 {
   "platform_contract": {
     "config_files": [
-      ".hermes/config.yaml",
+      ".hermes/config.yaml"
+    ],
+    "optional_config_files": [
       "_scan_only/.hermes/config.yaml",
       "_scan_only/.hermes/credentials",
       "_scan_only/.hermes/oauth",
       "_scan_only/.hermes/.anthropic_oauth.json",
       "_scan_only/.hermes/auth.json",
-      "_scan_only/.hermes/auth/google_oauth.json"
-    ],
-    "optional_config_files": [
+      "_scan_only/.hermes/auth/google_oauth.json",
       ".hermes/.env",
       "_scan_only/.hermes/.env"
     ],
-    "env_vars": {
+    "provider_environment": {
       "ANTHROPIC_API_KEY": {
         "service": "Anthropic",
         "canonical_url": "https://api.anthropic.com"
@@ -24,11 +24,11 @@
       },
       "GOOGLE_API_KEY": {
         "service": "Google",
-        "canonical_url": "https://generativelanguage.googleapis.com"
+        "canonical_url": "https://generativelanguage.googleapis.com/v1beta"
       },
       "GEMINI_API_KEY": {
         "service": "Google",
-        "canonical_url": "https://generativelanguage.googleapis.com"
+        "canonical_url": "https://generativelanguage.googleapis.com/v1beta"
       },
       "NOUS_API_KEY": {
         "service": "Nous Portal",
@@ -42,47 +42,101 @@
         "service": "xAI",
         "canonical_url": "https://api.x.ai/v1"
       },
+      "GLM_API_KEY": {
+        "service": "Z.AI",
+        "canonical_url": "https://api.z.ai/api/paas/v4"
+      },
       "ZAI_API_KEY": {
         "service": "Z.AI",
         "canonical_url": "https://api.z.ai/api/paas/v4"
       },
-      "ZHIPUAI_API_KEY": {
+      "Z_AI_API_KEY": {
         "service": "Z.AI",
         "canonical_url": "https://api.z.ai/api/paas/v4"
       },
-      "MOONSHOT_API_KEY": {
-        "service": "Moonshot",
-        "canonical_url": "https://api.moonshot.cn/v1"
-      },
       "KIMI_API_KEY": {
-        "service": "Moonshot",
+        "service": "Kimi / Moonshot",
+        "canonical_url": "https://api.moonshot.ai/v1"
+      },
+      "KIMI_CODING_API_KEY": {
+        "service": "Kimi / Moonshot",
+        "canonical_url": "https://api.moonshot.ai/v1"
+      },
+      "KIMI_CN_API_KEY": {
+        "service": "Kimi / Moonshot (China)",
         "canonical_url": "https://api.moonshot.cn/v1"
       },
       "MINIMAX_API_KEY": {
         "service": "MiniMax",
-        "canonical_url": "https://api.minimax.chat/v1"
+        "canonical_url": "https://api.minimax.io/anthropic"
+      },
+      "MINIMAX_CN_API_KEY": {
+        "service": "MiniMax (China)",
+        "canonical_url": "https://api.minimaxi.com/anthropic"
       },
       "OPENROUTER_API_KEY": {
         "service": "OpenRouter",
         "canonical_url": "https://openrouter.ai/api/v1"
+      },
+      "DASHSCOPE_API_KEY": {
+        "service": "Qwen Cloud",
+        "canonical_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+      },
+      "ALIBABA_CODING_PLAN_API_KEY": {
+        "service": "Alibaba Cloud (Coding Plan)",
+        "canonical_url": "https://coding-intl.dashscope.aliyuncs.com/v1"
+      },
+      "ARCEEAI_API_KEY": {
+        "service": "Arcee AI",
+        "canonical_url": "https://api.arcee.ai/api/v1"
+      },
+      "GMI_API_KEY": {
+        "service": "GMI Cloud",
+        "canonical_url": "https://api.gmi-serving.com/v1"
+      },
+      "HF_TOKEN": {
+        "service": "Hugging Face",
+        "canonical_url": "https://router.huggingface.co/v1"
+      },
+      "KILOCODE_API_KEY": {
+        "service": "Kilo Code",
+        "canonical_url": "https://api.kilo.ai/api/gateway"
+      },
+      "NOVITA_API_KEY": {
+        "service": "NovitaAI",
+        "canonical_url": "https://api.novita.ai/openai/v1"
+      },
+      "NVIDIA_API_KEY": {
+        "service": "NVIDIA NIM",
+        "canonical_url": "https://integrate.api.nvidia.com/v1"
+      },
+      "OLLAMA_API_KEY": {
+        "service": "Ollama Cloud",
+        "canonical_url": "https://ollama.com/v1"
+      },
+      "OPENCODE_ZEN_API_KEY": {
+        "service": "OpenCode Zen",
+        "canonical_url": "https://opencode.ai/zen/v1"
+      },
+      "OPENCODE_GO_API_KEY": {
+        "service": "OpenCode Go",
+        "canonical_url": "https://opencode.ai/zen/go/v1"
+      },
+      "STEPFUN_API_KEY": {
+        "service": "StepFun Step Plan",
+        "canonical_url": "https://api.stepfun.ai/step_plan/v1"
+      },
+      "TOKENHUB_API_KEY": {
+        "service": "Tencent TokenHub",
+        "canonical_url": "https://tokenhub.tencentmaas.com/v1"
+      },
+      "XIAOMI_API_KEY": {
+        "service": "Xiaomi MiMo",
+        "canonical_url": "https://api.xiaomimimo.com/v1"
       }
     }
   },
-  "url_proxy_os_fallback_names": [
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "GOOGLE_API_KEY",
-    "GEMINI_API_KEY",
-    "NOUS_API_KEY",
-    "DEEPSEEK_API_KEY",
-    "XAI_API_KEY",
-    "ZAI_API_KEY",
-    "ZHIPUAI_API_KEY",
-    "MOONSHOT_API_KEY",
-    "KIMI_API_KEY",
-    "MINIMAX_API_KEY",
-    "OPENROUTER_API_KEY"
-  ],
+  "url_proxy_os_fallback_names": [],
   "discovery_skill_precedence": [
     ".hermes/skills"
   ],
@@ -167,12 +221,5 @@
       "path": ".cursorrules",
       "display_path": "workspace/.cursorrules"
     }
-  ],
-  "runtime_env": {
-    "field": "hermes_version",
-    "command": [
-      "hermes",
-      "--version"
-    ]
-  }
+  ]
 }

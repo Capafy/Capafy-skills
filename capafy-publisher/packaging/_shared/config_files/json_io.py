@@ -92,10 +92,13 @@ def find_json_string_leaf_path(payload: object, needle: str) -> list[str]:
 
 
 def json_pointer_parts(pointer: str) -> list[str]:
+    raw_pointer = str(pointer or "")
+    if not raw_pointer:
+        return []
+    raw_parts = raw_pointer[1:].split("/") if raw_pointer.startswith("/") else raw_pointer.split("/")
     return [
         part.replace("~1", "/").replace("~0", "~")
-        for part in str(pointer or "").split("/")
-        if part
+        for part in raw_parts
     ]
 
 
@@ -120,7 +123,7 @@ def replace_json_value_text(text: str, pointer: str, replacement: object) -> str
 
     parent = _parent_for_json_path(payload, parts)
     node, key = parent
-    if node is None or not key:
+    if node is None:
         return text
     node[key] = replacement
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
@@ -255,7 +258,7 @@ def _parent_for_json_path(payload: object, path_parts: list[str]) -> tuple[Optio
 
 def remove_json_object_key_at_path(payload: object, path_parts: list[str]) -> bool:
     parent, key = _parent_for_json_path(payload, path_parts)
-    if parent is None or not key or key not in parent:
+    if parent is None or key not in parent:
         return False
     del parent[key]
     return True

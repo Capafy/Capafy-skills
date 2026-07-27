@@ -49,15 +49,26 @@ def _validate_platform_contract(profile: dict, *, path: Path) -> None:
         if not isinstance(item, str) or not item.strip():
             raise ValueError(f"{path}: platform_contract.optional_config_files[{index}] must be a non-empty string")
 
-    env_vars = _require_dict(contract.get("env_vars", {}), label="platform_contract.env_vars", path=path)
-    for env_name, raw_spec in env_vars.items():
+    provider_environment = _require_dict(
+        contract.get("provider_environment", {}),
+        label="platform_contract.provider_environment",
+        path=path,
+    )
+    for env_name, raw_spec in provider_environment.items():
         if not isinstance(env_name, str) or not env_name.strip():
-            raise ValueError(f"{path}: platform_contract.env_vars keys must be non-empty strings")
-        spec = _require_dict(raw_spec, label=f"platform_contract.env_vars[{env_name}]", path=path)
+            raise ValueError(f"{path}: platform_contract.provider_environment keys must be non-empty strings")
+        spec = _require_dict(
+            raw_spec,
+            label=f"platform_contract.provider_environment[{env_name}]",
+            path=path,
+        )
         for field in ("service", "canonical_url"):
             value = spec.get(field)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{path}: platform_contract.env_vars[{env_name}].{field} must be a non-empty string")
+                raise ValueError(
+                    f"{path}: platform_contract.provider_environment[{env_name}].{field} "
+                    "must be a non-empty string"
+                )
 
 
 def _validate_profile(profile: object, *, path: Path, expected_env_id: Optional[str] = None) -> dict:
@@ -69,13 +80,7 @@ def _validate_profile(profile: object, *, path: Path, expected_env_id: Optional[
             raise ValueError(f"profile env_id does not match: {path}")
         profile.setdefault("env_id", expected_env_id)
 
-    runtime_env = _require_dict(profile.get("runtime_env"), label="runtime_env", path=path)
-
     _validate_platform_contract(profile, path=path)
-
-    runtime_command = runtime_env.get("command")
-    if runtime_command is not None:
-        _require_list(runtime_command, label="runtime_env.command", path=path)
 
     for key in _PROFILE_LIST_KEYS:
         profile.setdefault(key, [])

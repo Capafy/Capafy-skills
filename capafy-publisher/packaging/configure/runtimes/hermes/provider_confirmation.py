@@ -10,8 +10,8 @@ from packaging._shared.config_files.yaml_loader import (
     safe_yaml_mapping_loads,
     set_yaml_path_value,
 )
-from packaging._shared.llm.official_providers import find_official_provider_by_marker
 from packaging.configure.runtimes.hermes.api_modes import hermes_api_mode_for_config
+from packaging.configure.runtimes.hermes.official_providers import find_hermes_official_provider_by_marker
 
 
 CONFIG_REL = ".hermes/config.yaml"
@@ -157,7 +157,7 @@ def _custom_reference_name(value: object, custom_names: set[str]) -> str:
     lowered = normalized.lower()
     if lowered.startswith("custom:"):
         return normalized.split(":", 1)[1].strip()
-    if lowered == "openrouter" or find_official_provider_by_marker(lowered) is not None:
+    if lowered == "openrouter" or find_hermes_official_provider_by_marker(lowered) is not None:
         return ""
     return normalized if normalized in custom_names else ""
 

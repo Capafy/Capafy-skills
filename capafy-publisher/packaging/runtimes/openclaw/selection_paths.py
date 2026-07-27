@@ -42,10 +42,6 @@ def canonicalize_openclaw_selection_path(path: object) -> str:
         return (_OPENCLAW_WORKSPACE_PREFIX / PurePosixPath(*(str(part) for part in parts[1:]))).as_posix()
     if parts[0] == "skills" and len(parts) > 1:
         return (_OPENCLAW_WORKSPACE_PREFIX / PurePosixPath(*(str(part) for part in parts))).as_posix()
-    if parts[0] == "extensions" and len(parts) > 1:
-        return (PurePosixPath(_OPENCLAW_ROOT_PREFIX) / PurePosixPath(*parts)).as_posix()
-    if parts[0] == "cron" and len(parts) > 1:
-        return (PurePosixPath(_OPENCLAW_ROOT_PREFIX) / PurePosixPath(*parts)).as_posix()
     return normalized
 
 
@@ -55,10 +51,9 @@ def normalize_openclaw_selection_groups(raw_groups: object) -> dict[str, list[di
     for key in SELECTION_GROUP_KEYS:
         for raw_item in groups.get(key, []):
             item = dict(raw_item)
-            if key != "crons":
-                item_path = _normalize_posix_path(item.get("path"))
-                if item_path:
-                    item["path"] = canonicalize_openclaw_selection_path(item_path)
+            item_path = _normalize_posix_path(item.get("path"))
+            if item_path:
+                item["path"] = canonicalize_openclaw_selection_path(item_path)
             normalized_groups[key].append(item)
     return normalized_groups
 

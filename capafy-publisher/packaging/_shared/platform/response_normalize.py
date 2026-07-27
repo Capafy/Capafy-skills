@@ -95,40 +95,6 @@ def _validate_optional_typed_field(
         raise ValueError(type_message)
 
 
-def _validate_cron_selection_group_item(item: dict[str, Any], *, key: str) -> None:
-    _require_non_empty_string_field(
-        item,
-        "id",
-        missing_message=f"workflow_info.selection_groups.{key} items must include id",
-        type_message=f"workflow_info.selection_groups.{key} item id must be a string",
-    )
-    _require_non_empty_string_field(
-        item,
-        "name",
-        missing_message=f"workflow_info.selection_groups.{key} items must include name",
-        type_message=f"workflow_info.selection_groups.{key} item name must be a string",
-    )
-    schedule = item.get("schedule")
-    if not isinstance(schedule, dict):
-        raise ValueError(f"workflow_info.selection_groups.{key} items must include schedule")
-    for field_name in ("kind", "expr", "tz"):
-        _require_non_empty_string_field(
-            schedule,
-            field_name,
-            missing_message=f"workflow_info.selection_groups.{key} item schedule must include {field_name}",
-            type_message=f"workflow_info.selection_groups.{key} item schedule.{field_name} must be a string",
-        )
-    payload = item.get("payload")
-    if not isinstance(payload, dict):
-        raise ValueError(f"workflow_info.selection_groups.{key} items must include payload")
-    _require_non_empty_string_field(
-        payload,
-        "prompt",
-        missing_message=f"workflow_info.selection_groups.{key} item payload must include prompt",
-        type_message=f"workflow_info.selection_groups.{key} item payload.prompt must be a string",
-    )
-
-
 def _normalize_selection_groups_from_workflow_info(
     workflow_info: dict[str, Any],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -145,16 +111,13 @@ def _normalize_selection_groups_from_workflow_info(
             for item in value:
                 if not isinstance(item, dict):
                     raise ValueError(f"workflow_info.selection_groups.{key} array items must be objects")
-                if key == "crons":
-                    _validate_cron_selection_group_item(item, key=key)
-                    continue
                 _require_non_empty_string_field(
                     item,
                     "path",
                     missing_message=f"workflow_info.selection_groups.{key} items must include path",
                     type_message=f"workflow_info.selection_groups.{key} item path must be a string",
                 )
-                if key in {"skills", "plugins", "workspace_documents"} and is_absolute_like_path(str(item.get("path", ""))):
+                if key in {"skills", "workspace_documents"} and is_absolute_like_path(str(item.get("path", ""))):
                     raise ValueError(
                         f"workflow_info.selection_groups.{key} item path must be a logical path, not an absolute path"
                     )

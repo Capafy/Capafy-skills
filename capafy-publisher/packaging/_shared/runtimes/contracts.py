@@ -7,17 +7,12 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, runtime
 from packaging._shared.contracts.stage_plan import StagePlan
 
 
-OPENCLAW_LEGACY_TARGET = "openclaw_legacy_native"
-OPENCLAW_MODERN_TARGET = "openclaw_bundle_aware"
-
-
 @dataclass(frozen=True)
 class TargetDescriptor:
     target_id: str
     canonical_name: str
     profile_env_id: Optional[str] = None
     runtime_generation: Optional[str] = None
-    runtime_variant: Optional[str] = None
 
 
 
@@ -29,13 +24,9 @@ SpecialScanResult = Tuple[Dict[str, str], Dict[str, str], Dict[str, str], List[d
 @dataclass(frozen=True)
 class RuntimeAdapter:
     runtime_id: str
-    descriptors: Callable[[], tuple[TargetDescriptor, ...]]
-    target_factory: Optional[Callable[[TargetDescriptor, dict], "PackagingTarget"]] = None
-    url_proxy_runtime_factory: Optional[Callable[[], Any]] = None
-    env_preprocess_hook: Optional[Callable[..., frozenset[str]]] = None
-    owns_structured_pair: Optional[Callable[[Any], bool]] = None
-    review_consistency_hook: Optional[Callable[..., None]] = None
-    semantic_field_identity_hook: Optional[Callable[[Any], tuple[str, str, str]]] = None
+    descriptors: tuple[TargetDescriptor, ...]
+    target_factory: Callable[[TargetDescriptor, dict], "PackagingTarget"]
+    url_proxy_runtime_factory: Callable[[], Any]
 
 
 @runtime_checkable
@@ -49,9 +40,6 @@ class PackagingTarget(Protocol):
     ) -> StagePlan:
         ...
 
-    def collect_runtime_environment_fields(self) -> dict:
-        ...
-
     def prepare_runtime_dir(
         self,
         runtime_dir: str,
@@ -61,8 +49,6 @@ class PackagingTarget(Protocol):
     def validate_runtime(
         self,
         runtime_root: Path,
-        *,
-        expected_version: Optional[str] = None,
     ) -> dict:
         ...
 
@@ -84,8 +70,6 @@ def call_optional_target_hook(
 
 __all__ = [
     "CandidateAnnotator",
-    "OPENCLAW_LEGACY_TARGET",
-    "OPENCLAW_MODERN_TARGET",
     "PackagingTarget",
     "RuntimeAdapter",
     "SpecialScanResult",

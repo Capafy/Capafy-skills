@@ -10,11 +10,8 @@ from .constants import (
     SKILL_CONFIG_PATH,
 )
 from .exclusion_rules import (
-    CREDENTIAL_EXCLUDED_DIRS,
-    PRIVATE_KEY_FILE_BASENAMES,
+    HIGH_RISK_FILE_BASENAMES,
     STAGE_EXCLUDED_DIRS,
-    STAGE_EXCLUDED_FILES,
-    STAGE_EXCLUDED_NAME_PATTERNS,
     STAGE_EXCLUDED_SUFFIXES,
 )
 from .fs import display_stage_path, is_within, looks_like_absolute_symlink, looks_like_virtualenv_dir, relpath as fs_relpath
@@ -54,7 +51,6 @@ def should_skip_packaged_relpath(
     skip_skill_runtime_outputs: bool = False,
     skill_runtime_prefixes: tuple[str, ...] = (),
     excluded_relpath_prefixes: tuple[str, ...] = (),
-    include_stage_excluded_files: bool = False,
 ) -> bool:
     pure = PurePosixPath(relpath.rstrip("/"))
     name = pure.name
@@ -65,17 +61,12 @@ def should_skip_packaged_relpath(
         prefix_parts = tuple(part for part in PurePosixPath(prefix.rstrip("/")).parts if part and part != ".")
         if prefix_parts and parts[: len(prefix_parts)] == prefix_parts:
             return True
-    if is_dir:
-        if name in STAGE_EXCLUDED_DIRS:
-            return True
-    elif not include_stage_excluded_files:
-        if name in STAGE_EXCLUDED_FILES:
-            return True
-        if name.lower() in PRIVATE_KEY_FILE_BASENAMES:
+    if any(part in STAGE_EXCLUDED_DIRS for part in parts):
+        return True
+    if not is_dir:
+        if name.lower() in HIGH_RISK_FILE_BASENAMES:
             return True
         if any(name.endswith(suffix) for suffix in STAGE_EXCLUDED_SUFFIXES):
-            return True
-        if any(pattern.match(name) for pattern in STAGE_EXCLUDED_NAME_PATTERNS):
             return True
     if skip_skill_runtime_outputs:
         runtime_parts = [part.lower() for part in pure.parts if part and part != "."]
@@ -111,7 +102,6 @@ def should_skip_packaged_path(
     skip_skill_runtime_outputs: bool = False,
     skill_runtime_prefixes: tuple[str, ...] = (),
     excluded_relpath_prefixes: tuple[str, ...] = (),
-    include_stage_excluded_files: bool = False,
 ) -> bool:
     if _is_local_host_state_path(source_path):
         return True
@@ -121,7 +111,6 @@ def should_skip_packaged_path(
         skip_skill_runtime_outputs=skip_skill_runtime_outputs,
         skill_runtime_prefixes=skill_runtime_prefixes,
         excluded_relpath_prefixes=excluded_relpath_prefixes,
-        include_stage_excluded_files=include_stage_excluded_files,
     )
 
 
@@ -131,7 +120,6 @@ def iter_packaged_files(
     skip_skill_runtime_outputs: bool = False,
     skill_runtime_prefixes: tuple[str, ...] = (),
     excluded_relpath_prefixes: tuple[str, ...] = (),
-    include_stage_excluded_files: bool = False,
 ) -> Iterable[Path]:
     for current, dirnames, filenames in os.walk(root, topdown=True):
         current_path = Path(current)
@@ -150,7 +138,6 @@ def iter_packaged_files(
                 skip_skill_runtime_outputs=skip_skill_runtime_outputs,
                 skill_runtime_prefixes=skill_runtime_prefixes,
                 excluded_relpath_prefixes=excluded_relpath_prefixes,
-                include_stage_excluded_files=include_stage_excluded_files,
             ):
                 continue
             kept_dirs.append(dirname)
@@ -167,14 +154,9 @@ def iter_packaged_files(
                 skip_skill_runtime_outputs=skip_skill_runtime_outputs,
                 skill_runtime_prefixes=skill_runtime_prefixes,
                 excluded_relpath_prefixes=excluded_relpath_prefixes,
-                include_stage_excluded_files=include_stage_excluded_files,
             ):
                 continue
             yield current_path / filename
-
-
-def is_credential_excluded_dir(name: str) -> bool:
-    return name in CREDENTIAL_EXCLUDED_DIRS
 
 
 def matches_workspace_allowlist(
@@ -206,7 +188,6 @@ def matches_workspace_allowlist(
     return False
 
 __all__ = [
-    "is_credential_excluded_dir",
     "iter_packaged_files",
     "matches_workspace_allowlist",
     "should_skip_packaged_path",

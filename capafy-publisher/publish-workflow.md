@@ -51,7 +51,7 @@ python3 packager.py publish-refresh-url --agent-id <agent_id>
 python3 packager.py publish-list
 ```
 
-The three web confirmation pages are: after `publish-init` **confirm the file content to be uploaded**, after `publish-configure` **confirm the secrets / environment variables etc. to be hosted**, after `publish-ship` **final confirmation and submit for review**.
+The three web confirmation pages are: after `publish-init` **confirm the file content to be uploaded**, after `publish-configure` **confirm provider keys / secrets to be hosted and manually add any required environment variables**, after `publish-ship` **final confirmation and submit for review**.
 
 Exit codes distinguish true command failures from expected workflow pauses. Soft-action payloads such as Phase A candidate selection and `needs_deep_scan` exit `0` and include `ok: true`, `requires_action: true`, and `action_type`; true errors exit `1` with `ok: false`, `status: error`. Always inspect the JSON `status` / `requires_action` fields instead of treating every pause as an error.
 
@@ -70,11 +70,11 @@ Parameter boundaries:
 - Even if this round selects a global skill, e.g. `/home/admin_wsl/.agents/skills/skill-vetter`, as long as Codex is currently running in `/home/admin_wsl/sunnet/project/agent_store`, you should pass `--runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter`.
 - Windows / WSL paths must be absolute paths accessible by the current system; publisher does not convert them automatically. See the `publish-init` section in SKILL.md for concrete examples.
 - The dot-agent target does not probe the host and does not decide for you whether `runtime_dir` is reasonable; the OpenClaw target validates that it must be a legal workspace.
-- When `publish-init` is run without `--selections`, it returns top-level `skills` / `plugins` / `crons` candidate arrays; if `--skill-dir` is passed, the candidates only return this explicit skill. Candidate entries do not carry a `selection` field — only appearing in the second submission's `--selections` indicates they have been selected. This step must run first so the host has real candidates to work with; constructing `--selections` without running Phase A and without `--skill-dir` is incorrect usage.
+- When `publish-init` is run without `--selections`, it returns the top-level `skills` candidate array. If `--skill-dir` is passed, the candidates only return this explicit skill. Candidate entries do not carry a `selection` field — only appearing in the second submission's `--selections` indicates they have been selected. This step must run first so the host has real candidates to work with; constructing `--selections` without running Phase A and without `--skill-dir` is incorrect usage.
 - For large workspaces, `--brief` returns compact candidate entries and can be combined with `--title` / `--description` from the Agent Card. The publisher may sort stronger text matches first and mark one entry as `suggested: true`; this is a suggestion only, not a filter. The publisher also filters its own `capafy-publisher` skill and suppresses nested child skill copies when the parent skill is already a candidate.
-- The host LLM generates `--selections` from the candidates and user context: top-level `title`, `description`, `skills`, `plugins`, `crons`; when updating an existing Agent, an additional top-level `agent_id` may be included; if the host already has a definite `agent_id`, it can also be passed directly via `publish-init --agent-id <agent_id>` — both forms are semantically equivalent and must stay consistent. `title` / `description` are jointly determined by the creator's intent and the candidate info; do not default to blindly copying the candidate's name.
+- The host LLM generates `--selections` from the candidates and user context: top-level `title`, `description`, `skills`; when updating an existing Agent, an additional top-level `agent_id` may be included; if the host already has a definite `agent_id`, it can also be passed directly via `publish-init --agent-id <agent_id>` — both forms are semantically equivalent and must stay consistent. `title` / `description` are jointly determined by the creator's intent and the candidate info; do not default to blindly copying the candidate's name.
 - When updating an existing Agent, first read back the `workflowInfo.selection_groups` from the latest version, recite the currently selected skill verbatim to the creator, and then ask a direct two-way choice: keep using the current skill, or switch to a different skill. The former means only updating the content of the same skill — continue using the existing `skills[]`; the latter goes back to Phase A to rescan candidates. Do not just ask "do you want to pick a new skill".
-- Each `skills[].path` / `plugins[].path` / `crons[].id` in `--selections` must correspond to a Phase A candidate or the explicit `--skill-dir` skill; entries without correspondence must be removed, or you must first go back and ask the creator. Inventing path / name / description / purpose from impression, memory, or historical sessions is prohibited.
+- Each `skills[].path` in `--selections` must correspond to a Phase A candidate or the explicit `--skill-dir` skill; entries without correspondence must be removed, or you must first go back and ask the creator. Inventing path / name / description / purpose from impression, memory, or historical sessions is prohibited.
 - `skills[]` must not be empty. When Phase A returns `skills: []`, stop and use plain language to confirm with the creator — per the field translation table in SKILL.md — the actual project root / the directory the skill lives in; do not submit empty selections, and do not continue creating a platform draft.
 - Do not filter Phase A candidates by the Agent Card's `Name` / `Description` yourself: at the code level `discover_units` does not filter by agent name, and "there is no candidate that exactly matches the Agent Card name" does not mean "the workspace has no files". When candidates are non-empty but none match exactly, recite the candidates verbatim to the creator and have them pick / change the skill directory / change the Agent Card name; do not report "not found / no files / no skill" — see Core Iron Rule #7 in SKILL.md.
 - When talking to the creator, translate CLI parameters / JSON fields / internal state names into plain language per the field translation table at the start of SKILL.md's "Core Iron Rule"; do not throw fields like `--skill-dir` / `--runtime-dir` / `agentType` / `selection_groups` at the creator.
@@ -125,9 +125,7 @@ Expected response shape:
       "name": "skill-vetter",
       "unit_type": "skill"
     }
-  ],
-  "plugins": [],
-  "crons": []
+  ]
 }
 ```
 
@@ -143,9 +141,7 @@ Expected response shape:
       "name": "skill-vetter",
       "purpose": "Review skill source code, detecting credential leakage, network exfiltration, permission escalation and other security risks"
     }
-  ],
-  "plugins": [],
-  "crons": []
+  ]
 }
 ```
 
@@ -168,9 +164,7 @@ python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunne
       "name": "skill-vetter",
       "purpose": "Review skill source code, detecting credential leakage, network exfiltration, permission escalation and other security risks"
     }
-  ],
-  "plugins": [],
-  "crons": []
+  ]
 }
 ```
 
@@ -187,17 +181,17 @@ Common wrong examples:
 | `publish-init --env codex --selections-file .temp/confirmed-selections.json` | Missing required `--runtime-dir` |
 | `--runtime-dir /home/admin_wsl/.agents/skills/skill-vetter` | Treats the skill source directory as the project root |
 | `--skill-dir /home/admin_wsl/.agents/skills` | `--skill-dir` can only be a single skill root directory, not the parent `skills` directory |
-| `{"selection_groups": {"skills": [...]}}` | `publish-init` only accepts top-level `skills` / `plugins` / `crons` |
+| `{"selection_groups": {"skills": [...]}}` | `publish-init` only accepts top-level `skills` |
 | `{"workflow_intent": "...", "skills": [...]}` | `workflow_intent` has been retired and is not an init input |
-| `{"skills": [{"path": "guessed path"}], "plugins": [], "crons": []}` | `path` must correspond to a Phase A candidate |
-| `{"skills": [], "plugins": [], "crons": []}` | No selected skill; must go back to Phase A or ask the creator to confirm |
+| `{"skills": [{"path": "guessed path"}]}` | `path` must correspond to a Phase A candidate |
+| `{"skills": []}` | No selected skill; must go back to Phase A or ask the creator to confirm |
 
 Web confirmation points:
 
 | Source | Meaning |
 |---|---|
 | `publish-init` | Confirm the file content to be uploaded |
-| `publish-configure` | Confirm the secrets / environment variables etc. to be hosted; returned only when needed |
+| `publish-configure` | Confirm provider keys / secrets to be hosted and manually add any required environment variables; returned only when needed |
 | `publish-ship` | Final confirmation and submit for review |
 
 ### Worked Example
@@ -208,7 +202,7 @@ Web confirmation points:
 | 2 | Log in or refresh token | Token written into `config.json`, `publish-init` login-state verification passes |
 | 3 | Confirm with the creator brand-new publish vs continuing / version update; for continuing publish, first ask whether to switch the skill directory, then branch by option | Creator intent (+ `agent_id`, only for continuing publish) |
 | 4 | (Only for continuing publish) Call `capafy_platform.api.get_latest_version_raw(agent_id)` to pull historical selections (from `workflowInfo.selection_groups`; only represents historical selection). The historical `skills[].path` is the **platform logical path** of the previous version, **do not treat it as the current local path** — confirm with the creator the current local package directory via the field translation table in plain language before running step 5 (Core Iron Rule #8) | Historical skill `name` / `description` / `purpose` + the local package directory confirmed by the creator |
-| 5 | `publish-init --env <env_id> --runtime-dir <absolute_path> [--skill-dir <single>]` (Phase A must run first) | Top-level `skills` / `plugins` / `crons` candidate JSON |
+| 5 | `publish-init --env <env_id> --runtime-dir <absolute_path> [--skill-dir <single>]` (Phase A must run first) | Top-level `skills` candidate JSON |
 | 6 | Candidates + creator intent (+ historical selections, only for continuing publish) → assemble confirmed selections (continuing publish carries `agent_id` at the top) | Confirmed selections JSON |
 | 7 | `publish-init --env <env_id> --runtime-dir <absolute_path> [--skill-dir <single>] --selections-file .temp/confirmed-selections.json` | `submitted` + `agent_id` / new `agent_version_id` + `review_url` |
 | 8 | Paste `review_url` verbatim to the creator, wait for the creator to complete the first page (confirm the file content to be uploaded, Core Iron Rule #1) | First page confirmation complete |
@@ -229,10 +223,11 @@ If the creator explicitly designates a particular local skill source directory, 
 
 | Situation | Correct action |
 |---|---|
-| Any step returns `review_url` (include all of them if a single response carries multiple) | **First action**: paste verbatim to the creator and explain what this page is for; only then pause. After the creator finishes, call `get_latest_version_raw` to reconcile (Core Iron Rule #1 + #2). Of these, `publish-init` is confirming the file content to be uploaded, `publish-configure` is confirming the secrets / environment variables etc. to be hosted (filled in on the webpage, do not have the creator send them in chat), and `publish-ship` is the final confirmation and submit for review |
+| Any step returns `review_url` (include all of them if a single response carries multiple) | **First action**: paste verbatim to the creator and explain what this page is for; only then pause. After the creator finishes, call `get_latest_version_raw` to reconcile (Core Iron Rule #1 + #2). Of these, `publish-init` is confirming the file content to be uploaded, `publish-configure` is confirming provider keys / secrets to be hosted and manually adding any required environment variables (fill them on the webpage, do not have the creator send values in chat), and `publish-ship` is the final confirmation and submit for review. If the configure response includes `environment_variable_hint`, also paste its Chinese message and variable names so the creator knows what may need to be added on the page |
 | The creator has completed the first page (confirm the file content to be uploaded), `agentType` is `run_online`, about to run `publish-configure` for the first time | Per Core Iron Rule #1, send "do you want the deep scan" as a top-level chat message and wait. Agreed: add `--deep-scan`; refused: regular configure. Download mode skips this step |
 | `publish-configure` returns `skills_empty_after_platform_confirmation` | After the first page (confirm the file content to be uploaded) was confirmed there was no selected skill; have the creator go back to the first page and select at least one skill, or rerun init with the correct `runtime_dir` / `skill_dir` |
 | `publish-configure --deep-scan` returns `needs_deep_scan` | This is a soft action, not a command failure. Per `staging_path`, do a supplementary scan for missed sensitive info; after no remaining misses, rerun configure without `--deep-scan` |
+| `publish-ship` returns `persist_shipped_state_failed` | Package report already succeeded remotely. Paste the returned final `review_url`, let the creator finish that page, then run `publish-remote-status --agent-id <agent_id>`. If remote state confirms success, do **not** rerun ship: remote status is read-only and automatic local reconciliation is unavailable. Preserve bundle / staging while remote state is uncertain; clear the prior local state only after remote success and the next publish chain are explicitly confirmed (Core Iron Rule #10) |
 | `publish-configure` / `publish-ship` fails, local working state missing / stale | Default to resume: check local state with `publish-status`, then retry with `publish-configure --agent-id <agent_id>` / `publish-ship --agent-id <agent_id>`. **Do not** go back to `publish-init` to create a new agent (Core Iron Rule #6) |
 | Seeing the `existing_local_publish_state` blocking error | This is a protection: default to resume, do not unconditionally `--reset-local-state` |
 | The creator comes back from the web saying confirm / confirmed / submitted / done / pricing set | First call `get_latest_version_raw(agent_id)` to reconcile `agentType` / status / `agentVersionId`, then answer; do not infer "submitted for review" from the local manifest (Core Iron Rule #2) |
@@ -252,7 +247,7 @@ By default `publish-configure` automatically rebuilds staging, scans for sensiti
 
 `reviewed-scan.json` is still generated by code. The host LLM does not hand-write this file, nor does it need to supply `_review`, digest, or bucket fields.
 
-The host LLM only intervenes when supplementary scanning is required for sensitive info missed by the rule scan. The plaintext `generic` items hit by the rule scan have already been rewritten to platform-hosted placeholders before deep scan; `url_proxy` / `env_var` / `excludes` have also been generated by the regular pipeline. Deep scan is not a second review of `url_proxy` / `generic` / `env_var` / `excludes` already hit by the rule scan, nor is it patching `reviewed-scan.json`.
+The host LLM only intervenes when supplementary scanning is required for sensitive info missed by the rule scan. The plaintext `generic` items hit by the rule scan have already been rewritten to platform-hosted placeholders before deep scan, and the selected runtime has already generated `url_proxy`. Deep scan is not a second review of `url_proxy` / `generic` already found by the regular pipeline, nor is it patching `reviewed-scan.json`. The publisher does not inspect host environment-variable values, and deep scan must not inspect or return them either.
 
 Deep scan only looks at risks of generic secrets / sensitive values that rules/regex find hard to cover:
 
@@ -263,23 +258,23 @@ Deep scan only looks at risks of generic secrets / sensitive values that rules/r
 
 Rules:
 
-- Use `scan_files` as the review boundary exception list. Files not listed there are reviewable by default. Files listed with `reviewable: false`, including `_scan_only/` context and publisher-generated files, are context only; do not report findings from them. Use `scan_files_summary` for total / reviewable / unreviewable counts.
-- Files marked `auto_generated: true` are publisher artifacts such as runtime environment manifests, stage manifests, and bundle context; skip them during LLM review.
-- Use `credential_hints.url_proxy[]` only to identify which provider key/url pair the rule scan already found. These hints carry field names and safe URL hints, not API key values; do not turn them into new findings.
+- Use `scan_files` as the review boundary exception list. Files not listed there are reviewable by default. Publisher-generated files listed with `reviewable: false` are context only; do not report findings from them. Logical scan-only inputs are read directly from their original paths for the rule scan and are never copied into staging or exposed to the host LLM. Use `scan_files_summary` for total / reviewable / unreviewable counts.
+- Files marked `auto_generated: true` are publisher artifacts such as stage manifests and bundle context; skip them during LLM review.
+- Use `credential_hints.url_proxy[]` only to identify which provider key/url pair the selected target runtime already found. These hints carry field names and safe URL hints, not API key values; do not turn them into new findings.
 - Deep scan only reports "risks the rule scan did not catch"; do not re-classify already-hit buckets.
-- Do not actively discover new `url_proxy`; have the host LLM output a JSON object whose top level only has the two arrays `generic` and `env_var`: `{"generic": [], "env_var": []}`. The `generic` array holds file findings; the `env_var` array holds environment variable findings.
+- Do not actively discover new `url_proxy`; have the host LLM output a JSON object whose top level only has the `generic` array: `{"generic": []}`. Environment-variable findings are not accepted.
 - Example values, placeholders, test stubs, documentation snippets, and runtime-irrelevant text are not treated as missed risks.
-- When a miss is found, give the specific file, field or snippet, reason, and recommendation; have the host LLM output a minimal findings JSON object: `generic` items should include `value` + `source`, `env_var` items need non-empty `value` + `field` (env var name). `generic.source` must be the specific file relative path in the final zip file list within staging — directories are not allowed, but `#json:/...`, `#toml:...`, or `line N` location details are allowed; `env_var` items keep only `value` + `field`. Then rerun `publish-configure --deep-scan-findings-file <path>` and hand it to the program for validation, field completion, placeholder rewriting, and regenerating reviewed-scan.
+- When a miss is found, give the specific file, field or snippet, reason, and recommendation; have the host LLM output a minimal findings JSON object whose `generic` items include `value` + `source`. `generic.source` must be the specific file relative path in the final zip file list within staging — directories are not allowed, but `#json:/...`, `#toml:...`, or `line N` location details are allowed. Then rerun `publish-configure --deep-scan-findings-file <path>` and hand it to the program for validation, field completion, placeholder rewriting, and regenerating reviewed-scan.
 - The program first filters deep-scan `generic` findings to the staging sources within the final package boundary; only items retained after filtering are written to `reviewed-scan.json`, and the original value is replaced with a platform-hosted placeholder in the staging file. Replacement only happens in staging, and is not written back to the creator's original source.
-- If a `generic` finding is missing `source`, its `source` points to a directory, `_scan_only/`, an internal manifest, a missing file, an escaped path, an already-excluded file, an existing `.zip` / `.tar.gz` archive artifact, or any other material that will not enter the final package, the program only filters that item and the flow continues. Do not hand-write reviewed-scan to retain such items; if you really need to publish that configuration, first have the corresponding file enter the staging/package boundary.
+- If a `generic` finding is missing `source`, its `source` points to a directory, a logical `_scan_only/` reference, an internal manifest, a missing file, an escaped path, an existing `.zip` / `.tar.gz` archive artifact, or any other material that will not enter the final package, the program only filters that item and the flow continues. Do not hand-write reviewed-scan to retain such items; if you really need to publish that configuration, first have the corresponding file enter the staging/package boundary.
 - After confirming no remaining misses, rerun `publish-configure` without `--deep-scan` to continue platform configuration or the buyout gate.
 - Do not directly edit `.temp/reviewed-scan.json`.
-- Credential files matched by filename/path go directly into `excludes`; values matched by provider key regex go into `generic`.
-- Misses found by deep scan cannot be resolved by manually patching buckets, and the host LLM should not actively collect new variables from the host environment. Generic secrets and environment variables must be expressed separately: file sources go into `generic`, environment variable sources go into `env_var`, and `url_proxy` can still only be generated by the rule scan, runtime contract, or source configuration; if `--deep-scan-findings-file` validation fails, fix the finding's `value` / `source` or `field` and rerun, instead of changing scan rules at this step.
+- Credential files matched by the high-risk path rules never enter staging. Values inside allowed runtime files that match provider key rules go into `generic`.
+- Misses found by deep scan cannot be resolved by manually patching buckets. The host LLM must not read or collect variables from the host environment. File sources go into `generic`; `url_proxy` can only be generated by the selected target runtime from that target's routing/provider configuration. If `--deep-scan-findings-file` validation fails, fix the finding's `value` / `source` and rerun, instead of changing scan rules at this step.
 
 ### Generated Payload
 
-`reviewed-scan.json` is an internally generated artifact; the top level only keeps `url_proxy`, `generic`, `env_var`, `excludes`, and `_review`.
+`reviewed-scan.json` is an internally generated artifact; the top level only keeps `url_proxy`, `generic`, and `_review`. The platform `requiredCredentials` payload contains only `url_proxy` and `generic`.
 
 | Field | Description |
 |---|---|
@@ -287,7 +282,6 @@ Rules:
 | `_review.status` | Fixed `reviewed` |
 | `_review.raw_scan_digest` | Raw scan digest |
 | `_review.staging_digest` | Staging digest |
-| `_review.scan_only_digest` | `_scan_only/` review material digest |
 | `_review.env_id` | Current env |
 | `_review.distribution_mode` | `cloud_hosted` / `buyout` |
 
@@ -299,7 +293,7 @@ For a pair of LLM provider endpoint + API key:
 
 | Field | Description |
 |---|---|
-| `api_key.value` | Original key value |
+| `api_key.value` | Always empty in persisted review data and platform configuration requests |
 | `api_key.placeholder` | Platform-hosted placeholder |
 | `api_key.field` | Original field name or path |
 | `api_key.source` | Source file |
@@ -309,7 +303,7 @@ For a pair of LLM provider endpoint + API key:
 | `url.source` | Source file |
 | `use` | Purpose description |
 
-Under `cloud_hosted`, the LLM provider endpoint + API key supplied by the creator must be grouped into `url_proxy`. If deep scan discovers a provider key/url pair not hit by the rules, the scan rules or source configuration should be corrected and `publish-configure` rerun.
+Under `cloud_hosted`, only the selected target runtime may group a provider endpoint + API key declaration into `url_proxy`. All runtimes emit persisted review data and platform requests with an empty API-key value. Hermes and OpenClaw still scan, retain, and rewrite their managed runtime configuration files so the packaged files contain platform-managed placeholders. Provider-like secrets found elsewhere remain `generic`, and deep scan never creates or repairs `url_proxy` pairs.
 
 ### `generic[]`
 
@@ -325,30 +319,27 @@ For standalone credentials or configuration values:
 | `occurrence_index` | Occurrence sequence number for the same source field |
 | `use` | Purpose description |
 
-`generic.source` is part of the deliverable boundary: the program uses the same final zip file list from the package stage to validate the source, and only accepts specific files in the list, not directories. Empty source, `process.env`, `_scan_only/`, `agent.stage_manifest.internal.json`, download package's `agent.bundle_context.json`, non-existent files, escaped paths, existing archive artifacts, and files pointed to by `excludes` will not enter `generic[]`. These cases only filter the corresponding single item and do not block configure. `source` still writes the staging relative path; for example, even if the final zip path for `workspace/config.json` in staging is `config.json`, `generic.source` still writes `workspace/config.json`.
+`generic.source` is part of the deliverable boundary: the program uses the same final zip file list from the package stage to validate the source, and only accepts specific files in the list, not directories. Empty source, `process.env`, logical scan-only references, `agent.stage_manifest.internal.json`, download package's `agent.bundle_context.json`, non-existent files, escaped paths, and existing archive artifacts will not enter `generic[]`. These cases only filter the corresponding single item and do not block configure. `source` still writes the staging relative path; for example, even if the final zip path for `workspace/config.json` in staging is `config.json`, `generic.source` still writes `workspace/config.json`.
 
-### `env_var[]`
+For `run_online`, the publisher scans only the files under the selected Skill paths for environment-variable references and records names only. After excluding system noise, the configure response includes `environment_variable_hint`. When a Skill name also appears in `url_proxy`, it remains in the hint and is listed in `conflicts`, for example:
 
-For environment variable references:
+```json
+{
+  "environment_variable_hint": {
+    "names": ["DEMO_TOKEN", "OPENAI_API_KEY"],
+    "conflicts": ["OPENAI_API_KEY"],
+    "message": "The Skill may use these environment variables: DEMO_TOKEN, OPENAI_API_KEY. Add them on the webpage as needed. Warning: OPENAI_API_KEY is also used by the cloud LLM provider configuration; entering a different value may conflict with the url_proxy configuration."
+  }
+}
+```
 
-| Field | Description |
-|---|---|
-| `field` | Variable name |
-| `value` | Current value; may be `null` when unknown |
-| `use` | Purpose description |
+This is a reminder, not an uploaded credential. Show the message, names, and any conflicts to the creator when returning the configuration confirmation page; the creator decides whether to add them on the webpage and enters values there.
 
-### `excludes[]` / `strip[]`
+### Staging filtering and strip
 
-`excludes` is for files or values that should not be uploaded to the cloud with the package, e.g. login credential files, authentication state files, high-risk files that the creator confirms to exclude wholesale.
+High-risk files, login state, system directories, and other non-package inputs are rejected before copying. They are not represented in the scan protocol and package does not perform a second credential-path removal pass.
 
-`strip` is for values that should only be removed in plaintext from staging but not uploaded to the platform.
-
-Each item must at minimum state source and reason:
-
-| Field | Description |
-|---|---|
-| `source` | Source file or path |
-| `use` | Reason for excluding or stripping |
+Allowed runtime files stay in staging. Sensitive values inside them are replaced with `PLATFORM_MANAGED_*` placeholders before upload; the original source files are never modified.
 
 ### `.env` rules
 
@@ -356,24 +347,21 @@ Do not default to excluding the whole file just because the filename matches `.e
 
 | Situation | Handling |
 |---|---|
-| Runtime-required `.env` | Keep in the package, values classified by semantics; Claude Code's `url_proxy` only recognizes `.claude/settings*`, login state, and explicit `process.env` references |
+| Runtime-required `.env` | Keep in the package and classify file values by semantics; do not read matching values from the host process environment |
 | `.env` inside a selected skill's root directory | Keep in the package, values classified by semantics and stripped; do not treat it as a Claude Code provider source |
-| Login credential / authentication state files | `excludes` |
-| High-risk files that the creator confirms to exclude wholesale | `excludes` |
-| Runtime-irrelevant local development configuration | `excludes` |
+| Login credential / authentication state files | Do not copy into staging |
+| Private keys and other high-risk files | Do not copy into staging |
+| Runtime-irrelevant local development configuration | Do not add to the stage plan or confirmed selection |
 
 Retaining `.env` in the package: keep the file shell, and have subsequent strip replace plaintext values with `PLATFORM_MANAGED_*` placeholders.
 
-**Host-required config files must not be excluded wholesale**: `.claude/settings.json` / `.claude/settings.local.json` (required by the Claude Code host) and any other host configuration files already identified by `url_proxy` / `generic` / `env_var` as runtime-required **can only go through the `strip` path** (keep the file shell + replace values with placeholders). Such files **must not go into `excludes`** — excluding them wholesale would cause the cloud host to fail to start. Top-level `permissions` blocks in Claude settings files are local allowlist/cache state, not cloud runtime configuration; the main flow deletes them before packaging.
-
-On the second page (confirm the secrets / environment variables etc. to be hosted) credential confirmation page, the host LLM **must not** suggest to the creator anything like "find an entry to exclude `.claude/settings.local.json` wholesale". Correct phrasing: tell the creator the keys have been automatically replaced with `PLATFORM_MANAGED_*` placeholders and uploaded with the package; the file shell is preserved because it is required for cloud Claude Code to run; local permissions allowlists are removed by the main flow and the user does not need to manually exclude them. The second confirmation page is only for the secrets / environment variables list anyway, and does not provide a file-level wholesale exclusion entry.
+Codex and Claude Code do not package global agent configuration; only the selected Skill and confirmed Markdown files enter their package boundary. Their local configuration is read only for URL, model, and API-format metadata, while every uploaded URL Proxy uses an empty API-key value for the creator to fill on the platform page. Hermes and OpenClaw retain their existing runtime-configuration handling. Runtime-required Hermes/OpenClaw configuration identified by the supported scan buckets should keep its necessary file shell and strip plaintext values rather than being excluded wholesale.
 
 ### Creator confirmation display
 
-- `url_proxy.api_key.value` is only displayed masked; the paired `url.value` may be displayed in full.
+- `url_proxy.api_key.value` is always empty; the creator enters the key on the platform page. The paired `url.value` may be displayed in full.
 - `generic.value` may be displayed in full.
 - Do not display `PLATFORM_MANAGED_*`, template variables, or internal fields verbatim to the creator.
-- Entries already in `excludes` are displayed as a read-only summary with reason and source path.
 - For `.env` files retained in the package, display the values that will be hosted or stripped within them.
 
 ### Web confirmation boundary

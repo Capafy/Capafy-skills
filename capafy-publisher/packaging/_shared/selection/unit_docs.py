@@ -21,15 +21,6 @@ def primary_instruction_doc(unit_path: Path, unit_type: str, *, target=None) -> 
     )
     if target_doc is not None:
         return target_doc
-    if unit_type == "plugin":
-        if unit_path.is_file():
-            return unit_path
-        for filename in ("README.md", "plugin.json", "package.json"):
-            candidate = unit_path / filename
-            if candidate.is_file():
-                return candidate
-        candidate = unit_path / ".claude-plugin" / "plugin.json"
-        return candidate if candidate.is_file() else None
     if unit_type == "skill":
         candidate = unit_path / "SKILL.md"
         return candidate if candidate.is_file() else None
@@ -57,8 +48,6 @@ def selectable_unit_name(unit_path: Path, unit_type: str, *, target=None) -> str
         frontmatter_name = parse_markdown_name(primary_doc)
         if frontmatter_name:
             return frontmatter_name
-    if unit_type == "plugin" and unit_path.is_file():
-        return unit_path.stem
     return unit_path.name
 
 

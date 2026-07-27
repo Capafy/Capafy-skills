@@ -19,7 +19,6 @@ _STRUCTURED_STAGE_MANIFESTS = frozenset({
     BUNDLE_CONTEXT_NAME,
     WORKSPACE_DOCUMENTS_MANIFEST_NAME,
     "agent.runtime_dependencies.json",
-    "agent.runtime_environment.json",
     "agent.selected_units.json",
 })
 

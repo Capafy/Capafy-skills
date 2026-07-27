@@ -1,24 +1,17 @@
 {
   "platform_contract": {
     "config_files": [
-      ".openclaw/openclaw.json",
-      "_scan_only/.openclaw/agents/main/agent/auth-profiles.json"
+      ".openclaw/openclaw.json"
     ],
-    "env_vars": {}
+    "optional_config_files": [
+      ".openclaw/agents/main/agent/models.json",
+      "_scan_only/.openclaw/agents/main/agent/auth-profiles.json",
+      ".openclaw/.env",
+      "_scan_only/.openclaw/.env"
+    ],
+    "provider_environment": {}
   },
-  "url_proxy_os_fallback_names": [
-    "OPENCLAW_LIVE_OPENAI_KEY",
-    "OPENAI_API_KEYS",
-    "OPENAI_API_KEY",
-    "OPENCLAW_LIVE_ANTHROPIC_KEY",
-    "OPENCLAW_LIVE_ANTHROPIC_KEYS",
-    "ANTHROPIC_API_KEYS",
-    "ANTHROPIC_API_KEY",
-    "OPENCLAW_LIVE_GEMINI_KEY",
-    "GEMINI_API_KEYS",
-    "GEMINI_API_KEY",
-    "GOOGLE_API_KEY"
-  ],
+  "url_proxy_os_fallback_names": [],
   "discovery_skill_precedence": [
     "workspace/skills",
     "workspace/.agents/skills",
@@ -73,13 +66,11 @@
       "base": "home",
       "path": ".openclaw/agents/main/agent/auth-profiles.json",
       "display_path": ".openclaw/agents/main/agent/auth-profiles.json"
+    },
+    {
+      "base": "home",
+      "path": ".openclaw/.env",
+      "display_path": ".openclaw/.env"
     }
-  ],
-  "runtime_env": {
-    "field": "openclaw_version",
-    "command": [
-      "openclaw",
-      "--version"
-    ]
-  }
+  ]
 }

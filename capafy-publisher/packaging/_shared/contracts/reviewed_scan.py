@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Iterable, List, Mapping, Optional, TypedDict
+from typing import Any, List, Mapping, Optional, TypedDict
 
 
 REVIEW_METADATA_KEY = "_review"
@@ -9,7 +9,6 @@ REVIEW_STATUS_REVIEWED = "reviewed"
 REVIEW_BINDING_FIELDS = (
     "raw_scan_digest",
     "staging_digest",
-    "scan_only_digest",
     "env_id",
     "agent_type",
 )
@@ -45,7 +44,6 @@ class ReviewMetadata(TypedDict, total=False):
     status: str
     raw_scan_digest: str
     staging_digest: str
-    scan_only_digest: str
     env_id: str
     agent_type: str
 
@@ -53,23 +51,23 @@ class ReviewMetadata(TypedDict, total=False):
 class ScanGroups(TypedDict, total=False):
     url_proxy: List[UrlProxyEntry]
     generic: List[ScanItem]
-    env_var: List[ScanItem]
 
 
 class ReviewedScan(ScanGroups, total=False):
-    excludes: List[dict]
     _review: ReviewMetadata
 
 
 def sanitize_reviewed_scan_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    cleaned = dict(payload)
-    cleaned.pop(REVIEW_METADATA_KEY, None)
-    return cleaned
+    return {
+        key: payload[key]
+        for key in ("url_proxy", "generic")
+        if key in payload
+    }
 
 
 def credential_counts(scan_payload: dict) -> dict:
     counts: dict = {}
-    for key in ("url_proxy", "generic", "env_var", "excludes"):
+    for key in ("url_proxy", "generic"):
         value = scan_payload.get(key, [])
         counts[key] = len(value) if isinstance(value, list) else 0
     return counts
@@ -121,8 +119,6 @@ def resolved_review_binding(
             resolved["raw_scan_digest"] = digest_builder.raw_scan(raw_scan)
         if "staging_digest" not in resolved and staging_root is not None:
             resolved["staging_digest"] = digest_builder.staging(staging_root)
-        if "scan_only_digest" not in resolved and staging_root is not None:
-            resolved["scan_only_digest"] = digest_builder.scan_only(staging_root)
     if "env_id" not in resolved and env_id is not None:
         resolved["env_id"] = str(env_id or "").strip()
     if "agent_type" not in resolved and agent_type is not None:
@@ -231,20 +227,6 @@ def collect_runtime_value_items(payload: ScanGroups) -> List[ScanItem]:
     return items
 
 
-def _string_value(value: object) -> str:
-    return "" if value is None else str(value)
-
-
-def _required_non_empty_text(entry: Mapping[str, Any], key: str, *, label: str) -> str:
-    raw_value = entry.get(key)
-    if not isinstance(raw_value, str):
-        raise ValueError(f"{label}.{key} must be a string")
-    value = raw_value.strip()
-    if not value:
-        raise ValueError(f"{label}.{key} must not be empty")
-    return value
-
-
 def require_reviewed_scan_use(entry: Mapping[str, Any], *, label: str) -> str:
     raw_use = entry.get("use")
     if not isinstance(raw_use, str):
@@ -253,40 +235,6 @@ def require_reviewed_scan_use(entry: Mapping[str, Any], *, label: str) -> str:
     if not use:
         raise ValueError(f"{label}.use must not be empty for reviewed_scan")
     return use
-
-
-def build_reviewed_env_var_item(
-    *,
-    field: str,
-    value: object,
-    use: str,
-    placeholder: object = "",
-    referenced_in: Iterable[object] = (),
-) -> ScanItem:
-    normalized_field = str(field or "").strip()
-    if not normalized_field:
-        raise ValueError("reviewed_scan.env_var.field must not be empty")
-    return {
-        "field": normalized_field,
-        "value": _string_value(value),
-        "placeholder": _string_value(placeholder),
-        "referenced_in": [str(item) for item in referenced_in if str(item).strip()],
-        "use": str(use or "").strip(),
-    }
-
-
-def project_env_var_credentials_item(entry: Mapping[str, Any], *, label: str) -> dict[str, Any]:
-    field = _required_non_empty_text(entry, "field", label=label)
-    return {
-        "field": field,
-        "value": entry.get("value", ""),
-        "use": require_reviewed_scan_use(entry, label=label),
-    }
-
-
-
-
-
 
 
 def required_list(payload: dict, key: str, *, label: str) -> list:
@@ -304,8 +252,6 @@ def _parse_reviewed_scan(payload: object, *, label: str = "reviewed_scan") -> Re
     parsed: ReviewedScan = {
         "url_proxy": required_list(payload, "url_proxy", label=label),
         "generic": required_list(payload, "generic", label=label),
-        "env_var": required_list(payload, "env_var", label=label),
-        "excludes": required_list(payload, "excludes", label=label),
     }
     metadata = payload.get(REVIEW_METADATA_KEY)
     if isinstance(metadata, dict):
@@ -457,7 +403,6 @@ __all__ = [
     "ScanGroups",
     "ScanItem",
     "UrlProxyEntry",
-    "build_reviewed_env_var_item",
     "collect_api_key_items",
     "collect_runtime_value_items",
     "credential_counts",
@@ -465,7 +410,6 @@ __all__ = [
     "load_reviewed_scan_object",
     "load_reviewed_scan_payload",
     "normalize_reviewed_scan_payload",
-    "project_env_var_credentials_item",
     "require_reviewed_scan_use",
     "require_cloud_hosted_url_proxy_entries",
     "required_list",

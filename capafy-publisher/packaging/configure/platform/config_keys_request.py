@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from typing import Any, Optional
 
 from capafy_platform.api import save_config_keys_raw
 from packaging._shared.contracts.reviewed_scan import (
-    project_env_var_credentials_item,
     require_reviewed_scan_use as _require_reviewed_use,
     sanitize_reviewed_scan_payload,
 )
@@ -13,7 +14,6 @@ from packaging._shared.platform.response_normalize import (
     attach_platform_status,
     normalize_edit_link_response,
 )
-from packaging.configure.env_var.dedupe import reviewed_env_var_covered_by_generic_entries
 from packaging.configure.scan.scan_only_paths import is_scan_only_source_path
 
 
@@ -27,9 +27,55 @@ def _strip_tracking_source(item: dict, *, label: str) -> str:
     return source
 
 
-def _strip_tracking_url_proxy_entry(entry: dict, *, index: int) -> dict[str, Any]:
+_DOT_AGENT_DEFAULT_FIELDS = {
+    "codex": ("OPENAI_API_KEY", "OPENAI_BASE_URL"),
+    "claude_code": ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"),
+}
+
+
+def _minimal_dot_agent_url_proxy_entry(
+    entry: dict,
+    *,
+    index: int,
+    env_id: str,
+) -> dict[str, Any]:
+    api_key = entry.get("api_key")
+    url = entry.get("url")
+    if not isinstance(api_key, dict):
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].api_key must be an object")
+    if not isinstance(url, dict):
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].url must be an object")
+    api_format = str(entry.get("api_format", "") or "").strip()
+    if not api_format:
+        raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].api_format must not be empty")
+    default_key_field, default_url_field = _DOT_AGENT_DEFAULT_FIELDS[env_id]
+    return {
+        # Keep platform-managed identities while never uploading the local API key.
+        "api_key": {
+            "value": "",
+            "placeholder": str(api_key.get("placeholder", "") or "").strip(),
+            "field": default_key_field,
+        },
+        "url": {
+            "value": url.get("value", ""),
+            "placeholder": str(url.get("placeholder", "") or "").strip(),
+            "field": default_url_field,
+        },
+        "model": str(entry.get("model", "") or "").strip(),
+        "api_format": api_format,
+    }
+
+
+def _strip_tracking_url_proxy_entry(
+    entry: dict,
+    *,
+    index: int,
+    env_id: str = "",
+) -> dict[str, Any]:
     if not isinstance(entry, dict):
         raise ValueError("reviewed_scan_payload.url_proxy items must be objects")
+    if env_id in {"codex", "claude_code"}:
+        return _minimal_dot_agent_url_proxy_entry(entry, index=index, env_id=env_id)
     api_key = entry.get("api_key")
     url = entry.get("url")
     if not isinstance(api_key, dict):
@@ -38,7 +84,7 @@ def _strip_tracking_url_proxy_entry(entry: dict, *, index: int) -> dict[str, Any
         raise ValueError(f"reviewed_scan_payload.url_proxy[{index}].url must be an object")
     projected: dict[str, Any] = {
         "api_key": {
-            "value": api_key.get("value", ""),
+            "value": "",
             "placeholder": api_key.get("placeholder", ""),
             "field": api_key.get("field", ""),
             "source": _strip_tracking_source(api_key, label=f"reviewed_scan_payload.url_proxy[{index}].api_key"),
@@ -94,25 +140,73 @@ def _is_uploadable_generic_entry(entry: Any) -> bool:
     return isinstance(entry, dict) and not is_scan_only_source_path(str(entry.get("source", "") or ""))
 
 
-def _strip_tracking_env_var_entry(entry: dict, *, index: int) -> dict[str, Any]:
-    if not isinstance(entry, dict):
-        raise ValueError("reviewed_scan_payload.env_var items must be objects")
-    return project_env_var_credentials_item(entry, label=f"reviewed_scan_payload.env_var[{index}]")
+def _qualified_generic_field(entry: dict[str, Any]) -> str:
+    field = str(entry.get("field", "") or "").strip()
+    source = str(entry.get("source", "") or "").strip()
+    source_detail = str(entry.get("source_detail", "") or "").strip()
+    if not field or not source_detail.startswith(("json:", "yaml:", "toml:")):
+        return ""
+    detail_path = (
+        source_detail.split(":", 1)[1]
+        .strip()
+        .replace("~1", "/")
+        .replace("~0", "~")
+    )
+    readable = re.sub(r"[^A-Za-z0-9_.-]+", "_", detail_path).strip("_.-")
+    digest = (
+        hashlib.sha256(f"{source}\n{source_detail}".encode("utf-8"))
+        .hexdigest()
+        .upper()[:8]
+    )
+    readable_suffix = readable[-64:] if readable else "location"
+    field_prefix = field[:40]
+    return f"{field_prefix}__{readable_suffix}__{digest}"
 
 
-def _strip_tracking_exclude_entry(entry: dict, *, index: int) -> dict[str, Any]:
-    if not isinstance(entry, dict):
-        raise ValueError("reviewed_scan_payload.excludes items must be objects")
-    raw_source = entry.get("source")
-    if not isinstance(raw_source, str):
-        raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must be a string")
-    source = raw_source.strip()
-    if not source:
-        raise ValueError(f"reviewed_scan_payload.excludes[{index}].source must not be empty")
-    return {
-        "source": source,
-        "use": _require_reviewed_use(entry, label=f"reviewed_scan_payload.excludes[{index}]"),
-    }
+def _project_unique_generic_entries(generic: list[Any]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for index, entry in enumerate(generic):
+        if not _is_uploadable_generic_entry(entry):
+            continue
+        projected = _strip_tracking_generic_entry(entry, index=index)
+        field = str(projected.get("field", "") or "").strip()
+        grouped.setdefault(field, []).append(projected)
+
+    result: list[dict[str, Any]] = []
+    for field, entries in grouped.items():
+        if not field or len(entries) == 1:
+            result.extend(entries)
+            continue
+
+        identities = {
+            (
+                str(entry.get("value", "") or ""),
+                str(entry.get("placeholder", "") or "").strip(),
+            )
+            for entry in entries
+        }
+        if len(identities) == 1:
+            result.append(entries[0])
+            continue
+
+        qualified_fields = [_qualified_generic_field(entry) for entry in entries]
+        if all(qualified_fields) and len(set(qualified_fields)) == len(qualified_fields):
+            for entry, qualified_field in zip(entries, qualified_fields):
+                qualified = dict(entry)
+                qualified["field"] = qualified_field
+                result.append(qualified)
+            continue
+
+        sources = [str(entry.get("source", "") or "").strip() for entry in entries]
+        unique_sources = list(dict.fromkeys(source for source in sources if source))
+        source_summary = ", ".join(unique_sources)
+        if not source_summary:
+            source_summary = "unknown"
+        raise ValueError(
+            f"reviewed_scan_payload.generic field must be unique: {field}; "
+            f"conflicting sources: {source_summary}"
+        )
+    return result
 
 
 def build_config_keys_request(
@@ -123,50 +217,28 @@ def build_config_keys_request(
         raise ValueError("agent_version_id must not be empty")
     if not isinstance(reviewed_scan_payload, dict):
         raise ValueError("reviewed_scan_payload must be an object")
+    review_metadata = reviewed_scan_payload.get("_review")
+    env_id = (
+        str(review_metadata.get("env_id", "") or "").strip()
+        if isinstance(review_metadata, dict)
+        else ""
+    )
     reviewed_scan_payload = sanitize_reviewed_scan_payload(reviewed_scan_payload)
 
     url_proxy = reviewed_scan_payload.get("url_proxy")
     generic = reviewed_scan_payload.get("generic")
-    env_vars = reviewed_scan_payload.get("env_var")
-    excludes = reviewed_scan_payload.get("excludes", [])
 
     if not isinstance(url_proxy, list):
         raise ValueError("reviewed_scan_payload.url_proxy must be an array")
     if not isinstance(generic, list):
         raise ValueError("reviewed_scan_payload.generic must be an array")
-    if not isinstance(env_vars, list):
-        raise ValueError("reviewed_scan_payload.env_var must be an array")
-    if "excludes" in reviewed_scan_payload and not isinstance(excludes, list):
-        raise ValueError("reviewed_scan_payload.excludes must be an array")
-
-    uploadable_generic_entries = [
-        entry
-        for entry in generic
-        if _is_uploadable_generic_entry(entry)
-    ]
 
     credentials_payload: dict[str, Any] = {
         "url_proxy": [
-            _strip_tracking_url_proxy_entry(entry, index=index)
+            _strip_tracking_url_proxy_entry(entry, index=index, env_id=env_id)
             for index, entry in enumerate(url_proxy)
         ],
-        "generic": [
-            _strip_tracking_generic_entry(entry, index=index)
-            for index, entry in enumerate(generic)
-            if _is_uploadable_generic_entry(entry)
-        ],
-        "env_var": [
-            _strip_tracking_env_var_entry(entry, index=index)
-            for index, entry in enumerate(env_vars)
-            if not (
-                isinstance(entry, dict)
-                and reviewed_env_var_covered_by_generic_entries(entry, uploadable_generic_entries)
-            )
-        ],
-        "excludes": [
-            _strip_tracking_exclude_entry(entry, index=index)
-            for index, entry in enumerate(excludes)
-        ],
+        "generic": _project_unique_generic_entries(generic),
     }
 
     return {

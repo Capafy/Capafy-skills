@@ -5,7 +5,7 @@ import re
 
 
 
-OPENCLAW_MODERN_MIN_VERSION = (2026, 3, 22)
+OPENCLAW_MIN_VERSION = (2026, 3, 22)
 
 OPENCLAW_VERSION_PATTERN = re.compile(r"(\d{4}\.\d+\.\d+)")
 
@@ -31,7 +31,7 @@ def version_tuple(version: Optional[str]) -> Optional[tuple[int, ...]]:
 
 
 __all__ = [
-    "OPENCLAW_MODERN_MIN_VERSION",
+    "OPENCLAW_MIN_VERSION",
     "OPENCLAW_VERSION_PATTERN",
     "extract_version",
     "version_tuple",

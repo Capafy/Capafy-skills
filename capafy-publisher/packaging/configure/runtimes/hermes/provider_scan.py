@@ -4,11 +4,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.llm.official_providers import (
-    OfficialProviderSpec,
-    find_official_provider_by_base_url,
-    find_official_provider_by_marker,
-)
 from packaging.configure.candidate import Candidate
 from packaging.configure.contracts import FieldLocation, SourceKind
 from packaging.configure.env_values import (
@@ -17,6 +12,12 @@ from packaging.configure.env_values import (
     usable_env_value,
 )
 from packaging.configure.runtimes.hermes.api_modes import platform_api_format_from_block
+from packaging.configure.runtimes.hermes.official_providers import (
+    HERMES_OFFICIAL_PROVIDER_SPECS,
+    HermesOfficialProviderSpec,
+    find_hermes_official_provider_by_base_url,
+    find_hermes_official_provider_by_marker,
+)
 from packaging.configure.runtimes.hermes.provider_blocks import (
     HermesProviderBlock,
     block_field_path,
@@ -28,31 +29,28 @@ from packaging.configure.runtimes.hermes.provider_refs import (
     provider_block_has_inline_credentials,
     referenced_custom_provider_group,
 )
-from packaging.configure.staging.env_preprocess import RuntimeEnvContext
+from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 
 
 CONFIG_REL = ".hermes/config.yaml"
 HERMES_DOTENV_RELPATHS = (".hermes/.env", ".env")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_ENV_KEY = "OPENROUTER_API_KEY"
-_HERMES_PROVIDER_ALIASES = {
-    "minimax-cn": "minimax",
-}
 
 
 def scan_hermes_provider_candidates(
     config: dict[str, Any],
     *,
     staging_root: Path,
-    env_context: RuntimeEnvContext,
+    provider_config_context: ProviderRuntimeConfigContext,
     process_env: Optional[dict[str, str]] = None,
 ) -> list[Candidate]:
     candidates: list[Candidate] = []
     env_names = _all_provider_env_names(config)
-    env = env_context.env_for_names(env_names)
+    env = provider_config_context.env_for_names(env_names)
     if process_env:
         env.update({key: value for key, value in process_env.items() if isinstance(value, str)})
-    dotenv_values = env_context.staged_dotenv_values(
+    dotenv_values = provider_config_context.staged_dotenv_values(
         staging_root,
         relpaths=HERMES_DOTENV_RELPATHS,
         names=env_names,
@@ -84,7 +82,7 @@ def _scan_block(provider_block: HermesProviderBlock, *, env: dict[str, str]) -> 
     base_url = _block_base_url(block, spec)
     model_field_name = block_model_field(provider_block)
     model = str(block.get(model_field_name, "") or "").strip()
-    raw_key = block.get("api_key", "") or block.get("key_env", "")
+    raw_key = _block_api_key_ref(block)
     env_name = env_reference_name(raw_key)
     value = resolve_env_reference_or_value(raw_key, env)
     source_kind = SourceKind.FILE
@@ -198,20 +196,20 @@ def _extra(
     }
 
 
-def resolve_hermes_official_spec(block: dict[str, Any]) -> Optional[OfficialProviderSpec]:
+def resolve_hermes_official_spec(block: dict[str, Any]) -> Optional[HermesOfficialProviderSpec]:
     for field in ("provider", "name"):
-        marker = _canonical_provider_marker(str(block.get(field, "") or "").strip())
-        spec = find_official_provider_by_marker(marker)
+        marker = str(block.get(field, "") or "").strip().lower()
+        spec = find_hermes_official_provider_by_marker(marker)
         if spec is not None:
             return spec
-    return find_official_provider_by_base_url(str(block.get("base_url", "") or ""))
+    return find_hermes_official_provider_by_base_url(_block_base_url_ref(block))
 
 
-def _block_service(provider_block: HermesProviderBlock, spec: Optional[OfficialProviderSpec]) -> str:
+def _block_service(provider_block: HermesProviderBlock, spec: Optional[HermesOfficialProviderSpec]) -> str:
     if spec is not None:
         return spec.service
     block = provider_block.block
-    provider = _canonical_provider_marker(str(block.get("provider", "") or "").strip()).lower()
+    provider = str(block.get("provider", "") or "").strip().lower()
     if provider == "openrouter":
         return "OpenRouter"
     for field in ("name", "provider"):
@@ -221,26 +219,26 @@ def _block_service(provider_block: HermesProviderBlock, spec: Optional[OfficialP
     return provider_block.group_path
 
 
-def _block_api_format(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
+def _block_api_format(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
     return platform_api_format_from_block(block, spec)
 
 
-def _block_base_url(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
-    value = normalize_http_url_candidate(str(block.get("base_url", "") or ""))
+def _block_base_url(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
+    value = normalize_http_url_candidate(_block_base_url_ref(block))
     if value:
         return value
     if spec is not None:
         return spec.base_url
-    provider = _canonical_provider_marker(str(block.get("provider", "") or "").strip()).lower()
+    provider = str(block.get("provider", "") or "").strip().lower()
     if provider == "openrouter":
         return OPENROUTER_BASE_URL
     return ""
 
 
-def hermes_default_env_names(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> tuple[str, ...]:
+def hermes_default_env_names(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> tuple[str, ...]:
     if spec is not None:
         return spec.exact_env_keys
-    provider = _canonical_provider_marker(str(block.get("provider", "") or "").strip()).lower()
+    provider = str(block.get("provider", "") or "").strip().lower()
     if provider == "openrouter":
         return (OPENROUTER_ENV_KEY,)
     return ()
@@ -250,21 +248,21 @@ def _all_provider_env_names(config: dict[str, Any]) -> frozenset[str]:
     names = {
         OPENROUTER_ENV_KEY,
     }
-    from packaging._shared.llm.official_providers import ALL_OFFICIAL_PROVIDER_SPECS
-
-    for spec in ALL_OFFICIAL_PROVIDER_SPECS:
+    for spec in HERMES_OFFICIAL_PROVIDER_SPECS:
         names.update(spec.exact_env_keys)
     for provider_block in iter_hermes_provider_blocks(config):
-        env_name = env_reference_name(provider_block.block.get("api_key", "") or provider_block.block.get("key_env", ""))
+        env_name = env_reference_name(_block_api_key_ref(provider_block.block))
         if env_name:
             names.add(env_name)
     return frozenset(names)
 
 
-def _canonical_provider_marker(value: str) -> str:
-    normalized = str(value or "").strip().lower()
-    return _HERMES_PROVIDER_ALIASES.get(normalized, normalized)
+def _block_api_key_ref(block: dict[str, Any]) -> object:
+    return block.get("api_key", "") or block.get("key_env", "") or block.get("api_key_env", "")
 
+
+def _block_base_url_ref(block: dict[str, Any]) -> str:
+    return str(block.get("base_url", "") or block.get("api_base", "") or "")
 
 __all__ = [
     "CONFIG_REL",

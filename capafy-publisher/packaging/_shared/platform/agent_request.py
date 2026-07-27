@@ -8,6 +8,7 @@ from packaging._shared.common.url_values import has_http_url_scheme
 from packaging._shared.platform.runtime_mapping import (
     documented_agent_runtime_from_values,
     normalize_agent_type,
+    normalize_default_language_code,
 )
 from packaging._shared.contracts.selection_groups import (
     SELECTION_GROUP_KEYS,
@@ -74,7 +75,17 @@ def _validate_selected_only_selection_groups(selection_groups: dict[str, list[di
 def _validated_upload_selection_groups(card_draft: dict) -> dict[str, list[dict[str, Any]]]:
     normalized = _draft_selection_groups(card_draft)
     _validate_selected_only_selection_groups(normalized)
-    return _strip_local_skill_source_fields(normalized)
+    selection_groups = _strip_local_skill_source_fields(normalized)
+    return {
+        key: [
+            {
+                **item,
+                "selection": "excluded",
+            }
+            for item in selection_groups.get(key, [])
+        ]
+        for key in SELECTION_GROUP_KEYS
+    }
 
 
 def _strip_local_skill_source_fields(
@@ -137,6 +148,10 @@ def build_agent_create_request(card_draft: dict) -> dict[str, Any]:
     documented_agent_runtime = _documented_agent_runtime(card_draft)
     if documented_agent_runtime:
         payload["agentRuntime"] = documented_agent_runtime
+
+    default_language_code = normalize_default_language_code(card_draft.get("lang"))
+    if default_language_code:
+        payload["lang"] = default_language_code
 
     for field in _OPTIONAL_CREATE_AGENT_FIELDS:
         value = card_draft.get(field)

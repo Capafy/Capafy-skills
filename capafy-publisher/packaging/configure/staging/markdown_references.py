@@ -9,7 +9,9 @@ from packaging._shared.common.fs import (
     windows_drive_mount_candidates as _windows_drive_mount_candidates,
     windows_path_parts as _windows_path_parts,
 )
+from packaging._shared.common.packaged_files import should_skip_packaged_path
 from packaging._shared.selection.local_ref_confirmation import local_reference_should_be_staged
+from packaging.configure.exclusion.stage import should_skip_high_risk_stage_file
 from packaging.configure.staging.markdown_reference_paths import (
     looks_like_local_destination,
     resolve_reference,
@@ -81,6 +83,8 @@ def stage_direct_markdown_file_references(
     source_doc: Path,
     target_doc: Path,
     *,
+    staging_root: Path,
+    target: object,
     stage_plan: Optional[StagePlan] = None,
 ) -> int:
     if not _is_markdown_reference_entry(source_doc) or not target_doc.is_file():
@@ -106,6 +110,11 @@ def stage_direct_markdown_file_references(
         if is_instruction_doc(source_file.name) and not local_reference_should_be_staged(source_file, stage_plan):
             continue
         target_file = target_doc.parent / relative_source
+        target_relpath = target_file.relative_to(staging_root).as_posix()
+        if should_skip_packaged_path(source_file, target_relpath, is_dir=False):
+            continue
+        if should_skip_high_risk_stage_file(target, target_relpath):
+            continue
         if target_file.resolve(strict=False) == target_doc.resolve(strict=False):
             continue
         target_key = target_file.as_posix()

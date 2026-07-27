@@ -5,28 +5,30 @@ from pathlib import Path
 from typing import Any, Optional
 
 from packaging._shared.reviewed_scan.query import reviewed_url_proxy_groups
+from packaging.configure.runtimes.openclaw.official_providers import OPENCLAW_OFFICIAL_PROVIDER_NAMES_BY_MARKER
+from packaging.configure.runtimes.openclaw.provider_scan import (
+    OPENCLAW_CONFIG_REL,
+    OPENCLAW_MAIN_MODELS_REL,
+)
 from packaging.configure.runtimes.openclaw.provider_usage import (
     builtin_openclaw_provider_map,
+    get_openclaw_providers,
     model_id_from_openclaw_provider,
     provider_from_openclaw_model_ref,
 )
 
 
-_OFFICIAL_PROVIDER_NAMES_BY_MARKER = {
-    "anthropic": "publisher_anthropic_official",
-    "claude": "publisher_anthropic_official",
-    "gemini": "publisher_google_official",
-    "google": "publisher_google_official",
-    "openai": "publisher_openai_official",
-}
 _AUTH_PROFILE_GROUP_PREFIX = ".openclaw/agents/main/agent/auth-profiles.json#"
 _CONFIG_PROVIDER_GROUP_PREFIX = ".openclaw/openclaw.json#models.providers."
+_MAIN_MODELS_PROVIDER_GROUP_PREFIX = ".openclaw/agents/main/agent/models.json#providers."
 
 
 def _provider_name_from_group(group: str) -> str:
     normalized = str(group or "").strip()
     if normalized.startswith(_CONFIG_PROVIDER_GROUP_PREFIX):
         return normalized[len(_CONFIG_PROVIDER_GROUP_PREFIX) :].split(".", 1)[0].strip()
+    if normalized.startswith(_MAIN_MODELS_PROVIDER_GROUP_PREFIX):
+        return normalized[len(_MAIN_MODELS_PROVIDER_GROUP_PREFIX) :].split(".", 1)[0].strip()
     return _official_provider_name_from_auth_profile_group(normalized)
 
 
@@ -42,7 +44,7 @@ def _official_provider_name_from_auth_profile_group(group: str) -> str:
         if token
     ]
     for token in reversed(path_tokens):
-        provider_name = _OFFICIAL_PROVIDER_NAMES_BY_MARKER.get(token)
+        provider_name = OPENCLAW_OFFICIAL_PROVIDER_NAMES_BY_MARKER.get(token)
         if provider_name:
             return provider_name
     return ""
@@ -218,28 +220,6 @@ def _rewrite_confirmed_provider_models(
     return replacement_refs, rewrites
 
 
-def _prune_confirmed_official_plugin_entries(payload: dict[str, Any], *, allowed: set[str]) -> int:
-    allowed_plugin_names = {
-        plugin_name
-        for plugin_name, provider_name in _OFFICIAL_PROVIDER_NAMES_BY_MARKER.items()
-        if provider_name in allowed
-    }
-    if not allowed_plugin_names:
-        return 0
-    plugins = payload.get("plugins")
-    if not isinstance(plugins, dict):
-        return 0
-    entries = plugins.get("entries")
-    if not isinstance(entries, dict):
-        return 0
-    rewrites = 0
-    for plugin_name in list(entries):
-        if str(plugin_name).strip().lower() in allowed_plugin_names:
-            entries.pop(plugin_name, None)
-            rewrites += 1
-    return rewrites
-
-
 def _rewrite_confirmed_provider_api_formats(
     providers: dict[str, Any],
     confirmed_api_formats: dict[str, str],
@@ -264,6 +244,59 @@ def _rewrite_confirmed_provider_api_formats(
     return rewrites
 
 
+def _load_json_object(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _main_models_providers(payload: dict[str, Any]) -> dict[str, Any]:
+    providers = payload.get("providers")
+    return providers if isinstance(providers, dict) else {}
+
+
+def _ordered_provider_names(*provider_maps: dict[str, Any]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for providers in provider_maps:
+        for provider_name, provider in providers.items():
+            normalized = str(provider_name)
+            if normalized in seen or not isinstance(provider, dict):
+                continue
+            seen.add(normalized)
+            result.append(normalized)
+    return result
+
+
+def _provider_payload(
+    provider_name: str,
+    *provider_maps: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    for providers in provider_maps:
+        provider = providers.get(provider_name)
+        if isinstance(provider, dict):
+            return provider
+    return None
+
+
+def _prune_unconfirmed_providers(
+    providers: dict[str, Any],
+    *,
+    allowed: set[str],
+) -> int:
+    removed = 0
+    for provider_name in list(providers):
+        if str(provider_name) in allowed:
+            continue
+        providers.pop(provider_name, None)
+        removed += 1
+    return removed
+
+
 def rewrite_openclaw_confirmed_providers(
     staging_root: Path,
     reviewed_scan: dict[str, Any],
@@ -271,69 +304,81 @@ def rewrite_openclaw_confirmed_providers(
     allowed = _allowed_openclaw_provider_names(reviewed_scan)
     if not allowed:
         return {"openclaw_confirmed_provider_rewrites": 0}
-    config_path = staging_root / ".openclaw" / "openclaw.json"
+    config_path = staging_root / OPENCLAW_CONFIG_REL
     if not config_path.is_file():
         return {"openclaw_confirmed_provider_rewrites": 0}
-    try:
-        payload = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"openclaw_confirmed_provider_rewrites": 0}
-    if not isinstance(payload, dict):
+    payload = _load_json_object(config_path)
+    if not payload:
         return {"openclaw_confirmed_provider_rewrites": 0}
 
-    models = payload.get("models")
-    if not isinstance(models, dict):
-        return {"openclaw_confirmed_provider_rewrites": 0}
-    providers = models.get("providers")
-    if not isinstance(providers, dict):
-        return {"openclaw_confirmed_provider_rewrites": 0}
+    models_path = staging_root / OPENCLAW_MAIN_MODELS_REL
+    main_models_payload = _load_json_object(models_path)
+    providers = get_openclaw_providers(payload)
+    main_models_providers = _main_models_providers(main_models_payload)
+    provider_maps = (providers, main_models_providers)
 
     ordered_allowed = [
-        str(provider_name)
-        for provider_name in providers
-        if str(provider_name) in allowed and isinstance(providers.get(provider_name), dict)
+        provider_name
+        for provider_name in _ordered_provider_names(*provider_maps)
+        if provider_name in allowed
     ]
     if not ordered_allowed:
         return {"openclaw_confirmed_provider_rewrites": 0}
     fallback_provider = ordered_allowed[0]
 
     original_payload = json.loads(json.dumps(payload, ensure_ascii=False))
-    managed_providers = {str(provider_name) for provider_name in providers}
-    removed = 0
-    for provider_name in list(providers):
-        if str(provider_name) in allowed:
-            continue
-        providers.pop(provider_name, None)
-        removed += 1
+    original_main_models_payload = json.loads(json.dumps(main_models_payload, ensure_ascii=False))
+    managed_providers = set(_ordered_provider_names(*provider_maps))
+    allowed_provider_names = set(ordered_allowed)
+    removed = sum(
+        _prune_unconfirmed_providers(provider_map, allowed=allowed_provider_names)
+        for provider_map in provider_maps
+    )
 
     confirmed_fields = _confirmed_openclaw_provider_fields(reviewed_scan)
     confirmed_models = confirmed_fields["model"]
     confirmed_api_formats = confirmed_fields["api_format"]
-    api_format_rewrites = _rewrite_confirmed_provider_api_formats(providers, confirmed_api_formats)
-    replacement_refs, model_rewrites = _rewrite_confirmed_provider_models(providers, confirmed_models)
-    fallback_model_id = model_id_from_openclaw_provider(providers[fallback_provider])
+    api_format_rewrites = sum(
+        _rewrite_confirmed_provider_api_formats(provider_map, confirmed_api_formats)
+        for provider_map in provider_maps
+    )
+    replacement_refs: dict[str, str] = {}
+    model_rewrites = 0
+    for provider_map in provider_maps:
+        provider_replacement_refs, provider_model_rewrites = _rewrite_confirmed_provider_models(
+            provider_map,
+            confirmed_models,
+        )
+        replacement_refs.update(provider_replacement_refs)
+        model_rewrites += provider_model_rewrites
+    fallback_payload = _provider_payload(fallback_provider, *provider_maps) or {}
+    fallback_model_id = model_id_from_openclaw_provider(fallback_payload)
     fallback_ref = replacement_refs.get(fallback_provider) or (
         f"{fallback_provider}/{fallback_model_id}" if fallback_model_id else fallback_provider
     )
-    builtin_provider_map = builtin_openclaw_provider_map(set(ordered_allowed))
+    builtin_provider_map = builtin_openclaw_provider_map(allowed_provider_names)
     rewrites = _rewrite_openclaw_model_defaults(
         payload,
-        allowed=set(ordered_allowed),
+        allowed=allowed_provider_names,
         fallback_ref=fallback_ref,
         managed_providers=managed_providers,
         replacement_refs=replacement_refs,
         builtin_provider_map=builtin_provider_map,
     )
-    plugin_rewrites = _prune_confirmed_official_plugin_entries(payload, allowed=set(ordered_allowed))
     if payload != original_payload:
         config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if main_models_payload != original_main_models_payload:
+        models_path.write_text(
+            json.dumps(main_models_payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    changed = payload != original_payload or main_models_payload != original_main_models_payload
     return {
-        "openclaw_confirmed_provider_rewrites": removed + rewrites + model_rewrites + api_format_rewrites + plugin_rewrites,
-        "openclaw_confirmed_provider_selected": fallback_provider if payload != original_payload else "",
+        "openclaw_confirmed_provider_rewrites": removed + rewrites + model_rewrites + api_format_rewrites,
+        "openclaw_confirmed_provider_selected": fallback_provider if changed else "",
         "openclaw_confirmed_provider_removed": removed,
         "openclaw_confirmed_model_rewrites": model_rewrites,
         "openclaw_confirmed_api_format_rewrites": api_format_rewrites,
-        "openclaw_confirmed_plugin_rewrites": plugin_rewrites,
     }
 
 

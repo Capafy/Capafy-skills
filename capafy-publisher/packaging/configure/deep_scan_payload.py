@@ -55,11 +55,6 @@ def build_deep_scan_payload(
 ) -> dict[str, Any]:
     file_boundary = deep_scan_file_boundary(
         staging_root=staging_root,
-        excluded_relpaths=(
-            str(item.get("source", "") or item.get("path", "")).strip()
-            for item in reviewed_scan.get("excludes", [])
-            if isinstance(item, dict)
-        ),
         agent_type=agent_type,
     )
     return build_soft_action(
@@ -69,12 +64,10 @@ def build_deep_scan_payload(
         developer_next_steps=[
             "Use staging_path as the source boundary for LLM deep scan.",
             "Rule-matched generic values have already been rewritten to platform-managed placeholders before this deep scan.",
-            "Treat _scan_only files as audit context only; do not report values from them as generic findings.",
             "Look only for missed credential-like secrets/sensitive values; do not discover new url_proxy entries.",
-            'Write findings as a JSON object with generic and env_var arrays: {"generic": [], "env_var": []}.',
+            'Write findings as a JSON object with a generic array: {"generic": []}.',
             "generic items need non-empty value and source fields.",
-            "env_var items need non-empty value and field (env var name).",
-            "Keep generic file secrets in generic and env vars in env_var.",
+            "Do not inspect or return host environment variable values.",
             "Do not edit reviewed-scan.json or hand-write bucket entries.",
             "If deep scan finds missed sensitive data, rerun publish-configure with --deep-scan-findings-file <path> so the normal pipeline can validate, infer fields, rewrite placeholders, and regenerate reviewed-scan.",
             "If no missed sensitive data is found, rerun publish-configure without --deep-scan to continue.",

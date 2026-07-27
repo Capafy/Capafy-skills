@@ -21,6 +21,7 @@ from packaging.configure.runtimes.openclaw.provider_payloads import (
     discover_model_template,
     ensure_provider_payload,
     provider_name_for_spec,
+    strip_provider_runtime_metadata,
 )
 from packaging.configure.runtimes.openclaw.provider_usage import (
     path_likely_contains_openclaw_model_ref,
@@ -28,7 +29,7 @@ from packaging.configure.runtimes.openclaw.provider_usage import (
 from packaging._shared.config_files.json_io import clone_json_value
 
 if TYPE_CHECKING:
-    from packaging.configure.staging.env_preprocess import RuntimeEnvContext
+    from packaging.configure.staging.provider_runtime_config import ProviderRuntimeConfigContext
 
 
 _DEFAULT_MODELS_MODE = "merge"
@@ -104,7 +105,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     config_text: str,
     *,
     staging_root: Path,
-    env_context: "RuntimeEnvContext",
+    provider_config_context: "ProviderRuntimeConfigContext",
 ) -> tuple[str, int]:
     try:
         payload = json.loads(config_text)
@@ -113,7 +114,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     if not isinstance(payload, dict):
         return config_text, 0
 
-    dotenv_env = collect_openclaw_staged_dotenv_env(staging_root, config_text, env_context=env_context)
+    dotenv_env = collect_openclaw_staged_dotenv_env(staging_root, config_text, provider_config_context=provider_config_context)
     config_env = resolve_openclaw_config_env(
         payload=payload,
         dotenv_env=dotenv_env,
@@ -130,6 +131,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
         providers = {}
         models["providers"] = providers
     alias_rewrites = canonicalize_official_provider_aliases(providers)
+    metadata_rewrites = strip_provider_runtime_metadata(providers)
 
     assigned_names: dict[str, str] = {}
     rewritten_payload, rewrite_count = _rewrite_builtin_model_refs(
@@ -148,17 +150,17 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
     consumed_env_names.update(provider_ref_consumed_env_names)
     provider_key_rewrites = official_key_rewrites + provider_ref_rewrites
     if consumed_env_names:
-        env_context.consume_staged_dotenv_names(
+        provider_config_context.consume_staged_dotenv_names(
             staging_root,
-            relpaths=env_context.staged_dotenv_relpaths_for_consumer(_OPENCLAW_CONFIG_REL_SOURCE),
+            relpaths=provider_config_context.staged_dotenv_relpaths_for_consumer(_OPENCLAW_CONFIG_REL_SOURCE),
             names=frozenset(consumed_env_names),
         )
-    if provider_key_rewrites or alias_rewrites:
+    if provider_key_rewrites or alias_rewrites or metadata_rewrites:
         rewritten_payload["models"] = clone_json_value(models)
     if consumed_env_names:
         drop_consumed_config_env(rewritten_payload, consumed_env_names)
     if rewrite_count <= 0:
-        total_rewrites = provider_key_rewrites + alias_rewrites
+        total_rewrites = provider_key_rewrites + alias_rewrites + metadata_rewrites
         if total_rewrites <= 0:
             return config_text, 0
         return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", total_rewrites
@@ -166,7 +168,7 @@ def rewrite_openclaw_builtin_models_as_explicit_providers(
         models["mode"] = _DEFAULT_MODELS_MODE
     rewritten_payload["models"] = clone_json_value(models)
     return json.dumps(rewritten_payload, ensure_ascii=False, indent=2) + "\n", (
-        rewrite_count + provider_key_rewrites + alias_rewrites
+        rewrite_count + provider_key_rewrites + alias_rewrites + metadata_rewrites
     )
 
 

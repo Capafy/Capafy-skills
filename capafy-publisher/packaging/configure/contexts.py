@@ -16,8 +16,6 @@ class StageContext:
     selected_skill_paths: Optional[Set[str]]
     target: Any
     workspace_documents_manifest_payload: Optional[Dict[str, Any]] = None
-    selected_plugin_paths: Optional[Set[str]] = None
-    selected_cron_paths: Optional[Set[str]] = None
     workspace_allowlist: Optional[Set[str]] = None
 
 

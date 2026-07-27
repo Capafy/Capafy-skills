@@ -7,7 +7,6 @@ from pathlib import Path
 from packaging._shared.contracts.stage_plan import StageFileSource, StagePlan, StageTreeSource
 from packaging._shared.env_profiles import string_tuple_profile_value
 from packaging._shared.env_profiles import load_profile
-from packaging._shared.runtimes.support import collect_optional_command_first_line
 from packaging.runtimes import stage_plan_builder
 from packaging.runtimes.hermes.config import resolve_hermes_home
 
@@ -118,21 +117,9 @@ class HermesTarget:
             agent_type=agent_type,
         )
 
-    def collect_runtime_environment_fields(self) -> dict:
-        runtime_env = self.profile.get("runtime_env", {})
-        if not isinstance(runtime_env, dict):
-            return {}
-        field = runtime_env.get("field")
-        command = runtime_env.get("command")
-        if not field or not isinstance(command, list) or not command:
-            return {}
-        return {str(field): collect_optional_command_first_line([str(item) for item in command])}
-
     def validate_runtime(
         self,
         runtime_root: Path,
-        *,
-        expected_version: Optional[str] = None,
     ) -> dict:
         from packaging.runtimes.validation import validate_env_runtime
 
@@ -140,19 +127,33 @@ class HermesTarget:
             self.profile,
             runtime_root,
             env_id=self.env_id,
-            expected_version=expected_version,
         )
 
+    def collect_special_scan_candidates(
+        self,
+        path: Path,
+        text: str,
+        annotate_candidate,
+    ) -> tuple[dict[str, str], dict[str, str], dict[str, str], list[dict]]:
+        normalized = path.as_posix().strip().replace("\\", "/")
+        if normalized not in {".hermes/config.yaml", "_scan_only/.hermes/config.yaml"}:
+            return {}, {}, {}, []
+        from packaging._shared.config_files.yaml_loader import safe_yaml_mapping_loads
+
+        try:
+            payload = safe_yaml_mapping_loads(text, label="Hermes config.yaml")
+        except (RuntimeError, ValueError):
+            return {}, {}, {}, []
+        hermes_scan_hints = import_module("packaging.configure.runtimes.hermes.scan_hints")
+        return hermes_scan_hints.collect_hermes_config_hints(payload, annotate_candidate)
+
     def should_scan_structured_values(self, relpath: str) -> bool:
-        normalized = str(relpath or "").strip().replace("\\", "/")
-        return normalized not in {
-            ".hermes/config.yaml",
-            "_scan_only/.hermes/config.yaml",
-        }
+        hermes_scan_hints = import_module("packaging.configure.runtimes.hermes.scan_hints")
+        return hermes_scan_hints.should_scan_hermes_structured_values(relpath)
 
 
 def _is_loaded_profile(profile: Optional[dict]) -> bool:
-    return isinstance(profile, dict) and "env_id" in profile and "runtime_env" in profile
+    return isinstance(profile, dict) and "env_id" in profile and "platform_contract" in profile
 
 
 def _with_hermes_exclusions(source: StageTreeSource) -> StageTreeSource:

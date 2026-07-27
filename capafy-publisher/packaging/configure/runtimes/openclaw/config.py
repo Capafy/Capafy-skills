@@ -17,8 +17,8 @@ from packaging._shared.contracts.selectable import normalize_text
 from packaging._shared.policies.path_refs import build_packaged_runtime_ref
 
 
-RUNTIME_ENVIRONMENT_MANIFEST_NAME = "agent.runtime_environment.json"
 OPENCLAW_CONFIG_MODE_OVERLAY_MERGE = "overlay_merge"
+
 
 _WORKSPACE_DOCUMENT_PATH_FIELDS = (
     ("memory", "qmd", "paths"),
@@ -28,11 +28,9 @@ _WORKSPACE_DOCUMENT_PATH_FIELDS = (
 _OVERLAY_TOP_LEVEL_FIELDS = (
     "models",
     "agents",
-    "channels",
     "memory",
     "memorySearch",
     "skills",
-    "plugins",
     "env",
 )
 
@@ -51,11 +49,6 @@ def _merge_json_patch(base: object, overlay: object) -> object:
     if isinstance(overlay, list):
         return [_clone_json_value(item) for item in overlay]
     return overlay
-
-
-def _is_openclaw_overlay_runtime(runtime_root: Path) -> bool:
-    payload = _load_json_object(runtime_root / RUNTIME_ENVIRONMENT_MANIFEST_NAME)
-    return normalize_text(payload.get("openclaw_config_mode")) == OPENCLAW_CONFIG_MODE_OVERLAY_MERGE
 
 
 def _iter_confirmed_workspace_document_entries(payload: dict) -> list[dict]:
@@ -115,26 +108,11 @@ def merge_openclaw_overlay_with_base(
 ) -> dict[str, object]:
     config_path = runtime_root / ".openclaw" / "openclaw.json"
     if not config_path.is_file():
-        return {
-            "mode": "missing_overlay",
-            "used_base_config": False,
-            "changed": False,
-        }
+        return {"mode": "missing_overlay", "used_base_config": False, "changed": False}
 
     overlay_payload = _load_json_object(config_path)
     if not overlay_payload:
-        return {
-            "mode": "invalid_overlay",
-            "used_base_config": False,
-            "changed": False,
-        }
-
-    if not _is_openclaw_overlay_runtime(runtime_root):
-        return {
-            "mode": "direct",
-            "used_base_config": False,
-            "changed": False,
-        }
+        return {"mode": "invalid_overlay", "used_base_config": False, "changed": False}
 
     base_payload = _load_json_object(base_config_path) if base_config_path is not None and base_config_path.is_file() else {}
     used_base_config = bool(base_payload)

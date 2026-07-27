@@ -16,8 +16,6 @@ from packaging.configure.staging.selection_payload import (
     has_explicit_selection_groups,
     load_skills_plan_payload,
     normalize_skills_plan_payload_for_target,
-    selected_cron_paths_from_payload,
-    selected_plugin_paths_from_payload,
     selected_skill_paths_from_payload,
     selection_groups_from_payload,
 )
@@ -93,30 +91,11 @@ def run_stage_pipeline(
         skills_plan_payload,
         loader=selected_skill_paths_from_payload,
     )
-    selected_plugin_paths = _selected_payload_value(
-        has_explicit_selection,
-        skills_plan_payload,
-        loader=selected_plugin_paths_from_payload,
-    )
-    selected_cron_paths = _selected_payload_value(
-        has_explicit_selection,
-        skills_plan_payload,
-        loader=selected_cron_paths_from_payload,
-        target=target,
-    )
     if agent_type == "download":
 
         selected_skill_paths_set = set(selected_skill_paths or set())
-        selected_plugin_paths_set = set(selected_plugin_paths or set())
-        selected_cron_paths_set = set(selected_cron_paths or set())
         if not has_explicit_selection or not selected_skill_paths_set:
-            if selected_plugin_paths_set or selected_cron_paths_set:
-                sample = next(iter(sorted(selected_plugin_paths_set | selected_cron_paths_set)))
-                raise ValueError(f"download only supports skill units, but received non-skill selection: {sample}")
             raise ValueError("download agent_type requires explicit --skills-plan with selection_groups.skills")
-        if selected_plugin_paths_set or selected_cron_paths_set:
-            sample = next(iter(sorted(selected_plugin_paths_set | selected_cron_paths_set)))
-            raise ValueError(f"download only supports skill units, but received non-skill selection: {sample}")
     mode = get_configure_mode(agent_type)
 
     if selection_groups is not None:
@@ -126,13 +105,6 @@ def run_stage_pipeline(
         }
 
 
-    stage_plan = call_optional_target_hook(
-        target,
-        "augment_stage_plan_for_selected_paths",
-        stage_plan,
-        selected_cron_paths=selected_cron_paths,
-        default=stage_plan,
-    )
     stage_plan = augment_stage_plan_with_selected_symlinks(stage_plan, selected_skill_paths)
     stage_plan = augment_stage_plan_with_selected_external_skill_bindings(
         stage_plan,
@@ -176,8 +148,6 @@ def run_stage_pipeline(
             selected_skill_paths=selected_skill_paths,
             target=target,
             workspace_documents_manifest_payload=workspace_documents_manifest_payload,
-            selected_plugin_paths=selected_plugin_paths,
-            selected_cron_paths=selected_cron_paths,
             workspace_allowlist=workspace_allowlist,
         )
     )

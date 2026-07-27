@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
-from packaging._shared.llm.official_providers import find_official_provider_by_marker
 from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging.configure.env_values import env_reference_name, usable_env_value
+from packaging.configure.runtimes.hermes.official_providers import find_hermes_official_provider_by_marker
 
 
 HERMES_OAUTH_REL_CANDIDATES = (
@@ -25,9 +25,6 @@ _AUTH_JSON_PROVIDER_NAMES = {
     "nous": "publisher_nous_official",
     "openai-codex": "publisher_openai_official",
     "xai-oauth": "publisher_xai_official",
-}
-_AUTH_PROVIDER_ALIASES = {
-    "minimax-cn": "minimax",
 }
 _OAUTH_KEY_FIELDS = ("access_token", "accessToken", "access", "api_key", "apiKey", "token", "value")
 
@@ -62,25 +59,20 @@ def hermes_oauth_keys_from_credentials(
 def load_hermes_auth_profile_credentials(ctx: Any) -> dict[str, list[HermesAuthProfileCredential]]:
     result: dict[str, list[HermesAuthProfileCredential]] = {}
     staged_env = _staged_dotenv_env(ctx)
-    scan_only_root = Path(ctx.scan_only_root)
-    for base in (scan_only_root, Path(ctx.staging_root)):
-        auth_json = Path(base) / HERMES_AUTH_JSON_REL
-        if auth_json.is_file():
-            process_env = dict(staged_env)
-            process_env.update(dict(ctx.process_env or {}))
-            _append_auth_json_oauth_keys(result, auth_json, process_env=process_env)
-        if Path(base) == scan_only_root:
-            for relpath in HERMES_OAUTH_REL_CANDIDATES:
-                oauth_root = Path(base) / relpath
-                if oauth_root.is_file():
-                    _append_oauth_file(result, oauth_root)
-                elif oauth_root.is_dir():
-                    for path in sorted(oauth_root.rglob("*.json")):
-                        _append_oauth_file(result, path)
-        for relpath, provider_name in HERMES_OAUTH_FILE_CANDIDATES.items():
-            oauth_file = Path(base) / relpath
-            if oauth_file.is_file():
-                _append_oauth_file(result, oauth_file, provider_name=provider_name)
+    process_env = dict(staged_env)
+    process_env.update(dict(ctx.process_env or {}))
+    auth_json = _scan_only_source_file(ctx, f"_scan_only/{HERMES_AUTH_JSON_REL}", HERMES_AUTH_JSON_REL)
+    if auth_json is not None:
+        _append_auth_json_oauth_keys(result, auth_json, process_env=process_env)
+
+    for relpath in HERMES_OAUTH_REL_CANDIDATES:
+        for path in _scan_only_source_files_under(ctx, relpath):
+            if path.suffix.lower() == ".json":
+                _append_oauth_file(result, path)
+    for relpath, provider_name in HERMES_OAUTH_FILE_CANDIDATES.items():
+        oauth_file = _scan_only_source_file(ctx, f"_scan_only/{relpath}", relpath)
+        if oauth_file is not None:
+            _append_oauth_file(result, oauth_file, provider_name=provider_name)
     return result
 
 
@@ -186,7 +178,7 @@ def _normalize_pool_provider_name(value: object) -> str:
     if normalized.lower().startswith("custom:"):
         suffix = normalized.split(":", 1)[1].strip()
         return f"custom:{suffix}" if suffix else ""
-    spec = find_official_provider_by_marker(_AUTH_PROVIDER_ALIASES.get(normalized.lower(), normalized))
+    spec = find_hermes_official_provider_by_marker(normalized)
     return spec.provider_name if spec else ""
 
 
@@ -275,7 +267,7 @@ def _extract_oauth_key(path: Path) -> str:
 
 def _vendor_from_filename(stem: str) -> str:
     normalized = str(stem or "").strip().lower()
-    spec = find_official_provider_by_marker(normalized)
+    spec = find_hermes_official_provider_by_marker(normalized)
     return spec.provider_name if spec else ""
 
 
@@ -287,13 +279,13 @@ def _source_env_name(value: object) -> str:
 
 
 def _staged_dotenv_env(ctx: Any) -> dict[str, str]:
-    env_context = getattr(ctx, "env_context", None)
-    if env_context is None:
+    provider_config_context = getattr(ctx, "provider_config_context", None)
+    if provider_config_context is None:
         return {}
     names = _auth_json_source_env_names(ctx)
     if not names:
         return {}
-    return env_context.staged_dotenv_values(
+    return provider_config_context.staged_dotenv_values(
         Path(ctx.staging_root),
         relpaths=HERMES_DOTENV_RELPATHS,
         names=frozenset(names),
@@ -302,8 +294,12 @@ def _staged_dotenv_env(ctx: Any) -> dict[str, str]:
 
 def _auth_json_source_env_names(ctx: Any) -> set[str]:
     result: set[str] = set()
-    for base in (Path(ctx.scan_only_root), Path(ctx.staging_root)):
-        auth_json = Path(base) / HERMES_AUTH_JSON_REL
+    auth_paths = [
+        _scan_only_source_file(ctx, f"_scan_only/{HERMES_AUTH_JSON_REL}", HERMES_AUTH_JSON_REL),
+    ]
+    for auth_json in auth_paths:
+        if auth_json is None or not auth_json.is_file():
+            continue
         payload = _read_json_object(auth_json)
         credential_pool = payload.get("credential_pool")
         if not isinstance(credential_pool, dict):
@@ -314,6 +310,21 @@ def _auth_json_source_env_names(ctx: Any) -> set[str]:
                 if env_name:
                     result.add(env_name)
     return result
+
+
+def _scan_only_source_file(ctx: Any, *relpaths: str) -> Optional[Path]:
+    resolver = getattr(ctx, "scan_only_source_file", None)
+    if not callable(resolver):
+        return None
+    path = resolver(*relpaths)
+    return Path(path) if path is not None else None
+
+
+def _scan_only_source_files_under(ctx: Any, relpath: str) -> list[Path]:
+    resolver = getattr(ctx, "scan_only_source_files_under", None)
+    if not callable(resolver):
+        return []
+    return [Path(path) for path in resolver(relpath)]
 
 
 __all__ = [

@@ -2,12 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
-from packaging._shared.contracts.reviewed_scan import build_reviewed_env_var_item
-from packaging.configure.use_text import (
-    use_for_env_var,
-    use_for_excluded_file,
-    use_for_generic_value,
-)
+from packaging.configure.use_text import use_for_generic_value
 
 if TYPE_CHECKING:
     from packaging.configure.contracts import ReviewedScanBuildInput
@@ -28,7 +23,7 @@ def build_reviewed_scan_from_input(
     for pair in reviewed_input.url_proxy_pairs:
         item = {
             "api_key": {
-                "value": pair.key.original_value,
+                "value": "",
                 "placeholder": pair.key.placeholder,
                 "field": pair.key.field,
                 "source": pair.key.source_identity(),
@@ -75,31 +70,9 @@ def build_reviewed_scan_from_input(
             "use": use_for_generic_value(generic_value.field, generic_value.value_type),
         })
 
-    env_var_items: list[dict[str, Any]] = []
-    for env_var in reviewed_input.env_vars:
-        env_var_items.append(
-            build_reviewed_env_var_item(
-                field=env_var.name,
-                value=env_var.process_value,
-                placeholder=env_var.placeholder,
-                referenced_in=env_var.referenced_in,
-                use=use_for_env_var(env_var.name),
-            )
-        )
-
-    exclude_items: list[dict[str, Any]] = []
-    for excluded_file in reviewed_input.excludes:
-        exclude_items.append({
-            "source": excluded_file.source,
-            "reason": excluded_file.reason,
-            "use": use_for_excluded_file(excluded_file.source, excluded_file.reason),
-        })
-
     return {
         "url_proxy": url_proxy_items,
         "generic": generic_items,
-        "env_var": env_var_items,
-        "excludes": exclude_items,
         "_review": review_metadata,
     }
 

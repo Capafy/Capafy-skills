@@ -4,8 +4,11 @@ import re
 from typing import Any, Optional
 
 from packaging._shared.common.url_values import normalize_http_url_candidate
-from packaging._shared.llm.official_providers import OfficialProviderSpec, find_official_provider_by_marker
 from packaging.configure.runtimes.hermes.api_modes import hermes_api_mode_from_block
+from packaging.configure.runtimes.hermes.official_providers import (
+    HermesOfficialProviderSpec,
+    find_hermes_official_provider_by_marker,
+)
 from packaging.configure.runtimes.hermes.provider_blocks import (
     HermesProviderBlock,
     block_model_field,
@@ -25,8 +28,10 @@ from packaging.configure.sensitive.literals import looks_like_platform_managed_p
 
 _PROVIDER_BLOCK_OWNED_FIELDS = {
     "api",
+    "api_base",
     "api_format",
     "api_key",
+    "api_key_env",
     "api_mode",
     "base_url",
     "default_model",
@@ -132,7 +137,7 @@ def _merge_provider_definition(
     source_block: dict[str, Any],
     provider_block: HermesProviderBlock,
     provider_name: str,
-    spec: Optional[OfficialProviderSpec],
+    spec: Optional[HermesOfficialProviderSpec],
     base_url: str,
 ) -> bool:
     changed = False
@@ -142,9 +147,13 @@ def _merge_provider_definition(
 
     changed = _set_if_missing(provider, "base_url", base_url) or changed
 
-    raw_key = _first_non_empty(source_block.get("api_key")) or _first_non_empty(source_block.get("key_env"))
+    raw_key = (
+        _first_non_empty(source_block.get("api_key"))
+        or _first_non_empty(source_block.get("key_env"))
+        or _first_non_empty(source_block.get("api_key_env"))
+    )
     changed = _set_if_missing(provider, "api_key", raw_key) or changed
-    key_env = _first_non_empty(source_block.get("key_env"))
+    key_env = _first_non_empty(source_block.get("key_env")) or _first_non_empty(source_block.get("api_key_env"))
     if key_env:
         changed = _set_if_missing(provider, "key_env", key_env) or changed
 
@@ -181,7 +190,7 @@ def _normalize_reference_spelling(provider_block: HermesProviderBlock) -> bool:
 
 def _provider_name(
     provider_block: HermesProviderBlock,
-    spec: Optional[OfficialProviderSpec],
+    spec: Optional[HermesOfficialProviderSpec],
     custom_providers: list[Any],
     assigned_names: set[str],
 ) -> str:
@@ -215,7 +224,7 @@ def _provider_name(
         suffix += 1
 
 
-def _provider_payload_matches_name(provider: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> bool:
+def _provider_payload_matches_name(provider: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> bool:
     if spec is None:
         return False
     base_url = str(provider.get("base_url", "") or "").strip()
@@ -228,7 +237,7 @@ def _provider_payload_matches_name(provider: dict[str, Any], spec: Optional[Offi
 
 def _provider_identity(provider: dict[str, Any]) -> tuple[str, str]:
     name = _normalize_name(provider.get("name"))
-    spec = find_official_provider_by_marker(_canonical_provider_marker(name))
+    spec = find_hermes_official_provider_by_marker(name)
     if spec is not None and name == spec.provider_name.lower():
         return ("official", spec.provider_name)
     base_url = normalize_http_url_candidate(str(provider.get("base_url", "") or ""))
@@ -239,7 +248,7 @@ def _provider_identity(provider: dict[str, Any]) -> tuple[str, str]:
 
 def _normalization_identity(
     provider_block: HermesProviderBlock,
-    spec: Optional[OfficialProviderSpec],
+    spec: Optional[HermesOfficialProviderSpec],
     base_url: str,
 ) -> tuple[str, str]:
     if spec is not None:
@@ -247,14 +256,14 @@ def _normalization_identity(
     return ("block", f"{provider_block.group_path}:{base_url}")
 
 
-def _block_base_url(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
-    value = normalize_http_url_candidate(str(block.get("base_url", "") or ""))
+def _block_base_url(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
+    value = normalize_http_url_candidate(str(block.get("base_url", "") or block.get("api_base", "") or ""))
     if value:
         return value
     return spec.base_url if spec is not None else ""
 
 
-def _api_format(block: dict[str, Any], spec: Optional[OfficialProviderSpec]) -> str:
+def _api_format(block: dict[str, Any], spec: Optional[HermesOfficialProviderSpec]) -> str:
     return hermes_api_mode_from_block(block, spec)
 
 
@@ -280,14 +289,6 @@ def _first_non_empty(value: object) -> str:
 
 def _normalize_name(value: object) -> str:
     return str(value or "").strip().lower()
-
-
-def _canonical_provider_marker(value: object) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized == "minimax-cn":
-        return "minimax"
-    return normalized
-
 
 def _slug(value: object) -> str:
     normalized = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "").strip().lower()).strip("_")

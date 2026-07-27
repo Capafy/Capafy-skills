@@ -81,7 +81,7 @@ def _run_strip_by_final_disposition(staging_root: Path, reviewed_scan: dict) -> 
     touched_files: set[str] = set()
     items: list[dict] = []
     total_replacements = 0
-    for bucket in ("url_proxy", "generic", "env_var"):
+    for bucket in ("url_proxy", "generic"):
         raw_items = reviewed_scan.get(bucket, [])
         if not isinstance(raw_items, list):
             continue

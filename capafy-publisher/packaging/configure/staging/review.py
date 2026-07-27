@@ -13,7 +13,6 @@ from packaging._shared.contracts.reviewed_scan import (
 )
 from packaging._shared.reviewed_scan.digest import (
     compute_scan_digest,
-    compute_scan_only_digest,
     compute_staging_digest,
 )
 from packaging.configure.deep_scan_payload import build_deep_scan_payload
@@ -39,7 +38,6 @@ def build_review_binding(
     return {
         "raw_scan_digest": compute_scan_digest(raw_scan),
         "staging_digest": compute_staging_digest(staging_root),
-        "scan_only_digest": compute_scan_only_digest(staging_root),
         "env_id": str(env_id or "").strip(),
         "agent_type": str(agent_type or "").strip(),
     }
@@ -48,7 +46,6 @@ def build_review_binding(
 class _DigestBuilder:
     raw_scan = staticmethod(compute_scan_digest)
     staging = staticmethod(compute_staging_digest)
-    scan_only = staticmethod(compute_scan_only_digest)
 
 
 def reviewed_scan_matches_context(
@@ -143,16 +140,9 @@ def _generic_payload(payload: dict[str, Any], *, staging_root: Union[str, Path],
     resolved_agent_type = str(agent_type or "").strip()
     if not resolved_agent_type:
         raise ValueError("reviewed scan source filtering requires agent_type")
-    excludes = _list_payload(payload, "excludes")
-    excluded_relpaths = (
-        str(item.get("source", "") or item.get("path", "")).strip()
-        for item in excludes
-        if isinstance(item, dict)
-    )
     return filter_generic_payload_items(
         _list_payload(payload, "generic"),
         staging_root=staging_root,
-        excluded_relpaths=excluded_relpaths,
         agent_type=resolved_agent_type,
     )
 
@@ -163,15 +153,12 @@ def build_reviewed_scan_from_scan(
     review_binding: dict[str, str],
     staging_root: Union[str, Path],
 ) -> dict[str, Any]:
-    excludes = _list_payload(raw_scan, "excludes")
     agent_type = str(review_binding.get("agent_type", "")).strip()
     if not agent_type:
         raise ValueError("review_binding.agent_type is required")
     reviewed_scan = {
         "url_proxy": _list_payload(raw_scan, "url_proxy"),
         "generic": _generic_payload(raw_scan, staging_root=staging_root, agent_type=agent_type),
-        "env_var": _list_payload(raw_scan, "env_var"),
-        "excludes": excludes,
         REVIEW_METADATA_KEY: _review_metadata_template(review_binding),
     }
     return reviewed_scan
@@ -181,7 +168,6 @@ __all__ = [
     "build_review_binding",
     "build_deep_scan_payload",
     "build_reviewed_scan_from_scan",
-    "compute_scan_only_digest",
     "compute_scan_digest",
     "compute_staging_digest",
     "is_reviewed_scan_payload",

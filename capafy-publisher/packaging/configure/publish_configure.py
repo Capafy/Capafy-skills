@@ -141,9 +141,8 @@ def run_publish_configure(
             failed_step="load_deep_scan_findings",
             blocking_category="invalid_deep_scan_findings",
             developer_next_steps=[
-                'Write a JSON object with generic and env_var arrays: {"generic": [], "env_var": []}.',
+                'Write a JSON object with only a generic array: {"generic": []}.',
                 "generic items need non-empty value and source fields.",
-                "env_var items need non-empty value and field (env var name).",
             ],
             next_step="fix_deep_scan_findings_then_retry",
             agent_id=agent_id,

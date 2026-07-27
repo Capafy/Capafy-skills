@@ -1,21 +1,18 @@
 from __future__ import annotations
 from typing import Optional
 
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from packaging._shared.common.fs import (
     display_stage_path,
     read_text,
     relpath as fs_relpath,
 )
-from packaging._shared.env_profiles.config_files import collect_packaged_config_paths
 from packaging._shared.common.packaged_files import iter_packaged_files
 from packaging._shared.policies.content_scan import should_skip_content_scan_for_file
-from packaging.configure.exclusion import build_exclude_entry, looks_like_high_risk_file
 from packaging.configure.generic_keys import collect_generic_key_candidates
 from packaging.runtimes import get_default_target, get_target
 from packaging._shared.runtimes.contracts import call_optional_target_hook
-from packaging._shared.selection.unit_types import has_skill_owning_path
 
 from .candidate_annotation import annotate_candidate
 from .env_reference_scan import collect_env_url_hints, collect_referenced_env_names
@@ -28,94 +25,48 @@ from .scan_only_paths import is_scan_only_source_path, normalize_scan_only_relpa
 from .special_files import collect_special_file_candidates
 
 
-def _is_runtime_required_env_file(relpath: str, *, target_name: Optional[str] = None) -> bool:
-    if not relpath:
-        return False
-    target = get_target(target_name) if target_name else get_default_target()
-    profile = getattr(target, "profile", None)
-    if not isinstance(profile, dict):
-        return False
-
-    normalized = relpath.strip().rstrip("/")
-    fixed_stage_paths = set(collect_packaged_config_paths(profile))
-    basename = PurePosixPath(normalized).name
-    return normalized in fixed_stage_paths and (basename == ".env" or basename.startswith(".env."))
-
-
-def _is_selected_skill_env_file(relpath: str, *, target_name: Optional[str] = None) -> bool:
-    normalized = str(relpath or "").strip().rstrip("/")
-    if not normalized or not normalized.endswith("/.env"):
-        return False
-
-    target = get_target(target_name) if target_name else get_default_target()
-    return has_skill_owning_path(normalized, target=target)
-
-
 def collect_api_key_candidates_from_file(
     path: Path,
     relpath: str,
     physical_relpath: Optional[str] = None,
-    process_env_names: Optional[set[str]] = None,
     target_name: Optional[str] = None,
     require_referenced_platform_envs: bool = False,
-) -> tuple[list[dict], list[dict], dict[str, str], dict[str, str], dict[str, str], set[str]]:
+) -> tuple[list[dict], dict[str, str], dict[str, str], dict[str, str]]:
     target = get_target(target_name) if target_name else get_default_target()
     active_target_name = target_name or getattr(target, "env_id", None)
     candidates: list[dict] = []
-    file_excludes: list[dict] = []
     env_url_hints: dict[str, str] = {}
     service_url_hints: dict[str, str] = {}
     value_url_hints: dict[str, str] = {}
-    referenced_env_names: set[str] = set()
-    is_runtime_required_file = _is_runtime_required_env_file(relpath, target_name=target_name)
-
     if not path.is_file():
         return (
             candidates,
-            file_excludes,
             env_url_hints,
             service_url_hints,
             value_url_hints,
-            referenced_env_names,
         )
 
     scan_only_source = is_scan_only_source_path(physical_relpath or relpath)
-    high_risk_reason = looks_like_high_risk_file(relpath)
-    if high_risk_reason and (
-        is_runtime_required_file
-        or _is_selected_skill_env_file(relpath, target_name=target_name)
-    ):
-        high_risk_reason = None
-    if high_risk_reason:
-        exclude_entry = build_exclude_entry(relpath, reason=high_risk_reason, added_by="scan")
-        if exclude_entry is not None:
-            file_excludes.append(exclude_entry)
-
     if should_skip_content_scan_for_file(relpath):
         return (
             candidates,
-            file_excludes,
             env_url_hints,
             service_url_hints,
             value_url_hints,
-            referenced_env_names,
         )
 
     text, _ = read_text(path)
     if text is None:
         return (
             candidates,
-            file_excludes,
             env_url_hints,
             service_url_hints,
             value_url_hints,
-            referenced_env_names,
         )
 
     for env_name, domain in collect_env_url_hints(text).items():
         env_url_hints.setdefault(env_name, domain)
-    file_referenced_env_names, file_env_name_hints = collect_referenced_env_names(text, process_env_names)
-    referenced_env_names.update(file_referenced_env_names)
+    file_referenced_env_names, file_env_name_hints = collect_referenced_env_names(text)
     for env_name, domain in file_env_name_hints.items():
         env_url_hints.setdefault(env_name, domain)
     for env_name, domain in collect_platform_env_url_hints(
@@ -145,11 +96,9 @@ def collect_api_key_candidates_from_file(
     if scan_only_source:
         return (
             candidates,
-            file_excludes,
             env_url_hints,
             service_url_hints,
             value_url_hints,
-            referenced_env_names,
         )
 
     candidates.extend(collect_special_file_candidates(text, relpath))
@@ -171,11 +120,9 @@ def collect_api_key_candidates_from_file(
 
     return (
         candidates,
-        file_excludes,
         env_url_hints,
         service_url_hints,
         value_url_hints,
-        referenced_env_names,
     )
 
 
@@ -183,45 +130,35 @@ def collect_api_key_candidates(
     root: Path,
     display_prefix: str = "",
     *,
-    process_env_names: Optional[set[str]] = None,
     target_name: Optional[str] = None,
     require_referenced_platform_envs: bool = False,
-    include_stage_excluded_files: bool = False,
     excluded_relpath_prefixes: tuple[str, ...] = (),
-) -> tuple[list[dict], list[dict], dict[str, str], dict[str, str], dict[str, str], set[str]]:
+) -> tuple[list[dict], dict[str, str], dict[str, str], dict[str, str]]:
     target = get_target(target_name) if target_name else get_default_target()
     candidates: list[dict] = []
-    file_excludes: list[dict] = []
     env_url_hints: dict[str, str] = {}
     service_url_hints: dict[str, str] = {}
     value_url_hints: dict[str, str] = {}
-    referenced_env_names: set[str] = set()
 
     for path in iter_packaged_files(
         root,
         excluded_relpath_prefixes=excluded_relpath_prefixes,
-        include_stage_excluded_files=include_stage_excluded_files,
     ):
         physical_relpath = display_stage_path(display_prefix, fs_relpath(path, root))
         relpath = normalize_scan_only_relpath(physical_relpath, target=target)
         (
             file_candidates,
-            file_excludes_for_path,
             file_env_hints,
             file_service_hints,
             file_value_hints,
-            file_referenced_env_names,
         ) = collect_api_key_candidates_from_file(
             path,
             relpath,
             physical_relpath=physical_relpath,
-            process_env_names=process_env_names,
             target_name=target_name,
             require_referenced_platform_envs=require_referenced_platform_envs,
         )
         candidates.extend(file_candidates)
-        file_excludes.extend(file_excludes_for_path)
-        referenced_env_names.update(file_referenced_env_names)
         for env_name, domain in file_env_hints.items():
             env_url_hints.setdefault(env_name, domain)
         for service_name, domain in file_service_hints.items():
@@ -231,9 +168,7 @@ def collect_api_key_candidates(
 
     return (
         candidates,
-        file_excludes,
         env_url_hints,
         service_url_hints,
         value_url_hints,
-        referenced_env_names,
     )

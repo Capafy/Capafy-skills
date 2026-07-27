@@ -1,21 +1,15 @@
 from __future__ import annotations
-from typing import Optional
 
 import json
 from dataclasses import dataclass
-from dataclasses import replace
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Optional
 
-from packaging.configure.candidate import Candidate
-from packaging.configure.contracts import SourceKind
+from packaging._shared.common.constants import ANTHROPIC_OFFICIAL_URL
+from packaging._shared.common.url_values import normalize_http_url_candidate
 from packaging._shared.config_files.dotenv import iter_dotenv_assignments
 from packaging.configure.env_values import usable_env_value
-from packaging.configure.runtimes.claude_code.auth import (
-    CLAUDE_AUTH_ENV_KEY,
-    CLAUDE_AUTH_TOKEN_ENV_KEY,
-    CLAUDE_BASE_URL_ENV_KEY,
-)
+from packaging.configure.runtimes.claude_code.auth import CLAUDE_BASE_URL_ENV_KEY
 
 SETTINGS_SCAN_RELPATHS = (
     ".claude/managed-settings.json",
@@ -24,18 +18,6 @@ SETTINGS_SCAN_RELPATHS = (
 )
 MODEL_ENV_FIELDS = ("ANTHROPIC_MODEL", "CLAUDE_MODEL")
 MODEL_DOTENV_RELPATHS = (".claude/.env", ".env")
-API_KEY_FIELD_ORDER = {
-    CLAUDE_AUTH_TOKEN_ENV_KEY: 0,
-    CLAUDE_AUTH_ENV_KEY: 1,
-}
-BASE_URL_FIELD_ORDER = {
-    CLAUDE_BASE_URL_ENV_KEY: 0,
-}
-
-_SETTINGS_SOURCE_ORDER = {
-    relpath: index
-    for index, relpath in enumerate(SETTINGS_SCAN_RELPATHS)
-}
 
 
 @dataclass(frozen=True)
@@ -49,13 +31,23 @@ class SettingsModel:
         return bool(self.value)
 
 
-def _settings_file_model(path: Path, relpath: str) -> SettingsModel:
+@dataclass(frozen=True)
+class SettingsUrl:
+    value: str
+    source_relpath: str = ""
+    kind: str = "synthesized"
+
+
+def _settings_payload(path: Path) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return SettingsModel()
-    if not isinstance(payload, dict):
-        return SettingsModel()
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _settings_file_model(path: Path, relpath: str) -> SettingsModel:
+    payload = _settings_payload(path)
     model = usable_env_value(payload.get("model"))
     if model:
         return SettingsModel(value=model, source_relpath=relpath, field="model", kind="settings")
@@ -85,16 +77,22 @@ def _dotenv_model(path: Path, relpath: str) -> SettingsModel:
     return SettingsModel()
 
 
-def resolve_settings_model(staging_root: Path, process_env: Optional[Mapping[str, str]] = None) -> SettingsModel:
+def resolve_settings_model(
+    claude_home: Optional[Path] = None,
+    staging_root: Optional[Path] = None,
+    process_env: Optional[Mapping[str, str]] = None,
+) -> SettingsModel:
     for relpath in SETTINGS_SCAN_RELPATHS:
-        path = staging_root / relpath
-        if not path.is_file():
-            continue
-        model = _settings_file_model(path, relpath)
-        if model:
-            return model
-    for relpath in MODEL_DOTENV_RELPATHS:
-        model = _dotenv_model(staging_root / relpath, relpath)
+        path = claude_home / Path(relpath).name if claude_home is not None else Path()
+        if path.is_file():
+            model = _settings_file_model(path, relpath)
+            if model:
+                return model
+    for path, relpath in (
+        (claude_home / ".env" if claude_home is not None else Path(), ".claude/.env"),
+        (staging_root / ".env" if staging_root is not None else Path(), ".env"),
+    ):
+        model = _dotenv_model(path, relpath)
         if model:
             return model
     if process_env is not None:
@@ -105,94 +103,36 @@ def resolve_settings_model(staging_root: Path, process_env: Optional[Mapping[str
     return SettingsModel()
 
 
-def settings_model(staging_root: Path, process_env: Optional[Mapping[str, str]] = None) -> str:
-    return resolve_settings_model(staging_root, process_env).value
-
-
-def candidate_with_model(candidate: Candidate, model: str) -> Candidate:
-    extra = dict(candidate.extra)
-    extra.setdefault("model", model)
-    return replace(candidate, extra=extra)
-
-
-def candidate_with_settings_model(candidate: Candidate, model: SettingsModel) -> Candidate:
-    extra = dict(candidate.extra)
-    extra.setdefault("model", model.value)
-    if model.kind:
-        extra.setdefault(
-            "model_source",
-            {
-                "kind": model.kind,
-                "field": model.field,
-                "source_relpath": model.source_relpath,
-            },
+def resolve_settings_url(
+    claude_home: Optional[Path],
+    process_env: Mapping[str, str],
+) -> SettingsUrl:
+    for relpath in SETTINGS_SCAN_RELPATHS:
+        path = claude_home / Path(relpath).name if claude_home is not None else Path()
+        if not path.is_file():
+            continue
+        env_payload = _settings_payload(path).get("env")
+        if not isinstance(env_payload, dict):
+            continue
+        value = normalize_http_url_candidate(
+            usable_env_value(env_payload.get(CLAUDE_BASE_URL_ENV_KEY))
         )
-    return replace(candidate, extra=extra)
-
-
-def annotate_candidates_with_settings_model(
-    candidates: list[Candidate],
-    staging_root: Path,
-    process_env: Optional[Mapping[str, str]] = None,
-) -> list[Candidate]:
-    model = resolve_settings_model(staging_root, process_env)
-    if not model:
-        return candidates
-    return [candidate_with_settings_model(candidate, model) for candidate in candidates]
-
-
-def select_preferred_candidate(
-    candidates: list[Candidate],
-    *,
-    roles: set[str],
-    field_order: dict[str, int],
-) -> Optional[Candidate]:
-    matching = [candidate for candidate in candidates if candidate.role in roles]
-    if not matching:
-        return None
-    non_empty = [candidate for candidate in matching if str(candidate.value or "").strip()]
-    if non_empty:
-        matching = non_empty
-    else:
-        synthesized = [candidate for candidate in matching if candidate.role == "synthesized_api_key"]
-        if synthesized:
-            matching = synthesized
-    return min(
-        matching,
-        key=lambda candidate: (
-            source_priority(candidate),
-            field_order.get(candidate.field, 99),
-            candidate.field,
-        ),
+        if value:
+            return SettingsUrl(value=value, source_relpath=relpath, kind="settings")
+    process_value = normalize_http_url_candidate(
+        usable_env_value(process_env.get(CLAUDE_BASE_URL_ENV_KEY, ""))
     )
-
-
-def source_priority(candidate: Candidate) -> tuple[int, int]:
-    if candidate.source_relpath in _SETTINGS_SOURCE_ORDER:
-        return (0, _SETTINGS_SOURCE_ORDER[candidate.source_relpath])
-    if candidate.extra.get("configured_auth_key"):
-        return (1, 0)
-    if candidate.source_kind == SourceKind.FILE:
-        return (2, 0)
-    if candidate.source_kind == SourceKind.PROCESS_ENV:
-        return (3, 0)
-    if str(candidate.value or "").strip():
-        return (4, 0)
-    return (5, 0)
+    if process_value:
+        return SettingsUrl(value=process_value, kind="process_env")
+    return SettingsUrl(value=ANTHROPIC_OFFICIAL_URL)
 
 
 __all__ = [
-    "API_KEY_FIELD_ORDER",
-    "BASE_URL_FIELD_ORDER",
     "MODEL_DOTENV_RELPATHS",
     "MODEL_ENV_FIELDS",
     "SETTINGS_SCAN_RELPATHS",
     "SettingsModel",
-    "candidate_with_settings_model",
-    "annotate_candidates_with_settings_model",
-    "candidate_with_model",
+    "SettingsUrl",
     "resolve_settings_model",
-    "select_preferred_candidate",
-    "settings_model",
-    "source_priority",
+    "resolve_settings_url",
 ]

@@ -9,6 +9,8 @@ from packaging.runtimes.openclaw.workspace_common import (
     OPENCLAW_ROOT,
     WORKSPACE_ROOT_DOCS,
     WORKSPACE_SKILL_SUBDIRS,
+    resolve_openclaw_config_source,
+    resolve_openclaw_state_root,
 )
 
 
@@ -21,9 +23,9 @@ def _openclaw_workspace_candidate(workspace_reference: str, *, openclaw_root: Pa
         return candidate
 
     parts = candidate.parts
-    openclaw_base = safe_expanduser_path(openclaw_root)
+    openclaw_base = resolve_openclaw_state_root(openclaw_root=openclaw_root)
     if parts and parts[0] == ".openclaw":
-        return openclaw_base.parent.joinpath(*parts)
+        return openclaw_base.joinpath(*parts[1:])
     return openclaw_base / candidate
 
 
@@ -36,15 +38,16 @@ def validate_openclaw_workspace_root(workspace_root: Path, *, openclaw_root: Pat
             "OpenClaw runtime_dir must be the workspace root, not a single skill directory: "
             f"{workspace_root}"
         )
-    openclaw_base = safe_expanduser_path(openclaw_root).resolve(strict=False)
-    if not (openclaw_base / "openclaw.json").is_file():
-        raise ValueError(f"OpenClaw root is missing openclaw.json: {openclaw_base / 'openclaw.json'}")
+    openclaw_base = resolve_openclaw_state_root(openclaw_root=openclaw_root).resolve(strict=False)
+    config_source = resolve_openclaw_config_source(openclaw_root=openclaw_root)
+    if not config_source.is_file():
+        raise ValueError(f"OpenClaw root is missing openclaw.json: {config_source}")
     try:
         relative = resolved.relative_to(openclaw_base)
     except ValueError as exc:
         raise ValueError(
-            "OpenClaw runtime_dir must be an OpenClaw workspace under ~/.openclaw, for example "
-            "~/.openclaw/workspace"
+            f"OpenClaw runtime_dir must be an OpenClaw workspace under {openclaw_base}, for example "
+            f"{openclaw_base / 'workspace'}"
         ) from exc
     first = relative.parts[0] if relative.parts else ""
     if len(relative.parts) != 1 or not first.startswith("workspace"):

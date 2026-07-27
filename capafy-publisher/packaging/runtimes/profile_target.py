@@ -6,7 +6,6 @@ from importlib import import_module
 
 from packaging._shared.contracts.stage_plan import StagePlan
 from packaging._shared.env_profiles import load_profile, string_tuple_profile_value
-from packaging._shared.runtimes.support import collect_optional_command_first_line
 from packaging.runtimes import stage_plan_builder
 
 
@@ -42,16 +41,6 @@ class EnvProfileTarget:
             agent_type=agent_type,
         )
 
-    def collect_runtime_environment_fields(self) -> dict:
-        runtime_env = self.profile.get("runtime_env", {})
-        if not isinstance(runtime_env, dict):
-            return {}
-        field = runtime_env.get("field")
-        command = runtime_env.get("command")
-        if not field or not isinstance(command, list) or not command:
-            return {}
-        return {str(field): collect_optional_command_first_line([str(item) for item in command])}
-
     def discovery_skill_precedence(self) -> tuple[str, ...]:
         return string_tuple_profile_value(self._profile_value("discovery_skill_precedence"))
 
@@ -65,8 +54,6 @@ class EnvProfileTarget:
     def validate_runtime(
         self,
         runtime_root: Path,
-        *,
-        expected_version: Optional[str] = None,
     ) -> dict:
         from packaging.runtimes.validation import validate_env_runtime
 
@@ -74,7 +61,6 @@ class EnvProfileTarget:
             self.profile,
             runtime_root,
             env_id=self.env_id,
-            expected_version=expected_version,
         )
 
 

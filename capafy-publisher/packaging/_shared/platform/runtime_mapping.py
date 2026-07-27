@@ -21,6 +21,28 @@ _ENV_ID_BY_DOCUMENTED_AGENT_RUNTIME = {
     "openclaw": "openclaw",
 }
 
+# Default language codes accepted by the platform addAgent endpoint; the value is
+# stored on the card's defaultLanguageCode field. Keep in sync with backend docs.
+SUPPORTED_DEFAULT_LANGUAGE_CODES = frozenset(
+    {"en", "es", "fr", "de", "it", "ja", "zh", "zh-TW", "ar", "nl", "ko", "pt"}
+)
+_CANONICAL_LANGUAGE_CODE_BY_LOWER = {code.lower(): code for code in SUPPORTED_DEFAULT_LANGUAGE_CODES}
+
+
+def normalize_default_language_code(value: object) -> Optional[str]:
+    """Return the canonical language code, or None when no value is provided.
+
+    Input is matched case-insensitively (so ``zh-tw`` resolves to ``zh-TW``).
+    Raises ValueError when a non-empty value is not in the supported enum.
+    """
+    candidate = str(value or "").strip()
+    if not candidate:
+        return None
+    canonical = _CANONICAL_LANGUAGE_CODE_BY_LOWER.get(candidate.lower())
+    if canonical is None:
+        raise ValueError(f"Unknown default language code: {value}")
+    return canonical
+
 
 def documented_agent_runtime_from_values(*values: object) -> str:
     for value in values:
@@ -123,8 +145,10 @@ __all__ = [
     "documented_agent_runtime_from_values",
     "env_id_from_agent_runtime",
     "LatestVersion",
+    "normalize_default_language_code",
     "PACKAGE_REPORT_ALLOWED_STATUSES",
     "normalize_agent_type",
     "parse_latest_version",
+    "SUPPORTED_DEFAULT_LANGUAGE_CODES",
     "VALID_AGENT_TYPES",
 ]
