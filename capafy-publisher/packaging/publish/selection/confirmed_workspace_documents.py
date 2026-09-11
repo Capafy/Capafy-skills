@@ -1,0 +1,362 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
+
+from packaging.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
+from packaging.common.fs import read_text
+from packaging.common.instruction_docs import is_instruction_doc
+from packaging.publish.selection.selectable import (
+    is_absolute_like_path,
+    normalize_text,
+)
+from packaging.publish.selection.selection_groups import (
+    is_selected_selection_group_item,
+    normalize_documented_selection_groups,
+)
+from packaging.runtime.stage_plan import StageFileSource, StageTreeSource
+from packaging.publish.selection.units import resolve_workspace_root
+
+from .confirmed_resolution import packaged_path_for_entry, resolve_logical_source_path
+
+
+CATEGORY_NAMES = (
+    "workspace_documents",
+    "excluded_sources",
+)
+SELECTED_CATEGORIES = ("workspace_documents",)
+
+
+def load_payload(*, skills_plan_json: Optional[str]) -> dict:
+    if not skills_plan_json:
+        return {}
+    try:
+        payload = json.loads(skills_plan_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"confirmed workspace documents payload parse failed: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("confirmed workspace documents payload top-level value must be an object")
+    return payload
+
+
+def normalize_payload_categories(payload: object) -> dict[str, list]:
+    if not isinstance(payload, dict):
+        raise ValueError("confirmed workspace documents payload top-level value must be an object")
+    normalized: dict[str, list] = {}
+    for category in CATEGORY_NAMES:
+        value = payload.get(category, [])
+        if not isinstance(value, list):
+            raise ValueError(f"{category} must be an array")
+        for item in value:
+            if not isinstance(item, (str, dict)):
+                raise ValueError(f"{category} items must be strings or objects")
+            if isinstance(item, dict):
+                raw_path = item.get("path")
+                if not isinstance(raw_path, str):
+                    if raw_path is None:
+                        raise ValueError(f"{category} item objects must include a non-empty path")
+                    raise ValueError(f"{category} item path must be a string")
+                if not raw_path.strip():
+                    raise ValueError(f"{category} item objects must include a non-empty path")
+        normalized[category] = value
+    return normalized
+
+
+def load_confirmed_workspace_documents_payload(
+    *,
+    skills_plan_json: Optional[str],
+) -> dict:
+    payload = load_payload(skills_plan_json=skills_plan_json)
+    raw_groups = payload.get("selection_groups", {}) if isinstance(payload, dict) else {}
+    if raw_groups is None:
+        raw_groups = {}
+    if not isinstance(raw_groups, dict):
+        raise ValueError("selection_groups must be an object")
+    for key in ("workspace_documents",):
+        value = raw_groups.get(key, [])
+        if not isinstance(value, list):
+            raise ValueError(f"selection_groups.{key} must be an array")
+        for item in value:
+            if not isinstance(item, dict):
+                raise ValueError(f"selection_groups.{key} items must be objects")
+            raw_path = item.get("path")
+            if not isinstance(raw_path, str):
+                if raw_path is None:
+                    raise ValueError(
+                        f"selection_groups.{key} item objects must include a non-empty path"
+                    )
+                raise ValueError(f"selection_groups.{key} item path must be a string")
+            if not raw_path.strip():
+                raise ValueError(
+                    f"selection_groups.{key} item objects must include a non-empty path"
+                )
+    groups = normalize_documented_selection_groups(raw_groups)
+
+    workspace_documents = [
+        item
+        for item in groups.get("workspace_documents", [])
+        if is_selected_selection_group_item(item)
+    ]
+    excluded_sources = [
+        item
+        for key in ("workspace_documents",)
+        for item in groups.get(key, [])
+        if not is_selected_selection_group_item(item)
+    ]
+    return normalize_payload_categories(
+        {
+            "workspace_documents": workspace_documents,
+            "excluded_sources": excluded_sources,
+        }
+    )
+
+
+@dataclass(frozen=True)
+class ConfirmedWorkspaceDocumentEntry:
+    logical_path: str
+    source_path: Path
+    packaged_path: str
+    source_kind: str
+
+
+def stage_sources_for_entry(
+    entry: Any,
+) -> tuple[Optional[StageTreeSource], Optional[StageFileSource]]:
+    if entry.source_kind == "directory":
+        return (
+            StageTreeSource(
+                source_root=entry.source_path,
+                relative_target_root=Path(entry.packaged_path),
+                display_prefix=entry.logical_path,
+                source_key=entry.packaged_path,
+                source_value=entry.logical_path,
+            ),
+            None,
+        )
+    return (
+        None,
+        StageFileSource(
+            source_file=entry.source_path,
+            relative_target_path=Path(entry.packaged_path),
+            source_key=entry.packaged_path,
+            source_value=entry.logical_path,
+        ),
+    )
+
+
+def manifest_item(
+    entry: Any,
+    *,
+    preserve_logical_path: bool,
+    packaged: bool,
+) -> dict:
+    source_path = (
+        entry.logical_path
+        if preserve_logical_path or is_absolute_like_path(entry.logical_path)
+        else str(entry.source_path)
+    )
+    return {
+        "source_path": source_path,
+        "resolved_source_path": str(entry.source_path),
+        "logical_path": entry.logical_path,
+        "packaged_path": entry.packaged_path if packaged else "",
+        "source_kind": entry.source_kind,
+    }
+
+
+def _target_for_workspace(target_name: Optional[str]) -> Optional[object]:
+    from packaging.runtime import DEFAULT_TARGET, get_target, resolve_target_request
+
+    resolved_target = resolve_target_request(target_name or DEFAULT_TARGET).resolved_name
+    try:
+        return get_target(resolved_target)
+    except ValueError:
+        return None
+
+
+def _entry_source_kind(source_path: Path, logical_path: str) -> str:
+    if source_path.is_dir():
+        return "directory"
+    if source_path.is_file():
+        return "file"
+    raise ValueError(f"confirmed workspace document is neither a file nor a directory: {logical_path}")
+
+
+def normalize_confirmed_workspace_document_entries(
+    normalized_payload: dict[str, list],
+    *,
+    target_name: Optional[str],
+    workspace: Optional[str],
+    agent_type: str,
+) -> dict[str, list[ConfirmedWorkspaceDocumentEntry]]:
+    workspace_root = resolve_workspace_root(
+        workspace=workspace,
+        target=_target_for_workspace(target_name),
+    )
+    excluded_paths = {
+        normalize_text(item.get("path") if isinstance(item, dict) else item)
+        for item in normalized_payload["excluded_sources"]
+        if normalize_text(item.get("path") if isinstance(item, dict) else item)
+    }
+    used_packaged_paths: set[str] = set()
+    entries: dict[str, list[ConfirmedWorkspaceDocumentEntry]] = {
+        category: [] for category in CATEGORY_NAMES
+    }
+
+    for category in SELECTED_CATEGORIES:
+        for raw_item in normalized_payload[category]:
+            logical_path = normalize_text(raw_item.get("path") if isinstance(raw_item, dict) else raw_item)
+            if not logical_path or logical_path in excluded_paths:
+                continue
+            source_path = resolve_logical_source_path(
+                logical_path,
+                workspace_root=workspace_root,
+                target_name=target_name,
+            )
+            source_kind = _entry_source_kind(source_path, logical_path)
+            if source_kind == "file" and is_instruction_doc(logical_path):
+                text, _encoding = read_text(source_path)
+                if text is not None and not text.strip():
+                    continue
+            packaged_path = packaged_path_for_entry(
+                logical_path,
+                source_path,
+                target_name=target_name,
+                agent_type=agent_type,
+                used_paths=used_packaged_paths,
+            )
+            entries[category].append(
+                ConfirmedWorkspaceDocumentEntry(
+                    logical_path=logical_path,
+                    source_path=source_path,
+                    packaged_path=packaged_path,
+                    source_kind=source_kind,
+                )
+            )
+
+    for raw_item in normalized_payload["excluded_sources"]:
+        logical_path = normalize_text(raw_item.get("path") if isinstance(raw_item, dict) else raw_item)
+        if not logical_path:
+            continue
+        try:
+            source_path = resolve_logical_source_path(
+                logical_path,
+                workspace_root=workspace_root,
+                target_name=target_name,
+            )
+            source_kind = "directory" if source_path.is_dir() else "file" if source_path.is_file() else "unknown"
+        except ValueError:
+
+            source_path = Path(logical_path)
+            source_kind = "unknown"
+        entries["excluded_sources"].append(
+            ConfirmedWorkspaceDocumentEntry(
+                logical_path=logical_path,
+                source_path=source_path,
+                packaged_path="",
+                source_kind=source_kind,
+            )
+        )
+
+    return entries
+
+
+def build_confirmed_workspace_document_stage_additions(
+    *,
+    skills_plan_json: Optional[str],
+    target_name: Optional[str],
+    workspace: Optional[str],
+    agent_type: str,
+) -> tuple[list[StageTreeSource], list[StageFileSource], Optional[dict]]:
+    if agent_type == "download":
+        return [], [], None
+
+    payload = load_confirmed_workspace_documents_payload(
+        skills_plan_json=skills_plan_json,
+    )
+
+    entries = normalize_confirmed_workspace_document_entries(
+        payload,
+        target_name=target_name,
+        workspace=workspace,
+        agent_type=agent_type,
+    )
+    if not any(entries[category] for category in ("workspace_documents", "excluded_sources")):
+        return [], [], None
+
+    tree_sources: list[StageTreeSource] = []
+    file_sources: list[StageFileSource] = []
+    for entry in entries["workspace_documents"]:
+        tree_source, file_source = stage_sources_for_entry(entry)
+        if tree_source is not None:
+            tree_sources.append(tree_source)
+        if file_source is not None:
+            file_sources.append(file_source)
+
+    manifest_payload = {
+        "agent_type": agent_type,
+        "workspace_documents": [
+            manifest_item(
+                item,
+                preserve_logical_path=True,
+                packaged=agent_type != "download",
+            )
+            for item in entries["workspace_documents"]
+        ],
+        "excluded_sources": [
+            manifest_item(item, preserve_logical_path=True, packaged=False)
+            for item in entries["excluded_sources"]
+        ],
+    }
+    return tree_sources, file_sources, manifest_payload
+
+
+def write_confirmed_workspace_documents_manifest(staging_root: Path, payload: Optional[dict]) -> Optional[Path]:
+    if not payload:
+        return None
+    output_path = staging_root / WORKSPACE_DOCUMENTS_MANIFEST_NAME
+    output_path.write_text(
+        json.dumps(_public_manifest_payload(payload), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def _public_manifest_payload(payload: dict) -> dict:
+    public_payload = dict(payload)
+    for key in ("workspace_documents", "excluded_sources"):
+        items = payload.get(key)
+        if not isinstance(items, list):
+            continue
+        public_items: list[dict] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            public_item = dict(item)
+            logical_path = str(public_item.get("logical_path", "") or "").strip()
+            if logical_path and not is_absolute_like_path(logical_path):
+                public_item["source_path"] = logical_path
+            else:
+                public_item.pop("source_path", None)
+            public_item.pop("resolved_source_path", None)
+            public_item.pop("source_root", None)
+            public_items.append(public_item)
+        public_payload[key] = public_items
+    return public_payload
+
+
+__all__ = [
+    "CATEGORY_NAMES",
+    "ConfirmedWorkspaceDocumentEntry",
+    "SELECTED_CATEGORIES",
+    "build_confirmed_workspace_document_stage_additions",
+    "load_confirmed_workspace_documents_payload",
+    "load_payload",
+    "manifest_item",
+    "normalize_confirmed_workspace_document_entries",
+    "normalize_payload_categories",
+    "stage_sources_for_entry",
+    "write_confirmed_workspace_documents_manifest",
+]

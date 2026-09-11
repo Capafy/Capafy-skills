@@ -1,8 +1,0 @@
-CODEX_AUTH_PROVIDER_NAME = "publisher_openai_official"
-CODEX_AUTH_ENV_KEY = "OPENAI_API_KEY"
-
-
-__all__ = [
-    "CODEX_AUTH_ENV_KEY",
-    "CODEX_AUTH_PROVIDER_NAME",
-]

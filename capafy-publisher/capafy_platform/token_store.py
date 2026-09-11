@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-from packaging._shared.common.constants import SKILL_CONFIG_PATH
-from packaging._shared.common.fs import safe_chmod
+from packaging.common.constants import SKILL_CONFIG_PATH
+from packaging.common.fs import safe_chmod
 
 
 def token_store_path() -> Path:

@@ -1,0 +1,68 @@
+{
+  "discovery_skill_precedence": [
+    ".hermes/skills"
+  ],
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".hermes/skills",
+      "display_prefix": ".hermes/skills",
+      "target_path": ".hermes/skills",
+      "source_key": ".hermes/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    }
+  ],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".hermes/SOUL.md",
+      "display_path": ".hermes/SOUL.md"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/memories/MEMORY.md",
+      "display_path": ".hermes/memories/MEMORY.md"
+    },
+    {
+      "base": "home",
+      "path": ".hermes/memories/USER.md",
+      "display_path": ".hermes/memories/USER.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".hermes.md",
+      "display_path": "workspace/.hermes.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "HERMES.md",
+      "display_path": "workspace/HERMES.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.md",
+      "display_path": "workspace/AGENTS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "agents.md",
+      "display_path": "workspace/agents.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "CLAUDE.md",
+      "display_path": "workspace/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "claude.md",
+      "display_path": "workspace/claude.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".cursorrules",
+      "display_path": "workspace/.cursorrules"
+    }
+  ]
+}

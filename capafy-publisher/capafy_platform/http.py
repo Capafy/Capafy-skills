@@ -10,11 +10,14 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
-from capafy_platform.defaults import DEFAULT_HTTP_TIMEOUT_SECONDS, DEFAULT_PLATFORM_BASE_URL
+from capafy_platform.defaults import (
+    DEFAULT_HTTP_TIMEOUT_SECONDS,
+    DEFAULT_PLATFORM_BASE_URL,
+    PLATFORM_BASE_URL_ENV,
+)
 from capafy_platform import runtime_context
 from capafy_platform.token_store import load_persisted_access_token
 
-PLATFORM_BASE_URL_ENV = "CAPAFY_PLATFORM_BASE_URL"
 PLATFORM_ACCESS_TOKEN_ENV = "CAPAFY_ACCESS_TOKEN"
 EXPLICIT_AUTH_HEADER_KEYS = {"authorization", "x-access-token"}
 SKILL_VERSION_STATUS_HEADER = "X-Skill-Version-Status"
@@ -26,10 +29,6 @@ REQUEST_ID_HEADER_NAMES = (
     "x-correlation-id",
     "request-id",
 )
-
-
-def platform_context_headers() -> dict[str, str]:
-    return runtime_context.platform_context_headers()
 
 
 def _maybe_inject_platform_context_headers(
@@ -124,7 +123,7 @@ def _maybe_log_skill_version_status(headers: Any) -> None:
     _LAST_SKILL_VERSION_STATUS = raw or None
     if raw == "outdated":
         print(
-            "[http] publisher skill update available; run self_update.py to upgrade "
+            "[http] publisher skill update available; run self_update_v2.py to upgrade "
             "(X-Skill-Version-Status: outdated)",
             file=sys.stderr,
         )

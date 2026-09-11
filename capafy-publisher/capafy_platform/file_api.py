@@ -13,8 +13,8 @@ from capafy_platform.defaults import (
     DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 )
 from capafy_platform.http import post_platform_json
-from packaging._shared.common.fs import normalize_path
-from packaging._shared.common.url_values import has_http_url_scheme
+from packaging.common.fs import normalize_path
+from packaging.common.url_values import has_http_url_scheme
 
 
 def build_file_upload_presign_request(
@@ -220,15 +220,9 @@ def upload_package_bundle(
         method=str(presign_payload.get("upload_method", "PUT") or "PUT").strip().upper(),
     )
     return {
-        "api_action": "upload_package_bundle",
-        "bundle_file": str(normalized_bundle_file),
-        "file_name": normalized_bundle_file.name,
-        "file_size_bytes": normalized_bundle_file.stat().st_size,
-        "content_type": content_type,
-        "biz_type": biz_type,
-        **presign_payload,
-        **upload_payload,
         "uploaded": True,
+        "package_url": str(presign_payload.get("package_url", "")).strip(),
+        "upload_status": upload_payload.get("upload_status"),
     }
 
 

@@ -5,18 +5,13 @@ from typing import Any, Callable, Optional
 
 from capafy_platform.api import get_account_me_raw
 from capafy_platform.auth import login_init, login_verify
-from packaging._shared.common.cli import emit_json, fail
+from packaging.common.cli import build_soft_action, build_success, emit_json, fail
 from capafy_platform.token_store import (
     persist_access_token,
 )
 
 
 def _persist_agent_access_token(payload: dict) -> dict:
-    if not isinstance(payload, dict):
-        return {
-            "token_persisted": False,
-            "token_store_path": "",
-        }
     access_token = str(payload.get("access_token", "")).strip()
     if not access_token:
         return {
@@ -49,7 +44,19 @@ def command_platform_login_init(
     *,
     base_url: Optional[str] = None,
 ) -> dict[str, object]:
-    return login_init(email, base_url=base_url)
+    payload = login_init(email, base_url=base_url)
+    return build_soft_action(
+        status="verification_code_sent",
+        action_type="enter_verification_code",
+        next_step="run_login_verify",
+        challenge_id=payload.get("challenge_id", ""),
+        expires_in_sec=payload.get("expires_in_sec"),
+        **(
+            {"skill_version_status": payload["skill_version_status"]}
+            if payload.get("skill_version_status")
+            else {}
+        ),
+    )
 
 
 @_platform_command
@@ -60,8 +67,19 @@ def command_platform_login_verify(
     base_url: Optional[str] = None,
 ) -> dict[str, object]:
     payload = login_verify(challenge_id, code, base_url=base_url)
-    payload.update(_persist_agent_access_token(payload))
-    return payload
+    persisted = _persist_agent_access_token(payload)
+    return build_success(
+        status="authenticated",
+        user_id=str(payload.get("user_id", "")).strip(),
+        email=str(payload.get("email", "")).strip(),
+        name=str(payload.get("name", "")).strip(),
+        token_persisted=bool(persisted.get("token_persisted")),
+        **(
+            {"skill_version_status": payload["skill_version_status"]}
+            if payload.get("skill_version_status")
+            else {}
+        ),
+    )
 
 
 @_platform_command
@@ -80,10 +98,10 @@ def command_platform_login_token(
         email=str(account_payload.get("email", "")).strip(),
         name=str(account_payload.get("name", "")).strip(),
     )
-    return {
-        "status": "token_persisted",
-        **persisted,
-    }
+    return build_success(
+        status="token_persisted",
+        token_persisted=bool(persisted.get("token_persisted")),
+    )
 
 
 __all__ = [

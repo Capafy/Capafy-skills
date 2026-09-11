@@ -1,375 +1,254 @@
 # Publish Workflow Guide
 
-This document only describes public entry points, web confirmation points, safe re-entry, and sensitive scan rules. The publish flow is driven by the JSON payload returned by each command; internal target / mode / scan / stage / package / validate logic is not written up as host-side operational steps.
+This document defines command order, path and selection inputs, safe re-entry, and deep-scan handoff. Follow each command's JSON payload; `developer_next_steps` takes precedence when present.
 
-## Publish Flow
+## Login
 
-### Login
-
-Before email OTP login, the host must first complete the compliance consent gate: take the current platform `base_url`, strip a trailing `/api` to derive `web_base`, present `web_base/terms-of-service` and `web_base/privacy-policy` to the creator, and require explicit consent to the Terms of Service and Privacy Policy. Vague replies (such as "ok", "go", "continue", "next") do not count as explicit consent; `login-init` must not be run before explicit consent.
+Before email OTP login, derive the web base from the platform base URL, show the Terms of Service and Privacy Policy links, and obtain explicit consent to both. Then run:
 
 ```bash
 python3 packager.py login-init --email <email>
 python3 packager.py login-verify --challenge-id <id> --code <otp>
 ```
 
-If the creator directly provides a token, or asks to switch platform account / user:
+For a supplied token or account switch:
 
 ```bash
 python3 packager.py login-token --access-token '<token>'
 ```
 
-Behavioral contract of `login-token`:
+`login-token` validates through `GET /agent/account` before changing local fallback login state. Never echo the token or raw login response. Authentication priority is `CAPAFY_ACCESS_TOKEN`, then this skill's `config.json`; an existing environment token therefore continues to take precedence.
 
-- First call `GET /agent/account` with the supplied token; this is the platform token validation and user info readback endpoint.
-- If `/agent/account` returns 401, network failure, non-JSON, a business error code, or a non-object response, the command fails and stops.
-- On validation failure, do not create, write, or overwrite the local `config.json`.
-- Only after validation passes is the token and available account info written to the local `config.json` (the file under the capafy-publisher root) and adopted as the new local fallback account. The user skill's account file is not touched here; the user skill has its own switching logic.
-- The command's JSON output must not contain the raw token, and error output must not echo the token either.
+If a publishing request includes a token in natural-language form (`token:`, `token：`, `access_token:`, `access_token：`, `access token:`, or `access token：`), including a token next to a Publisher installation request, treat that value as the supplied developer-Skill token. After installation completes, run `login-token` with the captured value before `publish-init`. A successful validation replaces the developer Skill (`capafy-publisher`) root `config.json`; a failed validation leaves the existing file unchanged. Do not read or modify `capafy-user/config.json`, and do not echo or log the token.
 
-`publish-*` commands do not accept the token as a parameter; the read order is `CAPAFY_ACCESS_TOKEN` → local `config.json` (the file under the capafy-publisher root). So if a token already exists in the environment variable, it still takes precedence; `login-token` is responsible for refreshing the local fallback login state / local account. To switch to the new account written by `login-token`, the current process must not keep the old `CAPAFY_ACCESS_TOKEN`. `publish-init` first verifies platform login state; if not logged in or the token has expired, it returns `platform_login_required` / `platform_login_invalid` and does not continue candidate discovery.
+`publish-init` verifies platform login before candidate discovery or submission. An absent or expired token returns `platform_login_required` or `platform_login_invalid` and stops the publish step.
 
-The compliance consent gate only applies to interactive email OTP login. `CAPAFY_ACCESS_TOKEN`, the local `config.json`, or `login-token` use the authentication path after the token has already been issued, and do not repeat the consent prompt.
+## Publish flow
 
 ### Main chain
 
+```text
+publish-init without selections
+→ host and creator confirm real candidates
+publish-init with --selections-file
+→ web confirmation of selected skills/files
+publish-submit(action=prepare)
+→ optional deep scan, Download dispositions, or Run Online environment-name selection
+→ no upload and no platform credential write
+→ if source files change, rerun `publish-submit(action=prepare)` to rebuild
+publish-submit(action=continue_upload)
+→ validate, package, upload, and call `/uploadPackageCredentials` once
+→ final web review/configuration confirmation and submit for review
+publish-remote-status
+```
+
+Expected pauses such as candidate selection and `needs_deep_scan` return exit code `0` with `ok: true` and `requires_action: true`. True failures return exit code `1` with `ok: false`. Always branch on the JSON envelope.
+
+### Non-negotiable execution rules
+
+1. MUST decide whether this is a new Agent or a version update before submitting selections.
+2. MUST run Phase A without selections first. Only Phase A candidates may appear in the selections file.
+3. For a version update, MUST read `workflowInfo.selection_groups`, confirm the current skill with the creator, and retain the original `agent_id`.
+4. MUST reuse the same `--env`, `--runtime-dir`, and `--skill-dir` values for discovery and submission.
+5. Only `publish-init`, `publish-submit(action=continue_upload)`, refresh, and certification flows may return `review_url`. Paste it verbatim and STOP until the creator completes the page.
+6. Treat `requires_action: true` as a pause, not an error. Use `publish-remote-status` for platform state.
+7. NEVER show tokens, secrets, `generic.value`, raw responses, signed URLs, or presign headers in chat or ordinary CLI output.
+
+### Primary commands
+
 ```bash
-python3 self_update.py --check
 python3 packager.py publish-init --env <env_id> --runtime-dir <absolute_path>
-python3 packager.py publish-init --env <env_id> --runtime-dir <absolute_path> --brief --title "<agent name>" --description "<agent description>"
-python3 packager.py publish-init --env <env_id> --runtime-dir <absolute_path> --skill-dir <single_skill_dir>
-python3 packager.py publish-init --env <env_id> --runtime-dir <absolute_path> --agent-id <agent_id> --selections-file .temp/confirmed-selections.json
 python3 packager.py publish-init --env <env_id> --runtime-dir <absolute_path> --selections-file .temp/confirmed-selections.json
-python3 packager.py publish-configure --agent-id <agent_id>
-python3 packager.py publish-configure --agent-id <agent_id> --dispositions-file <dispositions.json>
-python3 packager.py publish-configure --agent-id <agent_id> --deep-scan
-python3 packager.py publish-configure --agent-id <agent_id> --deep-scan-findings-file <findings.json>
-python3 packager.py publish-ship --agent-id <agent_id>
-python3 packager.py publish-status
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare
+python3 packager.py publish-submit --agent-id <agent_id> --action continue_upload
 python3 packager.py publish-remote-status --agent-id <agent_id>
-python3 packager.py publish-refresh-url --agent-id <agent_id>
+```
+
+Optional `publish-submit --action prepare` branches:
+
+```bash
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare --deep-scan
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare --deep-scan-findings-file <findings.json>
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare --dispositions-file <dispositions.json>
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare --environment-selection-file <selection.json>
+```
+
+Auxiliary commands:
+
+```bash
+python3 packager.py publish-status
 python3 packager.py publish-list
+python3 packager.py publish-refresh-url --agent-id <agent_id> [--step init|publish]
 ```
 
-The three web confirmation pages are: after `publish-init` **confirm the file content to be uploaded**, after `publish-configure` **confirm provider keys / secrets to be hosted and manually add any required environment variables**, after `publish-ship` **final confirmation and submit for review**.
+### Runtime and path rules
 
-Exit codes distinguish true command failures from expected workflow pauses. Soft-action payloads such as Phase A candidate selection and `needs_deep_scan` exit `0` and include `ok: true`, `requires_action: true`, and `action_type`; true errors exit `1` with `ok: false`, `status: error`. Always inspect the JSON `status` / `requires_action` fields instead of treating every pause as an error.
+| `--env` | `--runtime-dir` |
+|---|---|
+| `claude_code` | Project root opened when Claude Code was launched |
+| `codex` | Project root of the current Codex session |
+| `hermes` | Project/workspace root of the current Hermes session |
+| `openclaw` | Current OpenClaw workspace, such as `~/.openclaw/workspace`; not the user home, `~/.openclaw`, or a skill directory |
 
-Parameter boundaries:
+- `--env` and `--runtime-dir` are required on every `publish-init` call. The target runtime need not match the host running the publisher.
+- A `metadata.openclaw` skill requires `--env openclaw`.
+- `--runtime-dir` describes the active project/workspace. Do not derive it from the source skill path.
+- `--skill-dir` is optional and must point to one explicit skill root containing `SKILL.md`, never its parent `skills` directory.
+- Reuse the same `--env`, `--runtime-dir`, and explicit `--skill-dir` between candidate discovery and submission.
+- Windows and WSL paths must be absolute and accessible to the system running the publisher; paths are not converted automatically.
+- If the current OpenClaw workspace is unknown, ask the creator. Do not substitute the skill directory.
 
-- `--env` and `--runtime-dir` are required for `publish-init`; `--env` is the target runtime and is not necessarily the same as the host currently running publisher.
-- If the subject being published is a `metadata.openclaw` skill, `--env` must be `openclaw`; do not change it to a dot-agent env just because the command is being run inside Claude Code / Codex.
-- `--runtime-dir` is the project root / workspace root opened in the host session; it is not the publisher skill root, nor the source directory of the skill being published.
-- When specifying a single local skill source directory, use a separate `--skill-dir <single_skill_dir>`; do not stuff it into `--runtime-dir`.
-- `--skill-dir` must be a single skill root directory containing `SKILL.md`; the parent `skills` directory is not allowed.
-- Do not reverse-derive `--runtime-dir` from the path of the skill being published. The selected skill's logical path goes into `--selections.skills[].path`, the real source directory is preserved via `--skill-dir`, and `--runtime-dir` only describes where this runtime session is working.
-- Claude Code: pass the project root directory opened when `claude` was launched.
-- Codex: pass the project root directory of the current Codex session.
-- OpenClaw: pass the current OpenClaw workspace directory, e.g. `/home/admin_wsl/.openclaw/workspace_xxx`; do not pass a regular project root, user home, `~/.openclaw`, `~/.openclaw/skills`, or `~/.openclaw/skills/<skill>`.
-- If only an OpenClaw skill source directory is known but the current OpenClaw workspace is not, stop and ask the creator; do not treat the skill directory or its parent `skills` directory as the project root. Once the workspace is known, both `--runtime-dir <workspace>` and `--skill-dir <single_skill_dir>` can be passed together.
-- Even if this round selects a global skill, e.g. `/home/admin_wsl/.agents/skills/skill-vetter`, as long as Codex is currently running in `/home/admin_wsl/sunnet/project/agent_store`, you should pass `--runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter`.
-- Windows / WSL paths must be absolute paths accessible by the current system; publisher does not convert them automatically. See the `publish-init` section in SKILL.md for concrete examples.
-- The dot-agent target does not probe the host and does not decide for you whether `runtime_dir` is reasonable; the OpenClaw target validates that it must be a legal workspace.
-- When `publish-init` is run without `--selections`, it returns the top-level `skills` candidate array. If `--skill-dir` is passed, the candidates only return this explicit skill. Candidate entries do not carry a `selection` field — only appearing in the second submission's `--selections` indicates they have been selected. This step must run first so the host has real candidates to work with; constructing `--selections` without running Phase A and without `--skill-dir` is incorrect usage.
-- For large workspaces, `--brief` returns compact candidate entries and can be combined with `--title` / `--description` from the Agent Card. The publisher may sort stronger text matches first and mark one entry as `suggested: true`; this is a suggestion only, not a filter. The publisher also filters its own `capafy-publisher` skill and suppresses nested child skill copies when the parent skill is already a candidate.
-- The host LLM generates `--selections` from the candidates and user context: top-level `title`, `description`, `skills`; when updating an existing Agent, an additional top-level `agent_id` may be included; if the host already has a definite `agent_id`, it can also be passed directly via `publish-init --agent-id <agent_id>` — both forms are semantically equivalent and must stay consistent. `title` / `description` are jointly determined by the creator's intent and the candidate info; do not default to blindly copying the candidate's name.
-- When updating an existing Agent, first read back the `workflowInfo.selection_groups` from the latest version, recite the currently selected skill verbatim to the creator, and then ask a direct two-way choice: keep using the current skill, or switch to a different skill. The former means only updating the content of the same skill — continue using the existing `skills[]`; the latter goes back to Phase A to rescan candidates. Do not just ask "do you want to pick a new skill".
-- Each `skills[].path` in `--selections` must correspond to a Phase A candidate or the explicit `--skill-dir` skill; entries without correspondence must be removed, or you must first go back and ask the creator. Inventing path / name / description / purpose from impression, memory, or historical sessions is prohibited.
-- `skills[]` must not be empty. When Phase A returns `skills: []`, stop and use plain language to confirm with the creator — per the field translation table in SKILL.md — the actual project root / the directory the skill lives in; do not submit empty selections, and do not continue creating a platform draft.
-- Do not filter Phase A candidates by the Agent Card's `Name` / `Description` yourself: at the code level `discover_units` does not filter by agent name, and "there is no candidate that exactly matches the Agent Card name" does not mean "the workspace has no files". When candidates are non-empty but none match exactly, recite the candidates verbatim to the creator and have them pick / change the skill directory / change the Agent Card name; do not report "not found / no files / no skill" — see Core Iron Rule #7 in SKILL.md.
-- When talking to the creator, translate CLI parameters / JSON fields / internal state names into plain language per the field translation table at the start of SKILL.md's "Core Iron Rule"; do not throw fields like `--skill-dir` / `--runtime-dir` / `agentType` / `selection_groups` at the creator.
-- Before running `publish-init`, first confirm with the creator whether this is a brand-new publish vs continuing / version update; `agent_id` must be explicitly identified by the creator or come from `capafy_platform.api.list_agents_raw()` output.
-- Before updating an existing Agent (selections carrying `agent_id`), you must call `get_latest_version_raw(agent_id)` to reconcile the historical skill selection; read the selected content only from `workflowInfo.selection_groups`, not the raw top-level `selectionGroups`.
-- Each selected runtime unit should carry a `purpose` describing the unit's responsibility in the workflow; do not restore the `workflow_intent` / `selection_groups` / step index structure.
-- By default `publish-configure` only runs the rule scan and continues; when the creator must choose how to handle sensitive items in buyout mode, generate a dispositions JSON file from the command payload and pass it via `--dispositions-file <dispositions.json>`; do not pass inline JSON. Only with an explicit `--deep-scan` will it, after the rule scan, return `needs_deep_scan` to the host LLM for a supplementary scan.
-- For every step, look at the JSON payload first; `developer_next_steps` takes precedence over this document.
-- When you encounter `review_url`, the first action is to paste it verbatim to the creator and then pause — see Core Iron Rule #1; after the creator returns from the web with a completion signal, then call `get_latest_version_raw` to reconcile, and confirmed skill selection is read from `workflowInfo.selection_groups` — see Core Iron Rule #2.
+### `publish-init` inputs
 
+| Parameter | Use |
+|---|---|
+| `--brief` | Compact Phase A output in large workspaces; may be combined with `--title` and `--description` for sorting |
+| `--skill-dir` | Restrict discovery to one explicitly chosen local skill root |
+| `--selections-file` | Recommended way to submit a UTF-8 confirmed selections JSON file |
+| `--agent-id` | Existing Agent ID; if selections also contain `agent_id`, both values must match |
+| `--reset-local-state` | Abandon an active local draft only after explicit creator confirmation |
 
-### publish-init parameter quick reference
+Phase A is mandatory. Run `publish-init` without selections and use only returned candidates. Do not guess a path, infer it from history, or treat an Agent Card name mismatch as an empty workspace. If `skills: []`, stop and confirm the actual project root or skill source directory.
 
-| Parameter | Required | When to use | Correct value |
-|---|---|---|---|
-| `--env` | Yes | Every `publish-init` | Target runtime: `claude_code` / `codex` / `openclaw` |
-| `--runtime-dir` | Yes | Every `publish-init` | Project root / workspace root opened in the current host session; must be a path accessible on the current system |
-| `--skill-dir` | No | When the creator explicitly designates a single local skill source directory | Single skill root directory containing `SKILL.md` |
-| `--brief` | No | Phase A in large workspaces | Compact candidate output; still returns all publisher-kept candidates |
-| `--title` / `--description` | No | Phase A when an Agent Card already exists | Text used only for candidate sort order and `suggested: true` |
-| `--selections` | No | Submit confirmed selections; not recommended to use directly with multi-line JSON | JSON object string |
-| `--selections-file` | No | Submit confirmed selections; the recommended approach | Path to a UTF-8 JSON file |
-| `--reset-local-state` | No | When the creator explicitly abandons the current local publish scene | Takes no value; do not use to handle configure / ship errors |
+The selection branch is exact:
 
-`--selections` and `--selections-file` are mutually exclusive. On submission, the same `--env` / `--runtime-dir` / `--skill-dir` from Phase A must be reused.
+1. `publish-init` without selections → receive candidates (`requires_action: true`).
+2. Creator chooses at least one real candidate → write `.temp/confirmed-selections.json`.
+3. `publish-init` with `--selections-file` → receive the first `review_url`.
+4. Paste the URL and stop for web confirmation.
 
-### publish-init request examples
+For an existing Agent:
 
-The examples below use the Codex current project root `/home/admin_wsl/sunnet/project/agent_store` and explicitly publish the global skill `/home/admin_wsl/.agents/skills/skill-vetter`. Other paths must not be copied verbatim; replace them with the actual paths on the local machine.
+1. Obtain the Agent ID from the creator or `publish-list`.
+2. Read the latest version and its `workflowInfo.selection_groups`.
+3. Tell the creator which skill is currently selected and ask whether to keep it or switch.
+4. Treat historical skill paths as platform logical paths, not current local paths.
+5. Run Phase A against the current filesystem before submitting the update.
 
-1. Phase A candidate discovery, no platform draft is created:
-
-```bash
-python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter
-```
-
-Expected response shape:
-
-```json
-{
-  "ok": true,
-  "status": "needs_selection",
-  "requires_action": true,
-  "action_type": "llm_selection",
-  "skills": [
-    {
-      "path": ".agents/skills/skill-vetter",
-      "name": "skill-vetter",
-      "unit_type": "skill"
-    }
-  ]
-}
-```
-
-2. Write `.temp/confirmed-selections.json`. `path` and `name` must come from Phase A candidates; `purpose` must be the workflow responsibility confirmed by the creator:
-
-```json
-{
-  "title": "Skill Security Review",
-  "description": "Automatically review the code security of third-party skills, detecting red-flag patterns and permission boundaries",
-  "skills": [
-    {
-      "path": ".agents/skills/skill-vetter",
-      "name": "skill-vetter",
-      "purpose": "Review skill source code, detecting credential leakage, network exfiltration, permission escalation and other security risks"
-    }
-  ]
-}
-```
-
-3. Submit to create a new Agent:
-
-```bash
-python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter --selections-file .temp/confirmed-selections.json
-```
-
-4. When updating an existing Agent, add `agent_id` to the top level of `.temp/confirmed-selections.json`:
+Confirmed selections use this shape:
 
 ```json
 {
   "agent_id": "agt_xxx",
   "title": "Skill Security Review",
-  "description": "Automatically review the code security of third-party skills, detecting red-flag patterns and permission boundaries",
+  "description": "Review third-party skills for security risks.",
   "skills": [
     {
       "path": ".agents/skills/skill-vetter",
       "name": "skill-vetter",
-      "purpose": "Review skill source code, detecting credential leakage, network exfiltration, permission escalation and other security risks"
+      "purpose": "Review skill source code for credential leakage and unsafe behavior."
     }
   ]
 }
 ```
 
-5. Submit the updated version; the command still reuses the same set of local parameters:
+Omit `agent_id` only for a new Agent. Every `skills[].path` and `name` must come from Phase A; `skills` must be non-empty. Do not wrap inputs in `selection_groups` or add the retired `workflow_intent` structure.
 
-```bash
-python3 packager.py publish-init --env codex --runtime-dir /home/admin_wsl/sunnet/project/agent_store --skill-dir /home/admin_wsl/.agents/skills/skill-vetter --selections-file .temp/confirmed-selections.json
-```
+Use these two unambiguous variants:
 
-Common wrong examples:
+- New Agent: `{ "title": "...", "description": "...", "skills": [...] }` — no `agent_id`.
+- Version update: `{ "agent_id": "agt_existing", "title": "...", "description": "...", "skills": [...] }` — the ID must be the existing Agent being updated.
 
-| Wrong input | Reason |
+### Web confirmation points
+
+| Source | Creator action |
 |---|---|
-| `publish-init --env codex --selections-file .temp/confirmed-selections.json` | Missing required `--runtime-dir` |
-| `--runtime-dir /home/admin_wsl/.agents/skills/skill-vetter` | Treats the skill source directory as the project root |
-| `--skill-dir /home/admin_wsl/.agents/skills` | `--skill-dir` can only be a single skill root directory, not the parent `skills` directory |
-| `{"selection_groups": {"skills": [...]}}` | `publish-init` only accepts top-level `skills` |
-| `{"workflow_intent": "...", "skills": [...]}` | `workflow_intent` has been retired and is not an init input |
-| `{"skills": [{"path": "guessed path"}]}` | `path` must correspond to a Phase A candidate |
-| `{"skills": []}` | No selected skill; must go back to Phase A or ask the creator to confirm |
+| `publish-init` | Confirm the files and skills to upload |
+| `publish-submit(action=prepare)` | Complete local security preparation only; this step never writes package or credential state to the platform |
+| `publish-submit(action=continue_upload)` | Validate, package, upload, call the merged package-and-credentials API, and pause for final review/configuration confirmation |
 
-Web confirmation points:
+When `review_url` is returned, paste it verbatim, explain its purpose, and pause. After the creator finishes, read the latest platform version before reporting state or continuing. Refresh expired links with `publish-refresh-url`; do not rerun a publish step merely to obtain a new URL.
 
-| Source | Meaning |
-|---|---|
-| `publish-init` | Confirm the file content to be uploaded |
-| `publish-configure` | Confirm provider keys / secrets to be hosted and manually add any required environment variables; returned only when needed |
-| `publish-ship` | Final confirmation and submit for review |
-
-### Worked Example
-
-| Step | Action | Expected output |
-|---|---|---|
-| 1 | `python3 self_update.py --check` | `up_to_date` / `update_available` / `check_failed` |
-| 2 | Log in or refresh token | Token written into `config.json`, `publish-init` login-state verification passes |
-| 3 | Confirm with the creator brand-new publish vs continuing / version update; for continuing publish, first ask whether to switch the skill directory, then branch by option | Creator intent (+ `agent_id`, only for continuing publish) |
-| 4 | (Only for continuing publish) Call `capafy_platform.api.get_latest_version_raw(agent_id)` to pull historical selections (from `workflowInfo.selection_groups`; only represents historical selection). The historical `skills[].path` is the **platform logical path** of the previous version, **do not treat it as the current local path** — confirm with the creator the current local package directory via the field translation table in plain language before running step 5 (Core Iron Rule #8) | Historical skill `name` / `description` / `purpose` + the local package directory confirmed by the creator |
-| 5 | `publish-init --env <env_id> --runtime-dir <absolute_path> [--skill-dir <single>]` (Phase A must run first) | Top-level `skills` candidate JSON |
-| 6 | Candidates + creator intent (+ historical selections, only for continuing publish) → assemble confirmed selections (continuing publish carries `agent_id` at the top) | Confirmed selections JSON |
-| 7 | `publish-init --env <env_id> --runtime-dir <absolute_path> [--skill-dir <single>] --selections-file .temp/confirmed-selections.json` | `submitted` + `agent_id` / new `agent_version_id` + `review_url` |
-| 8 | Paste `review_url` verbatim to the creator, wait for the creator to complete the first page (confirm the file content to be uploaded, Core Iron Rule #1) | First page confirmation complete |
-| 8.5 | Call `get_latest_version_raw(agent_id)` to reconcile (Core Iron Rule #2); when skill selection needs to be confirmed look at `workflowInfo.selection_groups`, the raw top-level `selectionGroups` is not the basis for confirmation; if `agentType=run_online`, ask the creator in plain language whether to run the deep scan | Creator explicitly agrees / refuses the deep scan; download mode skips this step |
-| 9 | `publish-configure --agent-id <agent_id>` (add `--deep-scan` when the creator agrees) | `ready_for_ship` / `review_url` / `needs_creator_disposition` / other handleable states; when `review_url` is returned, paste it verbatim per Iron Rule #1 |
-| 10 | `publish-ship --agent-id <agent_id>` | `shipped` + final `review_url` (**only indicates the package has been uploaded**, not submitted for review) |
-| 11 | Paste the final `review_url` to the creator, let them open the **final confirmation and submit-for-review** page; until the creator explicitly tells you the final page has been clicked through, **do not** say "submitted / under review / approved". After the creator comes back, call `get_latest_version_raw` to reconcile per Core Iron Rule #2; only when the platform genuinely shows "under review" may you report it that way | Creator completes submission, platform reconciliation shows under review |
-
-The difference between continuing / version update and first-time publish is only in steps 3 / 4 / 6 / 7: step 3 needs to obtain `agent_id` and first confirm whether to switch the skill directory; step 4 makes one extra call to `get_latest_version_raw` to pull history; if following the historical flow, step 6 selections carry `agent_id` at the top and step 7 returns a new `agent_version_id`. If switching to a new skill and new flow, go back to Phase A to rescan candidates and then go through the new selections. The remaining steps are exactly the same.
-
-`--skill-dir` must pass the same value in both step 5 / step 7; `--runtime-dir` still passes the current host project root / OpenClaw workspace.
-
-Never construct `--selections` directly without having run Phase A and without having reconciled historical platform selections. `agent_id` must come from the creator's explicit identification or `list_agents_raw()` output; do not grab it casually from a local `.temp/` manifest or a previous session. Also, do not bypass `publish-init`'s web confirmation by going through the platform back office.
-
-If the creator explicitly designates a particular local skill source directory, both the Phase A step above and the subsequent submission step with `--selections` carry the same `--skill-dir <single_skill_dir>` (corresponding to steps 4 / 6 for first-time publish, and steps 5 / 7 for continuing publish). `--runtime-dir` still passes the current host project root / OpenClaw workspace and does not change with the skill source directory.
-
-### Re-entry and cleanup
+## Safe re-entry
 
 | Situation | Correct action |
 |---|---|
-| Any step returns `review_url` (include all of them if a single response carries multiple) | **First action**: paste verbatim to the creator and explain what this page is for; only then pause. After the creator finishes, call `get_latest_version_raw` to reconcile (Core Iron Rule #1 + #2). Of these, `publish-init` is confirming the file content to be uploaded, `publish-configure` is confirming provider keys / secrets to be hosted and manually adding any required environment variables (fill them on the webpage, do not have the creator send values in chat), and `publish-ship` is the final confirmation and submit for review. If the configure response includes `environment_variable_hint`, also paste its Chinese message and variable names so the creator knows what may need to be added on the page |
-| The creator has completed the first page (confirm the file content to be uploaded), `agentType` is `run_online`, about to run `publish-configure` for the first time | Per Core Iron Rule #1, send "do you want the deep scan" as a top-level chat message and wait. Agreed: add `--deep-scan`; refused: regular configure. Download mode skips this step |
-| `publish-configure` returns `skills_empty_after_platform_confirmation` | After the first page (confirm the file content to be uploaded) was confirmed there was no selected skill; have the creator go back to the first page and select at least one skill, or rerun init with the correct `runtime_dir` / `skill_dir` |
-| `publish-configure --deep-scan` returns `needs_deep_scan` | This is a soft action, not a command failure. Per `staging_path`, do a supplementary scan for missed sensitive info; after no remaining misses, rerun configure without `--deep-scan` |
-| `publish-ship` returns `persist_shipped_state_failed` | Package report already succeeded remotely. Paste the returned final `review_url`, let the creator finish that page, then run `publish-remote-status --agent-id <agent_id>`. If remote state confirms success, do **not** rerun ship: remote status is read-only and automatic local reconciliation is unavailable. Preserve bundle / staging while remote state is uncertain; clear the prior local state only after remote success and the next publish chain are explicitly confirmed (Core Iron Rule #10) |
-| `publish-configure` / `publish-ship` fails, local working state missing / stale | Default to resume: check local state with `publish-status`, then retry with `publish-configure --agent-id <agent_id>` / `publish-ship --agent-id <agent_id>`. **Do not** go back to `publish-init` to create a new agent (Core Iron Rule #6) |
-| Seeing the `existing_local_publish_state` blocking error | This is a protection: default to resume, do not unconditionally `--reset-local-state` |
-| The creator comes back from the web saying confirm / confirmed / submitted / done / pricing set | First call `get_latest_version_raw(agent_id)` to reconcile `agentType` / status / `agentVersionId`, then answer; do not infer "submitted for review" from the local manifest (Core Iron Rule #2) |
-| The platform's `agentType` does not match the local manifest's `agent_type` | The creator changed the publishing mode on the web: local stage / staging / bundle are all invalidated; go back to `publish-configure --agent-id <agent_id>` to let the code rerun under the new `agentType` (Core Iron Rule #4) |
-| The creator asks about review / publish / approval status | Run `publish-remote-status --agent-id <agent_id>` or call `capafy_platform.api.get_latest_version_raw(agent_id)` to see the platform's return; do not just run `publish-status` and answer |
-| After some time the creator comes back saying "continue publishing / one more time" and similar things that need web confirmation | `review_url` is valid for 1 hour; per Core Iron Rule #1 run `publish-refresh-url --agent-id <agent_id> --step <init|configure|ship>` to obtain a **new** one and paste it; do not recite old, possibly-expired links from the session, and do not rerun `publish-init` / `publish-configure` / `publish-ship` solely to refresh a link |
-| Interpretation of `status` / `auditStatus` returned by the platform | Both are the state of the **latest version**. `status` is the overall version lifecycle (draft → review → listed → offline), `auditStatus` is the sub-state of the segment where `status` is in review. `status: 0` = **draft (not submitted)**, `auditStatus: 0` = **review not started**; seeing these two `0`s you must report "draft / review not started"; **never** misread it as "submitted / under review / approved". The complete enumeration is in `api-docs/00_overview.md` (Core Iron Rule #3) |
-| The creator explicitly switches runtime / skill set and needs to rerun `publish-init` | First ask whether to switch the skill directory; first confirm the current local package directory with the creator per the field translation table (do not directly treat the historical `workflowInfo.selection_groups.skills[].path` as the local path — Core Iron Rule #8). If following the historical flow, selections must carry the original `agent_id`; if switching to a new skill / new flow, go back to Phase A to rescan candidates |
-| The creator explicitly says "void this agent and publish a new one" | Recite to confirm once more in chat, then use `publish-init --reset-local-state` and omit `agent_id`; this is the only situation where `agent_id` is omitted (Core Iron Rule #6) |
-| The creator wants to "modify the rejected version / resubmit for review" | Rerun the whole main chain `publish-init` → `publish-configure` (re-scan + re-package) → `publish-ship` (re-upload). **The selections of `publish-init` must carry the original `agent_id` at the top**, so the code goes through `create_version_from_draft` to create a new version on the same Agent; missing `agent_id` will create a brand-new Agent out of thin air. Phrasing: go through scan / packaging / submit-for-review on the same Agent; **forbidden** to say "rerun the whole pipeline / last flow ended / generated a new draft version" (Core Iron Rule #6) |
+| Skill/file confirmation page completed; security preparation has not run | Ask whether to perform deep scan in either mode. Use `publish-submit --action prepare --deep-scan` only after explicit agreement |
+| `skills_empty_after_platform_confirmation` | Have the creator select at least one skill on the first page, or rerun init with the correct project/workspace and skill source directories |
+| `needs_deep_scan` | Treat as an expected pause; inspect the returned staging boundary and submit findings, or rerun `publish-submit --action prepare` without `--deep-scan` when nothing is found |
+| Download returns `needs_creator_disposition` | Write the creator's choices to a dispositions JSON file and rerun with `--dispositions-file`; never pass inline JSON |
+| Run Online creator explicitly wants local environment values uploaded | Edit only the generated name-selection file and rerun with `--environment-selection-file`; otherwise use the existing web path |
+| `existing_local_publish_state` | Resume the local draft. Do not reset it automatically |
+| `publish-submit` fails | Inspect `publish-status`, preserve the same Agent ID, and retry the failed action; do not create a new Agent |
+| `persist_package_uploaded_state_failed` | The merged remote package submission succeeded. Provide the final review URL, then check `publish-remote-status`; do not rerun upload if remote state confirms success |
+| Creator returns from a web page saying done | Read the latest platform version before claiming confirmation, submission, review, or approval |
+| Platform mode differs from the local manifest | Web mode changed; rerun `publish-submit --action prepare` so staging and package are rebuilt for the new mode |
+| Creator asks for review or listing status | Use `publish-remote-status`, not local `publish-status` |
+| `review_url` expired | Use `publish-refresh-url --step <init|publish>` |
+| `status: 0`, `auditStatus: 0` | Report “draft / review not started”; never report submitted, under review, or approved |
+| Runtime or skill set changes | Reconfirm the current local paths and rerun Phase A; retain the original Agent ID when updating the same Agent |
+| Rejected version is being revised | Rerun init → `publish-submit(prepare)` → `publish-submit(continue_upload)` with the original Agent ID so a new version is created under the same Agent |
+| Creator explicitly abandons the Agent and starts over | Confirm once more, then use `--reset-local-state` and omit the old Agent ID |
 
-`publish-status` only looks at the local `.temp` working state; it returns `status_scope: local_only`, `does_not_include_remote_review_status: true`, and `remote_status_command`. It **does not** reflect platform review / publish status. Use `publish-remote-status --agent-id <agent_id>` for platform latest-version state, `publish-list` to list the creator's Agents, and `publish-refresh-url --agent-id <agent_id> [--step init|configure|ship]` to refresh an expired web confirmation link without rerunning a publish step. `--reset-local-state` only cleans local staging; it **does not** notify the platform to void the agent. See Core Iron Rule #3 / #6. During `publish-init` cleanup, `.temp/confirmed-selections.json` is preserved and copied to `.temp/last-good-selections.json` so a failed later step can be resumed without reconstructing selections from memory.
+`publish-status` is local-only. `--reset-local-state` changes local files only and does not cancel platform state. Preserve staging and bundle data while remote package submission state is uncertain.
 
-## Sensitive Deep Scan
+## Sensitive deep scan
 
-By default `publish-configure` automatically rebuilds staging, scans for sensitive items, and continues the subsequent configuration flow. When `--deep-scan` is explicitly passed, after the rule scan finishes it stops with a soft-action payload, returns `needs_deep_scan`, `staging_path`, `reviewed_scan_path`, `scan_files`, `scan_files_summary`, and `credential_hints`, and does not submit the platform configuration.
+Both Run Online and Download support the same deep-scan pause. `publish-submit --action prepare --deep-scan` returns `staging_path`, the complete `scan_files` list, `scan_files_summary`, and safe `credential_hints`; it does not upload or call the final package-submit API.
 
-`reviewed-scan.json` is still generated by code. The host LLM does not hand-write this file, nor does it need to supply `_review`, digest, or bucket fields.
+Deep-scan decision order:
 
-The host LLM only intervenes when supplementary scanning is required for sensitive info missed by the rule scan. The plaintext `generic` items hit by the rule scan have already been rewritten to platform-hosted placeholders before deep scan, and the selected runtime has already generated `url_proxy`. Deep scan is not a second review of `url_proxy` / `generic` already found by the regular pipeline, nor is it patching `reviewed-scan.json`. The publisher does not inspect host environment-variable values, and deep scan must not inspect or return them either.
+1. After the skill/file web confirmation, ask the creator whether to spend the extra scan time and tokens.
+2. If refused, run ordinary `publish-submit --action prepare`.
+3. If accepted, run `publish-submit --action prepare --deep-scan` and inspect every listed staged file.
+4. If nothing is missed, rerun `publish-submit --action prepare` without `--deep-scan`.
+5. If a miss is found, submit the findings file; do not hand-edit reviewed-scan output.
+6. If deep scan was selected, complete this sequence before adding a Run Online environment-selection file. Never combine `--deep-scan` with `--environment-selection-file`.
 
-Deep scan only looks at risks of generic secrets / sensitive values that rules/regex find hard to cover:
+The host reads every listed staged file, but findings may come only from entries with `reviewable: true`. Look only for real sensitive literals missed by the rule scan, including unusual field names, nested or concatenated tokens, mixed-language configuration, and sensitive values embedded in prose or comments.
 
-- Real credentials, private tokens, or sensitive configuration values described in natural-language explanations, prompts, READMEs, or comments.
-- Non-standard field names, mixed-language fields, nested configurations, concatenated tokens.
-- New providers, new auth formats, or platform-private configurations not covered by the rule scan.
-- Configuration material outside the scan context but that will enter the runtime package.
+Do not:
 
-Rules:
+- inspect host environment-variable values;
+- report examples, placeholders, test stubs, or runtime-irrelevant text;
+- recreate findings already covered by the rule scan;
+- discover or construct `url_proxy` entries;
+- edit `.temp/reviewed-scan.json` or supply internal review/digest fields.
 
-- Use `scan_files` as the review boundary exception list. Files not listed there are reviewable by default. Publisher-generated files listed with `reviewable: false` are context only; do not report findings from them. Logical scan-only inputs are read directly from their original paths for the rule scan and are never copied into staging or exposed to the host LLM. Use `scan_files_summary` for total / reviewable / unreviewable counts.
-- Files marked `auto_generated: true` are publisher artifacts such as stage manifests and bundle context; skip them during LLM review.
-- Use `credential_hints.url_proxy[]` only to identify which provider key/url pair the selected target runtime already found. These hints carry field names and safe URL hints, not API key values; do not turn them into new findings.
-- Deep scan only reports "risks the rule scan did not catch"; do not re-classify already-hit buckets.
-- Do not actively discover new `url_proxy`; have the host LLM output a JSON object whose top level only has the `generic` array: `{"generic": []}`. Environment-variable findings are not accepted.
-- Example values, placeholders, test stubs, documentation snippets, and runtime-irrelevant text are not treated as missed risks.
-- When a miss is found, give the specific file, field or snippet, reason, and recommendation; have the host LLM output a minimal findings JSON object whose `generic` items include `value` + `source`. `generic.source` must be the specific file relative path in the final zip file list within staging — directories are not allowed, but `#json:/...`, `#toml:...`, or `line N` location details are allowed. Then rerun `publish-configure --deep-scan-findings-file <path>` and hand it to the program for validation, field completion, placeholder rewriting, and regenerating reviewed-scan.
-- The program first filters deep-scan `generic` findings to the staging sources within the final package boundary; only items retained after filtering are written to `reviewed-scan.json`, and the original value is replaced with a platform-hosted placeholder in the staging file. Replacement only happens in staging, and is not written back to the creator's original source.
-- If a `generic` finding is missing `source`, its `source` points to a directory, a logical `_scan_only/` reference, an internal manifest, a missing file, an escaped path, an existing `.zip` / `.tar.gz` archive artifact, or any other material that will not enter the final package, the program only filters that item and the flow continues. Do not hand-write reviewed-scan to retain such items; if you really need to publish that configuration, first have the corresponding file enter the staging/package boundary.
-- After confirming no remaining misses, rerun `publish-configure` without `--deep-scan` to continue platform configuration or the buyout gate.
-- Do not directly edit `.temp/reviewed-scan.json`.
-- Credential files matched by the high-risk path rules never enter staging. Values inside allowed runtime files that match provider key rules go into `generic`.
-- Misses found by deep scan cannot be resolved by manually patching buckets. The host LLM must not read or collect variables from the host environment. File sources go into `generic`; `url_proxy` can only be generated by the selected target runtime from that target's routing/provider configuration. If `--deep-scan-findings-file` validation fails, fix the finding's `value` / `source` and rerun, instead of changing scan rules at this step.
+### Findings file contract
 
-### Generated Payload
-
-`reviewed-scan.json` is an internally generated artifact; the top level only keeps `url_proxy`, `generic`, and `_review`. The platform `requiredCredentials` payload contains only `url_proxy` and `generic`.
-
-| Field | Description |
-|---|---|
-| `_review.reviewer` | Generator identifier, currently `rules_scan` |
-| `_review.status` | Fixed `reviewed` |
-| `_review.raw_scan_digest` | Raw scan digest |
-| `_review.staging_digest` | Staging digest |
-| `_review.env_id` | Current env |
-| `_review.distribution_mode` | `cloud_hosted` / `buyout` |
-
-Digest / context must align with the current input; on mismatch, `publish-configure` regenerates them and does not reuse the old reviewed payload.
-
-### `url_proxy[]`
-
-For a pair of LLM provider endpoint + API key:
-
-| Field | Description |
-|---|---|
-| `api_key.value` | Always empty in persisted review data and platform configuration requests |
-| `api_key.placeholder` | Platform-hosted placeholder |
-| `api_key.field` | Original field name or path |
-| `api_key.source` | Source file |
-| `url.value` | Original endpoint value |
-| `url.placeholder` | Platform-hosted placeholder |
-| `url.field` | Original field name or path |
-| `url.source` | Source file |
-| `use` | Purpose description |
-
-Under `cloud_hosted`, only the selected target runtime may group a provider endpoint + API key declaration into `url_proxy`. All runtimes emit persisted review data and platform requests with an empty API-key value. Hermes and OpenClaw still scan, retain, and rewrite their managed runtime configuration files so the packaged files contain platform-managed placeholders. Provider-like secrets found elsewhere remain `generic`, and deep scan never creates or repairs `url_proxy` pairs.
-
-### `generic[]`
-
-For standalone credentials or configuration values:
-
-| Field | Description |
-|---|---|
-| `value` | Original value |
-| `placeholder` | Platform-hosted placeholder |
-| `field` | Original field name or path |
-| `source` | Specific file relative path within staging in the final zip file list |
-| `source_detail` | Location within the source file, e.g. `json:/token` or `line 3` |
-| `occurrence_index` | Occurrence sequence number for the same source field |
-| `use` | Purpose description |
-
-`generic.source` is part of the deliverable boundary: the program uses the same final zip file list from the package stage to validate the source, and only accepts specific files in the list, not directories. Empty source, `process.env`, logical scan-only references, `agent.stage_manifest.internal.json`, download package's `agent.bundle_context.json`, non-existent files, escaped paths, and existing archive artifacts will not enter `generic[]`. These cases only filter the corresponding single item and do not block configure. `source` still writes the staging relative path; for example, even if the final zip path for `workspace/config.json` in staging is `config.json`, `generic.source` still writes `workspace/config.json`.
-
-For `run_online`, the publisher scans only the files under the selected Skill paths for environment-variable references and records names only. After excluding system noise, the configure response includes `environment_variable_hint`. When a Skill name also appears in `url_proxy`, it remains in the hint and is listed in `conflicts`, for example:
+The findings file must be a JSON object with only a top-level `generic` array:
 
 ```json
 {
-  "environment_variable_hint": {
-    "names": ["DEMO_TOKEN", "OPENAI_API_KEY"],
-    "conflicts": ["OPENAI_API_KEY"],
-    "message": "The Skill may use these environment variables: DEMO_TOKEN, OPENAI_API_KEY. Add them on the webpage as needed. Warning: OPENAI_API_KEY is also used by the cloud LLM provider configuration; entering a different value may conflict with the url_proxy configuration."
-  }
+  "generic": [
+    {
+      "value": "missed-sensitive-value",
+      "source": "relative/path/in/staging.yaml"
+    }
+  ]
 }
 ```
 
-This is a reminder, not an uploaded credential. Show the message, names, and any conflicts to the creator when returning the configuration confirmation page; the creator decides whether to add them on the webpage and enters values there.
+Each item requires:
 
-### Staging filtering and strip
+- `value`: the exact sensitive literal found in the staged file;
+- `source`: a concrete staging-relative file that will enter the final package.
 
-High-risk files, login state, system directories, and other non-package inputs are rejected before copying. They are not represented in the scan protocol and package does not perform a second credential-path removal pass.
+`field` and `value_type` may be included when useful. Do not use directories, escaped paths, `_scan_only/` references, internal manifests, missing files, or existing archive artifacts as sources. The program validates findings, filters anything outside the package boundary, fills internal metadata, and replaces retained values only in staging.
 
-Allowed runtime files stay in staging. Sensitive values inside them are replaced with `PLATFORM_MANAGED_*` placeholders before upload; the original source files are never modified.
+Submit findings with:
 
-### `.env` rules
+```bash
+python3 packager.py publish-submit --agent-id <agent_id> --action prepare --deep-scan-findings-file <findings.json>
+```
 
-Do not default to excluding the whole file just because the filename matches `.env`. The basis is content and use:
+If no missed value exists, rerun `publish-submit --action prepare` without `--deep-scan`. `--deep-scan` cannot be combined with `--deep-scan-findings-file` or `--environment-selection-file`; finish the scan pause first.
 
-| Situation | Handling |
-|---|---|
-| Runtime-required `.env` | Keep in the package and classify file values by semantics; do not read matching values from the host process environment |
-| `.env` inside a selected skill's root directory | Keep in the package, values classified by semantics and stripped; do not treat it as a Claude Code provider source |
-| Login credential / authentication state files | Do not copy into staging |
-| Private keys and other high-risk files | Do not copy into staging |
-| Runtime-irrelevant local development configuration | Do not add to the stage plan or confirmed selection |
+### Staging and environment rules
 
-Retaining `.env` in the package: keep the file shell, and have subsequent strip replace plaintext values with `PLATFORM_MANAGED_*` placeholders.
+- High-risk credential files, login state, and system directories never enter staging.
+- Allowed files remain in staging; sensitive literals are replaced with `PLATFORM_MANAGED_*` placeholders without modifying the creator's source files.
+- Keep a runtime-required `.env` or a `.env` inside a selected skill when it belongs in the package, but strip sensitive values by semantics. Exclude authentication state, private keys, and runtime-irrelevant development configuration.
+- Codex, Claude Code, Hermes, and OpenClaw do not package global agent configuration. Local runtime configuration is read only for safe provider metadata needed by the publish flow.
+- Claude Code reserves `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` for `url_proxy`; Codex reserves `OPENAI_BASE_URL` and `OPENAI_API_KEY` for `url_proxy`. These names must never be offered or uploaded as ordinary Run Online environment variables.
+- Run Online environment discovery records names only. Show `environment_variable_hint` names and conflicts to the creator; selected values are included only in the final merged submission, while unselected credential values are completed on the final review page.
 
-Codex and Claude Code do not package global agent configuration; only the selected Skill and confirmed Markdown files enter their package boundary. Their local configuration is read only for URL, model, and API-format metadata, while every uploaded URL Proxy uses an empty API-key value for the creator to fill on the platform page. Hermes and OpenClaw retain their existing runtime-configuration handling. Runtime-required Hermes/OpenClaw configuration identified by the supported scan buckets should keep its necessary file shell and strip plaintext values rather than being excluded wholesale.
+### Secret display boundary
 
-### Creator confirmation display
+- Never print secrets or `generic.value` in chat, normal CLI output, logs, or local previews.
+- If a creator-facing full value must be shown, use only the platform's controlled web confirmation page.
+- Provider API-key values are not persisted in reviewed-scan data; the creator confirms or enters them on the final review page.
+- Do not display internal placeholders or template variables as creator-facing values.
 
-- `url_proxy.api_key.value` is always empty; the creator enters the key on the platform page. The paired `url.value` may be displayed in full.
-- `generic.value` may be displayed in full.
-- Do not display `PLATFORM_MANAGED_*`, template variables, or internal fields verbatim to the creator.
-- For `.env` files retained in the package, display the values that will be hosted or stripped within them.
-
-### Web confirmation boundary
-
-The reviewed payload is not the final confirmation. The runtime confirmation entry can only be the web confirmation page returned by the platform:
-
-- After obtaining the web confirmation entry, the host must pause.
-- Chat confirmation, script submission, reverse-engineering the web endpoint, or local preview must not be treated as equivalent substitutes.
-- After the creator completes the web confirmation, continue based on the platform's readback result.
-
-Before entering `publish-ship`, you must use the platform's web-confirmed `url_proxy` selection to continue; do not manually modify the local state.
+The web confirmation page is the only valid confirmation boundary. Chat confirmation, local previews, scripted form submission, and reverse-engineered endpoints are not substitutes.

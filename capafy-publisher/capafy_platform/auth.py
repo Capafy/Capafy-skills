@@ -37,11 +37,8 @@ def login_init(email: str, *, base_url: Optional[str] = None) -> dict[str, Any]:
     request_body = build_login_init_request(email)
     data = post_platform_json("/auth/login", request_body, base_url=base_url)
     response = {
-        "api_action": "login_init",
-        "request_body": request_body,
         "challenge_id": str(data.get("challengeId", "")).strip(),
         "expires_in_sec": data.get("expiresInSec"),
-        "raw_data": data,
     }
     warning = str(data.get("skill_version_status", "")).strip().lower()
     if warning:
@@ -57,14 +54,10 @@ def login_verify(
     request_body = build_login_verify_request(challenge_id, code)
     data = post_platform_json("/auth/login/verify", request_body, base_url=base_url)
     response = {
-        "api_action": "login_verify",
-        "request_body": request_body,
-        "source": request_body["source"],
         "user_id": str(data.get("userId", "")).strip(),
         "email": str(data.get("email", "")).strip(),
         "name": str(data.get("name", "")).strip(),
         "access_token": str(data.get("accessToken", "")).strip(),
-        "raw_data": data,
     }
     warning = str(data.get("skill_version_status", "")).strip().lower()
     if warning:

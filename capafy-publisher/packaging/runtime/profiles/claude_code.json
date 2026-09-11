@@ -1,0 +1,34 @@
+{
+  "discovery_skill_precedence": [
+    ".claude/skills"
+  ],
+  "skill_name_from_directory": true,
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".claude/skills",
+      "display_prefix": ".claude/skills",
+      "target_path": ".claude/skills",
+      "source_key": ".claude/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    }
+  ],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".claude/CLAUDE.md",
+      "display_path": ".claude/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "CLAUDE.md",
+      "display_path": "workspace/CLAUDE.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": ".claude/CLAUDE.md",
+      "display_path": "workspace/.claude/CLAUDE.md"
+    }
+  ]
+}

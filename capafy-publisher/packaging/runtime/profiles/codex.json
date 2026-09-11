@@ -1,0 +1,48 @@
+{
+  "discovery_skill_precedence": [
+    ".agents/skills",
+    ".codex/skills"
+  ],
+  "skill_roots": [
+    {
+      "base": "home",
+      "path": ".agents/skills",
+      "display_prefix": ".agents/skills",
+      "target_path": ".agents/skills",
+      "source_key": ".agents/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    },
+    {
+      "base": "home",
+      "path": ".codex/skills",
+      "display_prefix": ".codex/skills",
+      "target_path": ".codex/skills",
+      "source_key": ".codex/skills",
+      "source_value": "copied",
+      "skip_skill_runtime_outputs": true
+    }
+  ],
+  "fixed_scan_files": [
+    {
+      "base": "home",
+      "path": ".codex/AGENTS.md",
+      "display_path": ".codex/AGENTS.md"
+    },
+    {
+      "base": "home",
+      "path": ".codex/AGENTS.override.md",
+      "display_path": ".codex/AGENTS.override.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.md",
+      "display_path": "workspace/AGENTS.md"
+    },
+    {
+      "base": "runtime_dir",
+      "path": "AGENTS.override.md",
+      "display_path": "workspace/AGENTS.override.md"
+    }
+  ]
+}

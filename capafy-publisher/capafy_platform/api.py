@@ -56,12 +56,9 @@ def refresh_draft_url_raw(
 
 
 def get_account_me_raw(*, access_token: Optional[str] = None, base_url: Optional[str] = None) -> dict[str, Any]:
-    normalized_access_token = str(access_token or "").strip()
-    if not normalized_access_token:
-        raise ValueError("access_token must not be empty")
     return get_platform_json(
         "/agent/account",
-        access_token=normalized_access_token,
+        access_token=access_token,
         base_url=base_url,
         require_auth=True,
         unauthorized_message="access_token is invalid or expired",
@@ -91,7 +88,7 @@ def create_agent_version(
     return post_platform_json("/agent/agents/addAgentVersion", request_body, access_token=access_token, base_url=base_url, require_auth=True)
 
 
-def save_config_keys_raw(
+def submit_package_credentials_raw(
     agent_id: str,
     request_body: dict[str, Any],
     *,
@@ -104,24 +101,11 @@ def save_config_keys_raw(
     if not isinstance(request_body, dict):
         raise ValueError("request_body must be an object")
     return post_platform_json(
-        f"/agent/agents/{normalized_agent_id}/credentials", request_body, access_token=access_token, base_url=base_url, require_auth=True
-    )
-
-
-def report_package_raw(
-    agent_id: str,
-    request_body: dict[str, Any],
-    *,
-    access_token: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> dict[str, Any]:
-    normalized_agent_id = str(agent_id or "").strip()
-    if not normalized_agent_id:
-        raise ValueError("agent_id must not be empty")
-    if not isinstance(request_body, dict):
-        raise ValueError("request_body must be an object")
-    return post_platform_json(
-        f"/agent/agents/{normalized_agent_id}/uploadPackage", request_body, access_token=access_token, base_url=base_url, require_auth=True
+        f"/agent/agents/{normalized_agent_id}/uploadPackageCredentials",
+        request_body,
+        access_token=access_token,
+        base_url=base_url,
+        require_auth=True,
     )
 
 
@@ -132,7 +116,6 @@ __all__ = [
     "get_latest_version_raw",
     "list_agents_raw",
     "refresh_draft_url_raw",
-    "report_package_raw",
+    "submit_package_credentials_raw",
     "review_url_warnings",
-    "save_config_keys_raw",
 ]
