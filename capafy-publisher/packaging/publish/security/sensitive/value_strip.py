@@ -13,7 +13,7 @@ from packaging.common.text_parse import looks_like_platform_managed_placeholder_
 
 
 def _iter_text_files(root: Path) -> Iterable[tuple[Path, str, str]]:
-    for path in iter_workspace_files(root, skip_system=False):
+    for path in iter_workspace_files(root):
         if path.is_symlink() or not path.is_file():
             continue
         text, encoding = read_text(path)
@@ -22,7 +22,7 @@ def _iter_text_files(root: Path) -> Iterable[tuple[Path, str, str]]:
         yield path, text, encoding
 
 
-def _strip_candidates(key_value: str, extra_candidates: Optional[Iterable[str]] = None) -> list[str]:
+def _strip_candidates(key_value: str) -> list[str]:
     candidates: list[str] = []
 
     def add(candidate: str) -> None:
@@ -36,9 +36,6 @@ def _strip_candidates(key_value: str, extra_candidates: Optional[Iterable[str]] 
     ):
         add(encoded)
         add(encoded.replace("/", "\\/"))
-    if extra_candidates is not None:
-        for extra_candidate in extra_candidates:
-            add(str(extra_candidate))
     return candidates
 
 
@@ -81,7 +78,6 @@ def strip_value_from_staging(
     key_value: str,
     placeholder: str,
     *,
-    extra_candidates: Optional[Iterable[str]] = None,
     allow_empty_placeholder: bool = False,
 ) -> dict:
     if not placeholder and not allow_empty_placeholder:
@@ -95,7 +91,7 @@ def strip_value_from_staging(
         }
 
     replacement = placeholder
-    candidates = _strip_candidates(key_value, extra_candidates=extra_candidates)
+    candidates = _strip_candidates(key_value)
     replaced_in: list[str] = []
     total_replacements = 0
     for path, text, encoding in _iter_text_files(staging_root):

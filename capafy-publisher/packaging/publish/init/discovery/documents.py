@@ -76,8 +76,6 @@ def _iter_tree_source_documents(
                 if should_skip_packaged_relpath(
                     relpath,
                     is_dir=True,
-                    skip_skill_runtime_outputs=tree_source.skip_skill_runtime_outputs,
-                    excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
                 ):
                     continue
                 if keep_descending:
@@ -96,8 +94,6 @@ def _iter_tree_source_documents(
             if should_skip_packaged_relpath(
                 relpath,
                 is_dir=False,
-                skip_skill_runtime_outputs=tree_source.skip_skill_runtime_outputs,
-                excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
             ):
                 continue
             if should_skip_skill_reference_document(display_path) or display_path in seen:
@@ -179,10 +175,11 @@ def discover_documents(
 
     for file_source in stage_plan.file_sources:
         source_file = file_source.source_file.expanduser()
-        relpath = str(file_source.relative_target_path.as_posix())
-        display_path = str(file_source.source_key or "").strip() if file_source.scan_only else ""
-        if not display_path:
-            display_path = relpath
+        if file_source.scan_only:
+            display_path = file_source.source_key.strip()
+        else:
+            assert file_source.relative_target_path is not None
+            display_path = file_source.relative_target_path.as_posix()
         if not source_file.is_file():
             continue
         if should_skip_skill_reference_document(display_path) or display_path in seen:

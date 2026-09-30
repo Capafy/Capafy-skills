@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-from typing import Optional
 
 from packaging.common.constants import STRUCTURED_ASSIGNMENT_PATTERNS
 from packaging.common.fs import (
-    display_stage_path,
     read_text,
     relpath as fs_relpath,
 )
@@ -14,11 +12,9 @@ from packaging.common.packaged_files import iter_packaged_files
 from packaging.common.url_values import find_domains
 from packaging.common.exclusion_rules import should_skip_content_scan_for_file
 from packaging.publish.security.sensitive.literals import extract_assignment_value
-from packaging.runtime import get_default_target, get_target
 
 from .candidate_annotation import annotate_candidate
 from .env_reference_scan import collect_env_url_hints, collect_referenced_env_names
-from .scan_only_paths import is_scan_only_source_path, normalize_scan_only_relpath
 from .special_files import collect_special_file_candidates
 from .structured_value_candidates import collect_structured_value_candidates
 from .support import pick_domain
@@ -124,14 +120,14 @@ def collect_generic_key_candidates(text: str, relpath: str) -> list[dict]:
 def collect_api_key_candidates_from_file(
     path: Path,
     relpath: str,
-    physical_relpath: Optional[str] = None,
+    *,
+    scan_only_source: bool = False,
 ) -> tuple[list[dict], dict[str, str]]:
     candidates: list[dict] = []
     env_url_hints: dict[str, str] = {}
     if not path.is_file():
         return candidates, env_url_hints
 
-    scan_only_source = is_scan_only_source_path(physical_relpath or relpath)
     if should_skip_content_scan_for_file(relpath):
         return candidates, env_url_hints
 
@@ -162,25 +158,15 @@ def collect_api_key_candidates_from_file(
 
 def collect_api_key_candidates(
     root: Path,
-    display_prefix: str = "",
-    *,
-    target_name: Optional[str] = None,
-    excluded_relpath_prefixes: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict[str, str]]:
-    target = get_target(target_name) if target_name else get_default_target()
     candidates: list[dict] = []
     env_url_hints: dict[str, str] = {}
 
-    for path in iter_packaged_files(
-        root,
-        excluded_relpath_prefixes=excluded_relpath_prefixes,
-    ):
-        physical_relpath = display_stage_path(display_prefix, fs_relpath(path, root))
-        relpath = normalize_scan_only_relpath(physical_relpath, target=target)
+    for path in iter_packaged_files(root):
+        relpath = fs_relpath(path, root)
         file_candidates, file_env_hints = collect_api_key_candidates_from_file(
             path,
             relpath,
-            physical_relpath=physical_relpath,
         )
         candidates.extend(file_candidates)
         for env_name, domain in file_env_hints.items():

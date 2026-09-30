@@ -16,8 +16,6 @@ from packaging.publish.selection.selectable import (
 class SelectedSymlinkTreeSource:
     logical_path: str
     target_path: Path
-    skip_skill_runtime_outputs: bool = False
-    excluded_relpath_prefixes: tuple[str, ...] = ()
 
 
 def _resolve_target_path(symlink_path: Path, *, logical_path: str) -> Path:
@@ -58,8 +56,6 @@ def selected_symlink_tree_sources(
             matched_source = SelectedSymlinkTreeSource(
                 logical_path=logical_path,
                 target_path=_resolve_target_path(candidate, logical_path=logical_path),
-                skip_skill_runtime_outputs=tree_source.skip_skill_runtime_outputs,
-                excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
             )
         if matched_source is None:
             continue
@@ -82,8 +78,6 @@ def augment_stage_plan_with_selected_symlinks(
             display_prefix=item.logical_path,
             source_key=item.logical_path,
             source_value="dereferenced_symlink",
-            skip_skill_runtime_outputs=item.skip_skill_runtime_outputs,
-            excluded_relpath_prefixes=item.excluded_relpath_prefixes,
         )
         for item in symlink_sources
     ]

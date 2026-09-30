@@ -145,8 +145,6 @@ def _iter_tree_source_units(
             if should_skip_packaged_relpath(
                 relpath,
                 is_dir=True,
-                skip_skill_runtime_outputs=tree_source.skip_skill_runtime_outputs,
-                excluded_relpath_prefixes=tree_source.excluded_relpath_prefixes,
             ):
                 continue
 

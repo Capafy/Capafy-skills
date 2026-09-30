@@ -135,11 +135,11 @@ MODE_CLEAN_STEPS = {
 }
 
 
-def _replace_patterns(text: str, patterns: list[re.Pattern[str]], replacement: str) -> tuple[str, int]:
+def _replace_patterns(text: str, patterns: list[re.Pattern[str]]) -> tuple[str, int]:
     updated = text
     replacements = 0
     for pattern in patterns:
-        updated, count = pattern.subn(replacement, updated)
+        updated, count = pattern.subn("[redacted]", updated)
         replacements += count
     return updated, replacements
 
@@ -210,10 +210,10 @@ def _apply_clean_step(text: str, step: str) -> tuple[str, int, bool]:
         cleaned, count = _replace_memory_pii_lines(text)
         return cleaned, count, False
     if step == CLEAN_INLINE_PII:
-        cleaned, count = _replace_patterns(text, list(PII_PATTERNS), "[redacted]")
+        cleaned, count = _replace_patterns(text, list(PII_PATTERNS))
         return cleaned, count, False
     if step == CLEAN_TOOLS_PATTERNS:
-        cleaned, count = _replace_patterns(text, TOOLS_PATTERNS, "[redacted]")
+        cleaned, count = _replace_patterns(text, TOOLS_PATTERNS)
         return cleaned, count, False
     if step == CLEAN_TOOLS_FIELDS:
         cleaned, count = _replace_line_values(text, TOOLS_FIELD_PATTERN, "[redacted]")
@@ -306,7 +306,7 @@ def clean_staging_file(staging_root: Path, relative_file: str) -> dict:
 def clean_special_files_in_staging(staging_root: Path) -> dict:
     items: list[dict] = []
     total_replacements = 0
-    for path in sorted(iter_workspace_files(staging_root, skip_system=False)):
+    for path in sorted(iter_workspace_files(staging_root)):
         relative_file = relpath(path, staging_root)
         if (
             path.name not in SPECIAL_CLEAN_FILENAMES

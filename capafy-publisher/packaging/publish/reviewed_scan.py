@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Iterator, List, Mapping, Optional, TypedDict, Union
 
 from packaging.common.fs import iter_workspace_files, relpath as fs_relpath, safe_chmod
-from packaging.publish.staging.manifest import STAGE_MANIFEST_NAME
 
 REVIEW_METADATA_KEY = "_review"
 REVIEW_STATUS_REVIEWED = "reviewed"
@@ -191,18 +190,10 @@ def compute_scan_digest(scan: dict[str, Any]) -> str:
 
 def _iter_digest_file_records(
     staging_root: Union[str, Path],
-    *,
-    include_scan_only: bool,
 ) -> Iterator[tuple[str, bytes]]:
     root = Path(staging_root)
-    for path in sorted(iter_workspace_files(root, skip_system=False)):
+    for path in sorted(iter_workspace_files(root)):
         relpath = fs_relpath(path, root)
-        normalized = relpath.strip("/")
-        if normalized == STAGE_MANIFEST_NAME:
-            continue
-        is_scan_only = normalized == "_scan_only" or normalized.startswith("_scan_only/")
-        if include_scan_only != is_scan_only:
-            continue
         try:
             raw = path.read_bytes()
         except OSError:
@@ -210,18 +201,15 @@ def _iter_digest_file_records(
         yield relpath, raw
 
 
-def _compute_file_digest(staging_root: Union[str, Path], *, include_scan_only: bool) -> str:
+def compute_staging_digest(staging_root: Union[str, Path]) -> str:
     digest = hashlib.sha256()
-    for relpath, raw in _iter_digest_file_records(staging_root, include_scan_only=include_scan_only):
+    for relpath, raw in _iter_digest_file_records(staging_root):
         digest.update(relpath.encode("utf-8"))
         digest.update(b"\0")
         digest.update(hashlib.sha256(raw).digest())
         digest.update(b"\0")
     return digest.hexdigest()
 
-
-def compute_staging_digest(staging_root: Union[str, Path]) -> str:
-    return _compute_file_digest(staging_root, include_scan_only=False)
 
 REPLACE_WITH_PLACEHOLDER = "replace_with_placeholder"
 EXCLUDE_VALUE = "exclude_value"
@@ -343,16 +331,16 @@ def _write_private_json(path: Path, payload: dict[str, Any]) -> None:
     safe_chmod(path, 0o600)
 
 
-def _read_json_object(path: Path, *, label: str) -> dict[str, Any]:
+def _read_json_object(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        logger.warning("failed to parse %s JSON at %s: %s", label, path, exc)
+        logger.warning("failed to parse reviewed-scan JSON at %s: %s", path, exc)
         return {}
     except OSError as exc:
-        logger.warning("failed to read %s JSON at %s: %s", label, path, exc)
+        logger.warning("failed to read reviewed-scan JSON at %s: %s", path, exc)
         return {}
     if not isinstance(payload, dict):
         return {}
@@ -394,7 +382,7 @@ def persist_reviewed_scan(
 
 
 def read_reviewed_scan_file(reviewed_scan_path: str) -> dict[str, Any]:
-    return _read_json_object(Path(reviewed_scan_path), label="reviewed-scan")
+    return _read_json_object(Path(reviewed_scan_path))
 
 __all__ = [
     "REVIEW_BINDING_FIELDS",

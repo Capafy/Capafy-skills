@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,15 +31,8 @@ def _sample_local_path(text: str) -> str:
 
 def find_packaged_local_path_violations(
     staging_root: Path,
-    *,
-    exclude_paths: Optional[set[str]] = None,
-    exclude_prefixes: tuple[str, ...] = (),
 ) -> list[PackageLocalPathViolation]:
-    entries = collect_final_zip_entries(
-        staging_root,
-        exclude_paths=exclude_paths,
-        exclude_prefixes=exclude_prefixes,
-    )
+    entries = collect_final_zip_entries(staging_root)
     violations: list[PackageLocalPathViolation] = []
     for relpath in sorted(entries.staging_file_relpaths):
         path = staging_root / relpath
@@ -58,15 +50,8 @@ def find_packaged_local_path_violations(
 
 def validate_no_packaged_local_path_violations(
     staging_root: Path,
-    *,
-    exclude_paths: Optional[set[str]] = None,
-    exclude_prefixes: tuple[str, ...] = (),
 ) -> None:
-    violations = find_packaged_local_path_violations(
-        staging_root,
-        exclude_paths=exclude_paths,
-        exclude_prefixes=exclude_prefixes,
-    )
+    violations = find_packaged_local_path_violations(staging_root)
     if not violations:
         return
     details = "; ".join(

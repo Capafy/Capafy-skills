@@ -29,11 +29,11 @@ def _matches_selected_paths(
     selected_paths: set[str],
     owning_paths: tuple[str, ...],
     *,
-    is_dir: Optional[bool] = None,
+    is_dir: bool,
 ) -> bool:
     if owning_paths and any(path in selected_paths for path in owning_paths):
         return True
-    if is_dir is False:
+    if not is_dir:
         return False
     normalized = _normalized_display_path(display_path)
     if not normalized or normalized == ".":
@@ -45,7 +45,7 @@ def matches_selected_skill_paths(
     display_path: str,
     selected_skill_paths: Optional[set[str]],
     *,
-    is_dir: Optional[bool] = None,
+    is_dir: bool,
     target=None,
 ) -> bool:
     if selected_skill_paths is None:
@@ -65,12 +65,9 @@ class StageTreeCopyRequest:
     target_root: Path
     staging_root: Path
     display_prefix: str
-    skip_skill_runtime_outputs: bool = False
     excluded_relpath_prefixes: tuple[str, ...] = ()
     selected_paths: Optional[set[str]] = None
     workspace_allowlist: Optional[set[str]] = None
-    apply_selection_filters: bool = True
-    skip_high_risk_files: bool = True
     target: object = None
     stage_plan: object = None
 
@@ -105,7 +102,6 @@ def copy_stage_tree(
         source_root,
         source_root.name,
         is_dir=True,
-        skip_skill_runtime_outputs=request.skip_skill_runtime_outputs,
         excluded_relpath_prefixes=request.excluded_relpath_prefixes,
     ):
         record_skip(state.skipped, state.skipped_seen, display_prefix, is_dir=True)
@@ -121,7 +117,6 @@ def copy_stage_tree(
             source_path,
             relative_path,
             is_dir=is_dir,
-            skip_skill_runtime_outputs=request.skip_skill_runtime_outputs,
             excluded_relpath_prefixes=request.excluded_relpath_prefixes,
         )
         if is_dir and packaged_skip:
@@ -134,7 +129,6 @@ def copy_stage_tree(
             return True
         if (
             not is_dir
-            and request.skip_high_risk_files
             and should_skip_high_risk_stage_file(request.target, display_path)
         ):
             return True
@@ -144,9 +138,6 @@ def copy_stage_tree(
             is_dir=is_dir,
         ):
             return False
-        if not request.apply_selection_filters:
-
-            return bool(packaged_skip and not is_dir)
         if not matches_selected_skill_paths(
             display_path,
             request.selected_paths,

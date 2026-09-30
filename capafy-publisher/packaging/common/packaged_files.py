@@ -28,26 +28,10 @@ _LOCAL_HOST_STATE_STAGING_ROOTS = tuple(
 )
 
 
-def _matches_skill_runtime_output_parts(
-    parts: list[str],
-) -> bool:
-    if not parts:
-        return False
-    if parts[0] == "run":
-        return True
-    if len(parts) >= 2 and parts[1] == "run":
-        return True
-    for index in range(len(parts) - 2):
-        if parts[index] == "skills" and parts[index + 2] == "run":
-            return True
-    return False
-
-
 def should_skip_packaged_relpath(
     relpath: str,
     *,
     is_dir: bool,
-    skip_skill_runtime_outputs: bool = False,
     excluded_relpath_prefixes: tuple[str, ...] = (),
 ) -> bool:
     pure = PurePosixPath(relpath.rstrip("/"))
@@ -65,10 +49,6 @@ def should_skip_packaged_relpath(
         if name.lower() in HIGH_RISK_FILE_BASENAMES:
             return True
         if any(name.endswith(suffix) for suffix in STAGE_EXCLUDED_SUFFIXES):
-            return True
-    if skip_skill_runtime_outputs:
-        runtime_parts = [part.lower() for part in pure.parts if part and part != "."]
-        if runtime_parts and _matches_skill_runtime_output_parts(runtime_parts):
             return True
     return False
 
@@ -102,7 +82,6 @@ def should_skip_packaged_path(
     relpath: str,
     *,
     is_dir: bool,
-    skip_skill_runtime_outputs: bool = False,
     excluded_relpath_prefixes: tuple[str, ...] = (),
 ) -> bool:
     if is_publisher_source_path(source_path):
@@ -112,16 +91,12 @@ def should_skip_packaged_path(
     return should_skip_packaged_relpath(
         relpath,
         is_dir=is_dir,
-        skip_skill_runtime_outputs=skip_skill_runtime_outputs,
         excluded_relpath_prefixes=excluded_relpath_prefixes,
     )
 
 
 def iter_packaged_files(
     root: Path,
-    *,
-    skip_skill_runtime_outputs: bool = False,
-    excluded_relpath_prefixes: tuple[str, ...] = (),
 ) -> Iterable[Path]:
     for current, dirnames, filenames in os.walk(root, topdown=True):
         current_path = Path(current)
@@ -137,8 +112,6 @@ def iter_packaged_files(
                 current_path / dirname,
                 relpath,
                 is_dir=True,
-                skip_skill_runtime_outputs=skip_skill_runtime_outputs,
-                excluded_relpath_prefixes=excluded_relpath_prefixes,
             ):
                 continue
             kept_dirs.append(dirname)
@@ -152,8 +125,6 @@ def iter_packaged_files(
                 current_path / filename,
                 relpath,
                 is_dir=False,
-                skip_skill_runtime_outputs=skip_skill_runtime_outputs,
-                excluded_relpath_prefixes=excluded_relpath_prefixes,
             ):
                 continue
             yield current_path / filename
@@ -163,7 +134,7 @@ def matches_workspace_allowlist(
     display_path: str,
     workspace_allowlist: Optional[set[str]],
     *,
-    is_dir: Optional[bool] = None,
+    is_dir: bool,
 ) -> bool:
     if workspace_allowlist is None:
         return True

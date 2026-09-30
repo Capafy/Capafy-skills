@@ -74,7 +74,6 @@ def build_stage_plan(
             display_prefix=".openclaw/skills",
             source_key=".openclaw/skills",
             source_value="copied",
-            skip_skill_runtime_outputs=True,
             required=False,
         )
     )
@@ -85,7 +84,6 @@ def build_stage_plan(
             display_prefix=".agents/skills",
             source_key=".agents/skills",
             source_value="copied",
-            skip_skill_runtime_outputs=True,
             required=False,
         )
     )
@@ -99,7 +97,6 @@ def build_stage_plan(
                 display_prefix=display,
                 source_key=display,
                 source_value="extra_skill_dir",
-                skip_skill_runtime_outputs=True,
             )
         )
 

@@ -165,11 +165,27 @@ def prepare_upload_context(
 
     expected_source_digest = manifest.extra_value("source_snapshot_digest")
     if expected_source_digest:
-        current_source_digest = compute_publish_source_snapshot_digest(
-            runtime_dir=manifest.runtime_dir,
-            latest_state=latest,
-            manifest=manifest,
-        )
+        source_snapshot_roots = manifest.extra.get("source_snapshot_roots")
+        if not isinstance(source_snapshot_roots, list):
+            return build_publish_error(
+                error="prepared publish state is missing source snapshot roots",
+                failed_step="check_source_snapshot_digest",
+                blocking_category="invalid_publish_source_snapshot",
+                developer_next_steps=["Rerun `publish-submit --action prepare`, then retry `publish-submit --action continue_upload`."],
+                next_step="rerun_publish_submit_prepare",
+            ), 1
+        try:
+            current_source_digest = compute_publish_source_snapshot_digest(
+                source_roots=source_snapshot_roots,
+            )
+        except ValueError as exc:
+            return build_publish_error(
+                error=str(exc),
+                failed_step="check_source_snapshot_digest",
+                blocking_category="invalid_publish_source_snapshot",
+                developer_next_steps=["Rerun `publish-submit --action prepare`, then retry `publish-submit --action continue_upload`."],
+                next_step="rerun_publish_submit_prepare",
+            ), 1
         if current_source_digest != expected_source_digest:
             return build_publish_error(
                 error="publish source inputs no longer match the state prepared by publish-submit",

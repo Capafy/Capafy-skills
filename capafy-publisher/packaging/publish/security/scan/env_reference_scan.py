@@ -84,8 +84,7 @@ def _looks_like_env_reference_key(key: str) -> bool:
     return bool(tokens & ENV_REFERENCE_VALUE_TOKENS)
 
 
-def _collect_runtime_env_object_mentions(text: str, known_env_names: Optional[set[str]] = None) -> set[str]:
-    known = set(known_env_names) if known_env_names else None
+def _collect_runtime_env_object_mentions(text: str) -> set[str]:
     names: set[str] = set()
     for match in RUNTIME_ENV_DESTRUCTURE_PATTERN.finditer(text):
         body = match.group("body")
@@ -98,8 +97,6 @@ def _collect_runtime_env_object_mentions(text: str, known_env_names: Optional[se
                 continue
             env_name = name_match.group(1)
             if not ENV_NAME_LITERAL_PATTERN.fullmatch(env_name):
-                continue
-            if known is not None and env_name not in known:
                 continue
             names.add(env_name)
     return names
@@ -137,7 +134,7 @@ def _extract_nearby_structured_url_hint(text: str, target_line_no: int) -> str:
     return best_url
 
 
-def collect_referenced_env_names(text: str, known_env_names: Optional[set[str]] = None) -> tuple[set[str], dict[str, str]]:
+def collect_referenced_env_names(text: str) -> tuple[set[str], dict[str, str]]:
     names: set[str] = set()
     url_hints: dict[str, str] = {}
     cursor = 0
@@ -173,7 +170,7 @@ def collect_referenced_env_names(text: str, known_env_names: Optional[set[str]] 
             if local_url != "unknown" and "://" in local_url:
                 url_hints.setdefault(env_name, local_url)
             break
-    names.update(_collect_runtime_env_object_mentions(text, known_env_names))
+    names.update(_collect_runtime_env_object_mentions(text))
     return names, url_hints
 
 

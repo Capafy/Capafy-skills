@@ -10,8 +10,7 @@
       "display_prefix": ".claude/skills",
       "target_path": ".claude/skills",
       "source_key": ".claude/skills",
-      "source_value": "copied",
-      "skip_skill_runtime_outputs": true
+      "source_value": "copied"
     }
   ],
   "fixed_scan_files": [

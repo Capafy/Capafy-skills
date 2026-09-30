@@ -5,15 +5,11 @@ from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Union
 
-from packaging.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
 from packaging.common.final_zip_files import final_zip_staging_file_relpaths
-from packaging.publish.artifacts.bundle_context import BUNDLE_CONTEXT_NAME, validate_agent_type
-from packaging.publish.staging.manifest import STAGE_MANIFEST_NAME, load_stage_manifest
 from packaging.runtime.contracts import GenericValue, PROCESS_ENV_SOURCE
 from packaging.publish.security.sensitive.placeholders import split_source
 
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:/")
-_DEFAULT_SCAN_ONLY_PREFIXES = ("_scan_only",)
 
 
 def normalize_packaged_source_relpath(source: object) -> str:
@@ -36,41 +32,6 @@ def normalize_packaged_source_relpath(source: object) -> str:
     return normalized
 
 
-def _scan_only_prefixes(staging_root: Path) -> tuple[str, ...]:
-    prefixes: list[str] = list(_DEFAULT_SCAN_ONLY_PREFIXES)
-    try:
-        manifest = load_stage_manifest(staging_root)
-    except ValueError:
-        manifest = {}
-    manifest_prefixes = manifest.get("scan_only_prefixes", [])
-    if isinstance(manifest_prefixes, list):
-        prefixes.extend(str(item or "").strip() for item in manifest_prefixes)
-    return tuple(
-        dict.fromkeys(
-            prefix
-            for prefix in (normalize_packaged_source_relpath(item) for item in prefixes)
-            if prefix
-        )
-    )
-
-
-def _final_zip_exclude_prefixes(staging_root: Path, *, agent_type: str) -> tuple[str, ...]:
-    if agent_type == "download":
-        return _scan_only_prefixes(staging_root)
-    return _DEFAULT_SCAN_ONLY_PREFIXES
-
-
-def _final_zip_exclude_paths(*, agent_type: str) -> set[str]:
-    excluded = {STAGE_MANIFEST_NAME, BUNDLE_CONTEXT_NAME}
-    if agent_type == "run_online":
-        excluded.add(WORKSPACE_DOCUMENTS_MANIFEST_NAME)
-    return excluded
-
-
-def _is_scan_only_relpath(relpath: str, prefixes: tuple[str, ...]) -> bool:
-    return any(relpath == prefix or relpath.startswith(f"{prefix}/") for prefix in prefixes)
-
-
 def _staging_path(staging_root: Union[str, Path]) -> Path:
     if isinstance(staging_root, str) and not staging_root.strip():
         raise ValueError("staging_root is required for source boundary checks")
@@ -83,28 +44,17 @@ def _staging_path(staging_root: Union[str, Path]) -> Path:
 def final_zip_source_relpaths(
     *,
     staging_root: Union[str, Path],
-    agent_type: str,
 ) -> frozenset[str]:
-    resolved_agent_type = validate_agent_type(agent_type)
-    staging_path = _staging_path(staging_root)
-    return final_zip_staging_file_relpaths(
-        staging_path,
-        exclude_paths=_final_zip_exclude_paths(agent_type=resolved_agent_type),
-        exclude_prefixes=_final_zip_exclude_prefixes(staging_path, agent_type=resolved_agent_type),
-    )
+    return final_zip_staging_file_relpaths(_staging_path(staging_root))
 
 
 def deep_scan_file_boundary(
     *,
     staging_root: Union[str, Path],
-    agent_type: str,
 ) -> dict[str, object]:
-    resolved_agent_type = validate_agent_type(agent_type)
     staging_path = _staging_path(staging_root)
-    scan_only_prefixes = _scan_only_prefixes(staging_path)
     final_sources = final_zip_source_relpaths(
         staging_root=staging_path,
-        agent_type=resolved_agent_type,
     )
     items: list[dict[str, object]] = []
     summary = {
@@ -119,10 +69,7 @@ def deep_scan_file_boundary(
         summary["total_files"] += 1
         reason = ""
         reviewable = relpath in final_sources
-        if _is_scan_only_relpath(relpath, scan_only_prefixes):
-            reviewable = False
-            reason = "scan_only_context"
-        elif not reviewable:
+        if not reviewable:
             reason = "not_in_final_package"
         if reviewable:
             summary["reviewable_files"] += 1
@@ -145,12 +92,10 @@ def filter_generic_payload_items(
     items: Iterable[object],
     *,
     staging_root: Union[str, Path],
-    agent_type: str,
 ) -> list[dict]:
     result: list[dict] = []
     final_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        agent_type=agent_type,
     )
     for item in items:
         if not isinstance(item, dict):
@@ -168,12 +113,10 @@ def filter_generic_values_for_packaged_sources(
     generic_values: Iterable[GenericValue],
     *,
     staging_root: Union[str, Path],
-    agent_type: str,
 ) -> tuple[GenericValue, ...]:
     result: list[GenericValue] = []
     final_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        agent_type=agent_type,
     )
     for generic_value in generic_values:
         source = normalize_packaged_source_relpath(generic_value.source_relpath)

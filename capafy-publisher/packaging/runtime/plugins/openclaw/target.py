@@ -23,7 +23,6 @@ from packaging.runtime.plugins.openclaw.workspace_plans import (
 
 _OPENCLAW_WORKSPACE_SOURCE_KEY = ".openclaw/workspace"
 _CLOUD_WORKSPACE_EXCLUDED_PREFIXES = (
-    ".pytest_cache",
     "dev/tests",
 )
 

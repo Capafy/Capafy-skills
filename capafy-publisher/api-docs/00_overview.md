@@ -163,7 +163,7 @@ Common account fields:
 | `agentStatus` | `draft` / `under_review` / `review_rejected` / `online` / `offline` / `banned` | List view status |
 | `status` | `0` / `1` / `2` / `3` / `4` / `5` / `6` | The overall agent lifecycle status of the **latest version**: draft, under review, review rejected, review passed/pending listing, listed, expired, delisted. `0` = draft (not submitted); do not misread as "submitted / processing" |
 | `auditStatus` | `0` / `1` / `2` / `3` / `4` | Review sub-status of the **latest version** (only meaningful when `status` is in the review-flow segment): review not started, auto-review in progress, manual review in progress, review failed, review passed. `0` = review not started; not "pending review / under review" |
-| `agentRuntime` | `openclaw` / `codex` / `claude` / `hermes` | Runtime identifier returned by the platform; this skill maps `claude` / `codex` / `openclaw` / `hermes` to local runtimes |
+| `agentRuntime` | `openclaw` / `codex` / `claude-sdk` / `hermes` | Runtime identifier returned by the platform; this skill maps `claude-sdk` / `codex` / `openclaw` / `hermes` to local runtimes |
 
 `status in (0, 2)` is the baseline gate for subsequent publish write operations; the specific next step is determined by the JSON payload returned by `publish-*` commands.
 
@@ -239,7 +239,7 @@ Detail fields:
 | `agentVersionId` | string | Latest version ID returned this time. |
 | `agentPackageId` | string/null | Package ID bound to the current version. |
 | `agentType` | string | `run_online` / `download`. |
-| `agentRuntime` | string/null | Platform runtime identifier, e.g., `codex`, `claude`, `openclaw`, `hermes`. |
+| `agentRuntime` | string/null | Platform runtime identifier, e.g., `codex`, `claude-sdk`, `openclaw`, `hermes`. |
 | `status` | int | Main status of the latest version; see common enumerations. |
 | `auditStatus` | int/null | Review sub-status of the latest version; see common enumerations. |
 | `isConfirmedSkills` | int/boolean/null | Whether the web confirmation page has confirmed skill / file selection. |

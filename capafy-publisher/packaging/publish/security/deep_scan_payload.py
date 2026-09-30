@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from packaging.publish.artifacts.bundle_context import validate_agent_type
 from packaging.publish.reviewed_scan import credential_counts
 from packaging.common.cli import build_soft_action
 from packaging.publish.staging.source_boundary import deep_scan_file_boundary
@@ -53,9 +54,9 @@ def build_deep_scan_payload(
     staging_root: str,
     reviewed_scan: dict[str, Any],
 ) -> dict[str, Any]:
+    validate_agent_type(agent_type)
     file_boundary = deep_scan_file_boundary(
         staging_root=staging_root,
-        agent_type=agent_type,
     )
     return build_soft_action(
         status="needs_deep_scan",

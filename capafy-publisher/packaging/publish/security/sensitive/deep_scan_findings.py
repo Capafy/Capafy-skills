@@ -150,14 +150,11 @@ def _resolve_source_file(staging_root: Path, source_relpath: str) -> Path:
 def _generic_findings_to_values(
     staging_root: Path,
     findings: tuple[DeepScanFinding, ...],
-    *,
-    agent_type: str,
 ) -> tuple[GenericValue, ...]:
     generic_values: list[GenericValue] = []
     seen_generic: set[tuple[str, str, str]] = set()
     packaged_sources = final_zip_source_relpaths(
         staging_root=staging_root,
-        agent_type=agent_type,
     )
     for finding in findings:
         if looks_like_platform_managed_placeholder_value(finding.value):
@@ -221,13 +218,10 @@ def _generic_findings_to_values(
 def deep_scan_findings_to_generic_values_for_staging(
     staging_root: Path,
     findings: DeepScanFindingsInput,
-    *,
-    agent_type: str = "run_online",
 ) -> tuple[GenericValue, ...]:
     return _generic_findings_to_values(
         staging_root,
         findings.generic,
-        agent_type=agent_type,
     )
 
 

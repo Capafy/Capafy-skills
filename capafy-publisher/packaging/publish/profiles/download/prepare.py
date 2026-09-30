@@ -79,10 +79,9 @@ def _write_buyout_manifest(
         disposition_summary=disposition_summary(reviewed_scan_payload),
         disposition_status=disposition_status,
         source_snapshot_digest=compute_publish_source_snapshot_digest(
-            runtime_dir=manifest.runtime_dir,
-            latest_state=latest_state,
-            manifest=manifest,
+            source_roots=result.source_snapshot_roots,
         ),
+        source_snapshot_roots=result.source_snapshot_roots,
         redaction_summary=redaction_summary,
     )
 

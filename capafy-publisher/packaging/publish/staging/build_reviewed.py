@@ -29,6 +29,7 @@ from packaging.publish.platform.url_proxy_environment import (
     url_proxy_os_fallback_names,
 )
 from packaging.publish.staging.source_boundary import filter_generic_values_for_packaged_sources
+from packaging.publish.staging.source_snapshot_roots import build_publish_source_snapshot_roots
 from packaging.publish.security.scan.entries import filter_generic_values
 from packaging.runtime.registry import build_provider_runtime_for_target
 
@@ -39,6 +40,7 @@ class ReviewedScanResult:
     reviewed_scan_path: str
     reviewed_scan: dict[str, Any]
     staging_digest: str
+    source_snapshot_roots: tuple[dict[str, Any], ...]
     suggested_environment_variable_names: tuple[str, ...] = ()
 
 
@@ -72,7 +74,6 @@ def build_run_online_reviewed_scan(
     )
     raw_scan = scan_staging_full(
         staging_root,
-        target_name=env_id,
         stage_plan=stage_plan,
     )
     raw_generic = raw_scan.get("generic", [])
@@ -88,7 +89,6 @@ def build_run_online_reviewed_scan(
         finding_generic_values = deep_scan_findings_to_generic_values_for_staging(
             staging_root,
             deep_scan_findings,
-            agent_type="run_online",
         )
         if finding_generic_values:
             reviewed_scan_input = ReviewedScanBuildInput(
@@ -102,7 +102,6 @@ def build_run_online_reviewed_scan(
     packaged_generic_values = filter_generic_values_for_packaged_sources(
         reviewed_scan_input.generic_values,
         staging_root=staging_root,
-        agent_type="run_online",
     )
     if packaged_generic_values != reviewed_scan_input.generic_values:
         reviewed_scan_input = ReviewedScanBuildInput(
@@ -221,7 +220,6 @@ def build_staging_and_reviewed_scan(
     else:
         raw_scan = scan_staging_full(
             staging_root_p,
-            target_name=env_id,
         )
         review_binding = build_review_binding(
             raw_scan=raw_scan,
@@ -246,7 +244,6 @@ def build_staging_and_reviewed_scan(
                         generic_values=deep_scan_findings_to_generic_values_for_staging(
                             staging_root_p,
                             deep_scan_findings,
-                            agent_type=agent_type,
                         ),
                     ),
                     review_binding=review_binding,
@@ -266,6 +263,10 @@ def build_staging_and_reviewed_scan(
         reviewed_scan_path=reviewed_scan_path,
         reviewed_scan=reviewed_scan,
         staging_digest=str(review_binding.get("staging_digest", "") or "").strip(),
+        source_snapshot_roots=build_publish_source_snapshot_roots(
+            selection_groups=stage_plan.metadata.get("selection_groups", selection_groups),
+            stage_plan=stage_plan,
+        ),
         suggested_environment_variable_names=suggested_environment_variable_names,
     ), None
 

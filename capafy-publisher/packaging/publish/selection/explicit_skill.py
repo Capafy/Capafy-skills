@@ -21,8 +21,7 @@ EXPLICIT_SKILL_BINDING_KIND = "external_skill_dir"
 
 
 _DEFAULT_SKILL_PREFIX_BY_ENV = {
-    "claude": ".claude/skills",
-    "claude_code": ".claude/skills",
+    "claude-sdk": ".claude/skills",
     "codex": ".agents/skills",
     "openclaw": ".openclaw/skills",
     "hermes": ".hermes/skills",
@@ -31,8 +30,8 @@ _DEFAULT_SKILL_PREFIX_BY_ENV = {
 
 def _env_family(env_id: str) -> str:
     normalized = str(env_id or "").strip()
-    if normalized in {"claude", "claude_code"}:
-        return "claude_code"
+    if normalized == "claude-sdk":
+        return normalized
     for prefix in ("openclaw", "codex", "hermes"):
         if normalized == prefix or normalized.startswith(f"{prefix}_"):
             return prefix
@@ -78,7 +77,6 @@ def resolve_explicit_skill(
         "source_path": str(source_root),
         "binding_kind": EXPLICIT_SKILL_BINDING_KIND,
         "source_kind": EXPLICIT_SKILL_SOURCE_KIND,
-        "skip_skill_runtime_outputs": True,
     }
     if target is not None:
         entry = finalize_selectable_entry(target, entry, unit_path=source_root)
@@ -97,7 +95,6 @@ def _selected_explicit_skill_item(explicit_skill: dict[str, Any]) -> dict[str, A
         "unit_type": "skill",
         "selection": "selected",
         "requires_user_confirmation": True,
-        "skip_skill_runtime_outputs": bool(explicit_skill.get("skip_skill_runtime_outputs", True)),
     }
 
 
@@ -208,11 +205,6 @@ def _external_skill_binding_for_manifest(item: dict[str, Any]) -> Optional[dict[
         "unit_type": unit_type,
         "name": str(item.get("name", "")).strip(),
         "description": str(item.get("description", "")).strip(),
-        "skip_skill_runtime_outputs": (
-            item.get("skip_skill_runtime_outputs")
-            if isinstance(item.get("skip_skill_runtime_outputs"), bool)
-            else True
-        ),
     }
     return {key: value for key, value in payload.items() if value not in ("", None)}
 
@@ -266,7 +258,6 @@ def merge_external_skill_bindings_into_selection_groups(
             "binding_kind": binding["binding_kind"],
             "source_kind": binding.get("source_kind", EXPLICIT_SKILL_SOURCE_KIND),
             "unit_type": "skill",
-            "skip_skill_runtime_outputs": binding.get("skip_skill_runtime_outputs", True),
         }
     merged_groups["skills"] = skills
     return merged_groups
@@ -283,7 +274,6 @@ def explicit_skill_for_manifest(explicit_skill: Optional[dict[str, Any]]) -> Opt
         "unit_type": "skill",
         "name": str(explicit_skill.get("name", "")).strip(),
         "description": str(explicit_skill.get("description", "")).strip(),
-        "skip_skill_runtime_outputs": bool(explicit_skill.get("skip_skill_runtime_outputs", True)),
     }
     return payload if payload["path"] and payload["source_path"] else None
 

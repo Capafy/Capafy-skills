@@ -34,7 +34,6 @@ class GroupItem(TypedDict, total=False):
     source_root: str
     source_kind: str
     binding_kind: str
-    skip_skill_runtime_outputs: bool
     config_ref: str
     skill_key: str
     synopsis: str
@@ -110,13 +109,12 @@ def _base_group_item(
     item: dict,
     *,
     purpose: str,
-    requires_user_confirmation: bool,
 ) -> GroupItem:
     payload: GroupItem = {
         "path": normalize_text(item.get("path")),
         "selection": _DEFAULT_SELECTION,
         "purpose": normalize_text(purpose) or "Purpose pending confirmation",
-        "requires_user_confirmation": bool(requires_user_confirmation),
+        "requires_user_confirmation": True,
     }
     for key in (
         "name",
@@ -135,9 +133,6 @@ def _base_group_item(
         normalized = normalize_text(value)
         if normalized:
             payload[key] = normalized  # type: ignore[literal-required]
-    skip_skill_runtime_outputs = item.get("skip_skill_runtime_outputs")
-    if isinstance(skip_skill_runtime_outputs, bool):
-        payload["skip_skill_runtime_outputs"] = skip_skill_runtime_outputs
     reasons = item.get("reasons")
     if isinstance(reasons, list):
         normalized_reasons = [normalize_text(reason) for reason in reasons if normalize_text(reason)]
@@ -153,8 +148,6 @@ def _base_group_item(
 
 def _group_selected_units(
     selected_units: list,
-    *,
-    requires_user_confirmation: bool,
 ) -> dict:
     grouped: dict = {
         "skills": [],
@@ -172,7 +165,6 @@ def _group_selected_units(
             _base_group_item(
                 item,
                 purpose=_unit_purpose(item),
-                requires_user_confirmation=requires_user_confirmation,
             )
         )
     return grouped
@@ -194,10 +186,7 @@ def build_selected_selection_groups(
         normalized_selected_units = selected_units
     groups: SelectionGroups = {key: [] for key in SELECTION_GROUP_KEYS}  # type: ignore[misc]
     groups.update(  # type: ignore[typeddict-item]
-        _group_selected_units(
-            normalized_selected_units,
-            requires_user_confirmation=True,
-        )
+        _group_selected_units(normalized_selected_units)
     )
 
     if context_sources_input is None:
@@ -222,7 +211,6 @@ def build_selected_selection_groups(
             _base_group_item(
                 item,
                 purpose=_explicit_purpose(item) or _document_purpose(path),
-                requires_user_confirmation=True,
             )
         )
     return groups

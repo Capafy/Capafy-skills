@@ -10,12 +10,11 @@ from packaging.common.home import current_home_from_env, safe_expanduser_path
 def _resolve_base_root(
     spec: dict,
     *,
-    home: Optional[Path] = None,
     runtime_dir: Optional[str] = None,
 ) -> Path:
     base = str(spec.get("base", "home")).strip() or "home"
     if base == "home":
-        resolved_home = safe_expanduser_path(home) if home is not None else current_home_from_env()
+        resolved_home = current_home_from_env()
         if resolved_home is None:
             raise ValueError("base=home requires a resolvable home directory")
         return resolved_home
@@ -48,7 +47,6 @@ def _resolve_root_override(override: dict) -> Optional[Path]:
 def resolve_path_spec(
     spec: dict,
     *,
-    home: Optional[Path] = None,
     runtime_dir: Optional[str] = None,
 ) -> Path:
     path_env = str(spec.get("path_env", "")).strip()
@@ -68,7 +66,7 @@ def resolve_path_spec(
             return override_root
         return safe_expanduser_path(override_root / relative)
 
-    root = _resolve_base_root(spec, home=home, runtime_dir=runtime_dir)
+    root = _resolve_base_root(spec, runtime_dir=runtime_dir)
     root_path = str(spec.get("root_path", "")).strip()
     if root_path and root_path != ".":
         root = safe_expanduser_path(root / root_path)

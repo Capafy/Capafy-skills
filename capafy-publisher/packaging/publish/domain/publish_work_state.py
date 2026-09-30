@@ -96,9 +96,9 @@ class PublishWorkState:
     def runtime_dir(self) -> str:
         return self.extra_value("runtime_dir")
 
-    def extra_value(self, key: str, default: str = "") -> str:
+    def extra_value(self, key: str) -> str:
         extra = self.extra if isinstance(self.extra, dict) else {}
-        return str(extra.get(key, default)).strip()
+        return str(extra.get(key, "")).strip()
 
 def publish_work_state_manifest_path(work_dir: Path) -> Path:
     return work_dir / PUBLISH_WORK_STATE_MANIFEST_NAME
@@ -416,6 +416,7 @@ def write_buyout_bundle_prepared_manifest(
     disposition_summary: dict[str, int],
     disposition_status: str,
     source_snapshot_digest: str,
+    source_snapshot_roots: tuple[dict[str, Any], ...],
     redaction_summary: Optional[dict[str, Any]] = None,
 ) -> Path:
     extra = prepare_extra_with_review_artifacts(
@@ -428,6 +429,7 @@ def write_buyout_bundle_prepared_manifest(
     extra["reviewed_scan_digest"] = reviewed_scan_digest
     extra["disposition_summary"] = disposition_summary
     extra["source_snapshot_digest"] = source_snapshot_digest
+    extra["source_snapshot_roots"] = list(source_snapshot_roots)
     if redaction_summary:
         extra["prepare_redaction_summary"] = redaction_summary
     return write_publish_work_state_manifest(

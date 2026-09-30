@@ -9,8 +9,7 @@
       "display_prefix": ".hermes/skills",
       "target_path": ".hermes/skills",
       "source_key": ".hermes/skills",
-      "source_value": "copied",
-      "skip_skill_runtime_outputs": true
+      "source_value": "copied"
     }
   ],
   "fixed_scan_files": [

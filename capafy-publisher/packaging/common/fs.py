@@ -9,7 +9,6 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Iterable, Optional, Union
 
 from .constants import TEXT_ENCODINGS, TEXT_SAMPLE_BYTES, VIRTUALENV_BIN_DIRS, VIRTUALENV_MARKER_FILES
-from .exclusion_rules import SYSTEM_DIRS, SYSTEM_SUFFIXES
 
 
 def classify_cleanup_error(exc: OSError) -> str:
@@ -189,24 +188,13 @@ def looks_like_absolute_symlink(path: Path) -> bool:
     return PurePosixPath(target).is_absolute() or PureWindowsPath(target).is_absolute()
 
 
-def iter_workspace_files(root: Path, skip_system: bool) -> Iterable[Path]:
+def iter_workspace_files(root: Path) -> Iterable[Path]:
     for current, dirnames, filenames in os.walk(root, topdown=True):
         current_path = Path(current)
-        kept_dirs: list[str] = []
-        for dirname in sorted(dirnames):
-            directory_path = current_path / dirname
-            if skip_system and (
-                dirname in SYSTEM_DIRS or looks_like_virtualenv_dir(directory_path)
-            ):
-                continue
-            kept_dirs.append(dirname)
-        dirnames[:] = kept_dirs
+        dirnames.sort()
 
         for filename in sorted(filenames):
-            path = current_path / filename
-            if skip_system and any(filename.endswith(suffix) for suffix in SYSTEM_SUFFIXES):
-                continue
-            yield path
+            yield current_path / filename
 
 
 __all__ = [

@@ -23,7 +23,6 @@ DEFAULT_BUNDLE_PATH = str(DEVELOPER_WORK_DIR_PATH / "bundle.zip")
 OPENAI_OFFICIAL_URL_V1 = "https://api.openai.com/v1"
 ANTHROPIC_OFFICIAL_URL = "https://api.anthropic.com"
 GOOGLE_OFFICIAL_URL = "https://generativelanguage.googleapis.com"
-WORKSPACE_DOCUMENTS_MANIFEST_NAME = "agent.workspace_documents.json"
 VIRTUALENV_MARKER_FILES = ("pyvenv.cfg",)
 VIRTUALENV_BIN_DIRS = ("bin", "Scripts")
 DEPENDENCY_MANIFEST_FILES = {
@@ -92,7 +91,6 @@ __all__ = [
     "DSN_VALUE_PATTERN",
     "ENV_REF_PATTERN",
     "GOOGLE_OFFICIAL_URL",
-    "WORKSPACE_DOCUMENTS_MANIFEST_NAME",
     "OPENAI_OFFICIAL_URL_V1",
     "PII_PATTERNS",
     "PUBLISHER_ROOT_PATH",

@@ -143,14 +143,13 @@ def packaged_path_for_entry(
     source_path: Path,
     *,
     target_name: Optional[str],
-    agent_type: str,
     used_paths: set[str],
 ) -> str:
     normalized, target_rewritten = target_relative_packaged_path(logical_path, target_name=target_name)
     if target_rewritten and not is_absolute_like_path(normalized):
         used_paths.add(normalized)
         return normalized
-    if agent_type != "download" and not is_absolute_like_path(normalized):
+    if not is_absolute_like_path(normalized):
         first_part = PurePosixPath(normalized).parts[0] if normalized else ""
         if first_part in preserved_logical_root_prefixes(target_name=target_name):
             used_paths.add(normalized)

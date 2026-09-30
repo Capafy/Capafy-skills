@@ -5,13 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from packaging.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
 from packaging.common.fs import read_text
 from packaging.common.instruction_docs import is_instruction_doc
-from packaging.publish.selection.selectable import (
-    is_absolute_like_path,
-    normalize_text,
-)
+from packaging.publish.selection.selectable import normalize_text
 from packaging.publish.selection.selection_groups import (
     is_selected_selection_group_item,
     normalize_documented_selection_groups,
@@ -149,16 +145,10 @@ def stage_sources_for_entry(
 def manifest_item(
     entry: Any,
     *,
-    preserve_logical_path: bool,
     packaged: bool,
 ) -> dict:
-    source_path = (
-        entry.logical_path
-        if preserve_logical_path or is_absolute_like_path(entry.logical_path)
-        else str(entry.source_path)
-    )
     return {
-        "source_path": source_path,
+        "source_path": entry.logical_path,
         "resolved_source_path": str(entry.source_path),
         "logical_path": entry.logical_path,
         "packaged_path": entry.packaged_path if packaged else "",
@@ -189,7 +179,6 @@ def normalize_confirmed_workspace_document_entries(
     *,
     target_name: Optional[str],
     workspace: Optional[str],
-    agent_type: str,
 ) -> dict[str, list[ConfirmedWorkspaceDocumentEntry]]:
     workspace_root = resolve_workspace_root(
         workspace=workspace,
@@ -224,7 +213,6 @@ def normalize_confirmed_workspace_document_entries(
                 logical_path,
                 source_path,
                 target_name=target_name,
-                agent_type=agent_type,
                 used_paths=used_packaged_paths,
             )
             entries[category].append(
@@ -281,7 +269,6 @@ def build_confirmed_workspace_document_stage_additions(
         payload,
         target_name=target_name,
         workspace=workspace,
-        agent_type=agent_type,
     )
     if not any(entries[category] for category in ("workspace_documents", "excluded_sources")):
         return [], [], None
@@ -298,53 +285,15 @@ def build_confirmed_workspace_document_stage_additions(
     manifest_payload = {
         "agent_type": agent_type,
         "workspace_documents": [
-            manifest_item(
-                item,
-                preserve_logical_path=True,
-                packaged=agent_type != "download",
-            )
+            manifest_item(item, packaged=True)
             for item in entries["workspace_documents"]
         ],
         "excluded_sources": [
-            manifest_item(item, preserve_logical_path=True, packaged=False)
+            manifest_item(item, packaged=False)
             for item in entries["excluded_sources"]
         ],
     }
     return tree_sources, file_sources, manifest_payload
-
-
-def write_confirmed_workspace_documents_manifest(staging_root: Path, payload: Optional[dict]) -> Optional[Path]:
-    if not payload:
-        return None
-    output_path = staging_root / WORKSPACE_DOCUMENTS_MANIFEST_NAME
-    output_path.write_text(
-        json.dumps(_public_manifest_payload(payload), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return output_path
-
-
-def _public_manifest_payload(payload: dict) -> dict:
-    public_payload = dict(payload)
-    for key in ("workspace_documents", "excluded_sources"):
-        items = payload.get(key)
-        if not isinstance(items, list):
-            continue
-        public_items: list[dict] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            public_item = dict(item)
-            logical_path = str(public_item.get("logical_path", "") or "").strip()
-            if logical_path and not is_absolute_like_path(logical_path):
-                public_item["source_path"] = logical_path
-            else:
-                public_item.pop("source_path", None)
-            public_item.pop("resolved_source_path", None)
-            public_item.pop("source_root", None)
-            public_items.append(public_item)
-        public_payload[key] = public_items
-    return public_payload
 
 
 __all__ = [
@@ -358,5 +307,4 @@ __all__ = [
     "normalize_confirmed_workspace_document_entries",
     "normalize_payload_categories",
     "stage_sources_for_entry",
-    "write_confirmed_workspace_documents_manifest",
 ]

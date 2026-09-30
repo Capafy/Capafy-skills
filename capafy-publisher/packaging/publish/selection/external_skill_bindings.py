@@ -69,7 +69,6 @@ def load_external_skill_sources_payload(
                 "origin_ref": str(raw_item.get("origin_ref") or "").strip(),
                 "snapshot_digest": str(raw_item.get("snapshot_digest") or "").strip(),
                 "source_kind": str(raw_item.get("source_kind") or "").strip(),
-                "skip_skill_runtime_outputs": raw_item.get("skip_skill_runtime_outputs"),
             }
         )
     return normalized
@@ -78,10 +77,7 @@ def load_external_skill_sources_payload(
 def compute_skill_snapshot_digest(skill_root: Path) -> str:
     root = skill_root.expanduser().resolve()
     digest = hashlib.sha256()
-    for path in iter_packaged_files(
-        root,
-        skip_skill_runtime_outputs=True,
-    ):
+    for path in iter_packaged_files(root):
         relpath = fs_relpath(path, root)
         digest.update(relpath.encode("utf-8"))
         digest.update(b"\0")
@@ -98,7 +94,6 @@ def compute_skill_snapshot_digest(skill_root: Path) -> str:
 class SelectedExternalSkillBinding:
     logical_path: str
     source_path: Path
-    skip_skill_runtime_outputs: bool = True
 
 
 _SKILL_SNAPSHOT_DIGESTS_BY_PATH: dict[str, str] = {}
@@ -245,11 +240,6 @@ def selected_external_skill_bindings(
             SelectedExternalSkillBinding(
                 logical_path=logical_path,
                 source_path=resolved,
-                skip_skill_runtime_outputs=(
-                    binding.get("skip_skill_runtime_outputs")
-                    if isinstance(binding.get("skip_skill_runtime_outputs"), bool)
-                    else True
-                ),
             )
         )
 
@@ -293,7 +283,6 @@ def augment_stage_plan_with_selected_external_skill_bindings(
             display_prefix=logical_path,
             source_key=logical_path,
             source_value="external_skill_source",
-            skip_skill_runtime_outputs=item.skip_skill_runtime_outputs,
         ))
     return StagePlan(
         tree_sources=[*stage_plan.tree_sources, *extra_tree_sources],

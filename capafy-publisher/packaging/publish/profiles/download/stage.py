@@ -11,8 +11,6 @@ from packaging.common.packaged_files import (
     should_skip_packaged_path,
 )
 from packaging.publish.staging.tree_copy import copy_tree
-from packaging.publish.artifacts.bundle_context import write_bundle_context
-from packaging.publish.staging.manifest import write_stage_manifest
 from packaging.publish.selection.selection_groups import (
     is_selected_selection_group_item,
     normalize_documented_selection_groups,
@@ -203,22 +201,12 @@ def stage_buyout(
             }
         )
 
-    bundle_context_payload = dict(bundle_context)
-
-    bundle_context_path = write_bundle_context(staging_root, bundle_context_payload)
-    stage_manifest_path = write_stage_manifest(
-        staging_root,
-        scan_only_prefixes=(),
-    )
-
     payload = {
         "agent_type": "download",
         "staging_path": str(staging_root),
         "copied_files": copied_files,
         "skipped": skipped,
-        "generated_files": [bundle_context_path.name],
-        "bundle_context_path": str(bundle_context_path),
-        "stage_manifest_path": str(stage_manifest_path),
+        "generated_files": [],
         "included_units": included_units,
         "selected_units": selected_units,
     }

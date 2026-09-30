@@ -46,7 +46,7 @@ def _workspace_document_candidates(documents: list[SourceDocument], *, target=No
         if not bool(document.get("is_instruction", False)):
             continue
         path = normalize_text(document.get("path"))
-        if not path or path == "_scan_only" or path.startswith("_scan_only/") or _is_under_skill_root(path):
+        if not path or _is_under_skill_root(path):
             continue
         owning_paths = tuple(
             str(item).strip()

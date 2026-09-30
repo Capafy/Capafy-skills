@@ -10,8 +10,7 @@
       "display_prefix": ".agents/skills",
       "target_path": ".agents/skills",
       "source_key": ".agents/skills",
-      "source_value": "copied",
-      "skip_skill_runtime_outputs": true
+      "source_value": "copied"
     },
     {
       "base": "home",
@@ -19,8 +18,7 @@
       "display_prefix": ".codex/skills",
       "target_path": ".codex/skills",
       "source_key": ".codex/skills",
-      "source_value": "copied",
-      "skip_skill_runtime_outputs": true
+      "source_value": "copied"
     }
   ],
   "fixed_scan_files": [

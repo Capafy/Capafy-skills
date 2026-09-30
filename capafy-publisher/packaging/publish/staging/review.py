@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, TYPE_CHECKING, Union
 
+from packaging.publish.artifacts.bundle_context import validate_agent_type
 from packaging.publish.reviewed_scan import (
     REVIEW_METADATA_KEY,
     REVIEW_STATUS_REVIEWED,
@@ -101,14 +102,10 @@ def _list_payload(payload: dict[str, Any], key: str) -> list[Any]:
     return _copy_dict_list(value) if isinstance(value, list) else []
 
 
-def _generic_payload(payload: dict[str, Any], *, staging_root: Union[str, Path], agent_type: str) -> list[Any]:
-    resolved_agent_type = str(agent_type or "").strip()
-    if not resolved_agent_type:
-        raise ValueError("reviewed scan source filtering requires agent_type")
+def _generic_payload(payload: dict[str, Any], *, staging_root: Union[str, Path]) -> list[Any]:
     return filter_generic_payload_items(
         _list_payload(payload, "generic"),
         staging_root=staging_root,
-        agent_type=resolved_agent_type,
     )
 
 
@@ -121,9 +118,10 @@ def build_reviewed_scan_from_scan(
     agent_type = str(review_binding.get("agent_type", "")).strip()
     if not agent_type:
         raise ValueError("review_binding.agent_type is required")
+    validate_agent_type(agent_type)
     reviewed_scan = {
         "url_proxy": _list_payload(raw_scan, "url_proxy"),
-        "generic": _generic_payload(raw_scan, staging_root=staging_root, agent_type=agent_type),
+        "generic": _generic_payload(raw_scan, staging_root=staging_root),
         REVIEW_METADATA_KEY: _review_metadata_template(review_binding),
     }
     return reviewed_scan

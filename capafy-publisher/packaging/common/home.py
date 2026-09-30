@@ -40,12 +40,10 @@ def _system_home_fallback() -> Optional[Path]:
 
 def home_roots_from_env(
     environ: Optional[Mapping[str, str]] = None,
-    *,
-    include_system_fallback: bool = True,
 ) -> list[Path]:
     env = os.environ if environ is None else environ
     raw_values = _env_home_values(env)
-    if include_system_fallback and not raw_values:
+    if not raw_values:
         fallback = _system_home_fallback()
         if fallback is not None:
             raw_values.append(str(fallback))
@@ -65,10 +63,8 @@ def home_roots_from_env(
 
 def current_home_from_env(
     environ: Optional[Mapping[str, str]] = None,
-    *,
-    include_system_fallback: bool = True,
 ) -> Optional[Path]:
-    roots = home_roots_from_env(environ, include_system_fallback=include_system_fallback)
+    roots = home_roots_from_env(environ)
     return roots[0] if roots else None
 
 
@@ -83,15 +79,10 @@ def safe_expanduser_path(
     path: PathLike,
     *,
     environ: Optional[Mapping[str, str]] = None,
-    home: Optional[Path] = None,
-    include_system_fallback: bool = True,
 ) -> Path:
     text = str(path)
     if text == "~" or text.startswith("~/") or text.startswith("~\\"):
-        resolved_home = home or current_home_from_env(
-            environ,
-            include_system_fallback=include_system_fallback,
-        )
+        resolved_home = current_home_from_env(environ)
         if resolved_home is None:
             return Path(text)
         if text == "~":

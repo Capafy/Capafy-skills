@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Collection, Mapping, Optional, Union
+from typing import Mapping, Optional, Union
 
 from packaging.common.constants import (
     ANTHROPIC_OFFICIAL_URL,
@@ -506,14 +506,11 @@ ALL_OFFICIAL_PROVIDER_SPECS_BY_FAMILY = {spec.family: spec for spec in ALL_OFFIC
 
 def build_platform_official_provider_specs(
     platform: str,
-    families: Optional[Collection[str]] = None,
 ) -> tuple[OfficialProviderSpec, ...]:
     normalized_platform = str(platform or "").strip().lower()
-    family_names = None if families is None else set(families)
     selected = tuple(
         spec
         for definition in PROVIDER_CATALOG
-        if family_names is None or definition.family in family_names
         if (spec := definition.official_spec(normalized_platform)) is not None
     )
     _validate_official_provider_api_formats(selected)

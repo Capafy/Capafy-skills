@@ -4,18 +4,13 @@ from typing import Optional
 import json
 from pathlib import Path
 
-from packaging.common.constants import WORKSPACE_DOCUMENTS_MANIFEST_NAME
 from packaging.common.exclusion_rules import is_content_scan_text_file
 from packaging.common.fs import is_archive_artifact, iter_workspace_files, read_text, relpath
 from packaging.config.json_io import walk_json_strings
-from packaging.publish.artifacts.bundle_context import BUNDLE_CONTEXT_NAME
-from packaging.publish.staging.manifest import STAGE_MANIFEST_NAME
 from packaging.publish.staging.local_path_sanitizer import rewrite_local_path_text
 
 
 _STRUCTURED_STAGE_MANIFESTS = frozenset({
-    BUNDLE_CONTEXT_NAME,
-    WORKSPACE_DOCUMENTS_MANIFEST_NAME,
     "agent.runtime_dependencies.json",
 })
 
@@ -58,10 +53,10 @@ def redact_main_tree_local_paths(
     total_replacements = 0
     known_refs = dict(packaged_path_refs)
 
-    for path in iter_workspace_files(staging_root, skip_system=False):
+    for path in iter_workspace_files(staging_root):
         relative_file = relpath(path, staging_root)
         normalized = relative_file.replace("\\", "/")
-        if not normalized or normalized == STAGE_MANIFEST_NAME or normalized.startswith("_scan_only/"):
+        if not normalized:
             continue
         if is_archive_artifact(path.name):
             continue

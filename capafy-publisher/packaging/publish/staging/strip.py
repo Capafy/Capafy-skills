@@ -183,8 +183,6 @@ class StripSummary:
 def replace_values_in_staging(
     staging_root: Path,
     replacements: list[tuple[str, str]],
-    *,
-    scan_only_prefix: str = "_scan_only",
 ) -> StripSummary:
     targets = [
         StripTarget(value=value, placeholder=placeholder)
@@ -195,7 +193,7 @@ def replace_values_in_staging(
         return StripSummary(total_replacements=0, targets_matched=0)
 
     total = matched = 0
-    for file_path in _text_files(staging_root, scan_only_prefix):
+    for file_path in _text_files(staging_root):
         try:
             text = file_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -217,8 +215,6 @@ def replace_values_in_staging(
 def replace_strip_targets_in_staging(
     staging_root: Path,
     targets: list[StripTarget],
-    *,
-    scan_only_prefix: str = "_scan_only",
 ) -> StripSummary:
     if not targets:
         return StripSummary(total_replacements=0, targets_matched=0)
@@ -248,7 +244,6 @@ def replace_strip_targets_in_staging(
         summary = replace_values_in_staging(
             staging_root,
             global_replacements,
-            scan_only_prefix=scan_only_prefix,
         )
         total += summary.total_replacements
         if summary.targets_matched:
@@ -259,16 +254,14 @@ def replace_strip_targets_in_staging(
 def apply_strip(
     staging_root: Path,
     generic_values: Iterable[GenericValue],
-    *,
-    scan_only_prefix: str = "_scan_only",
 ) -> StripSummary:
     targets = collect_generic_strip_targets(generic_values)
     if not targets:
         return StripSummary(total_replacements=0, targets_matched=0)
-    return replace_strip_targets_in_staging(staging_root, targets, scan_only_prefix=scan_only_prefix)
+    return replace_strip_targets_in_staging(staging_root, targets)
 
 
-def _text_files(staging_root: Path, scan_only_prefix: str) -> list[Path]:
+def _text_files(staging_root: Path) -> list[Path]:
     if not staging_root.is_dir():
         return []
     excluded_suffixes = {
@@ -280,12 +273,7 @@ def _text_files(staging_root: Path, scan_only_prefix: str) -> list[Path]:
     for path in staging_root.rglob("*"):
         if not path.is_file() or path.suffix.lower() in excluded_suffixes:
             continue
-        try:
-            rel = path.relative_to(staging_root).as_posix()
-        except ValueError:
-            continue
-        if not rel.startswith(scan_only_prefix):
-            result.append(path)
+        result.append(path)
     return result
 
 

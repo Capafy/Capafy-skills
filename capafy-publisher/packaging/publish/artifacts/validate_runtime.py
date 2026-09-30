@@ -11,7 +11,6 @@ from packaging.publish.artifacts.bundle_context import (
     BUYOUT_FORBIDDEN_FILES,
     validate_agent_type,
 )
-from packaging.publish.staging.manifest import STAGE_MANIFEST_NAME
 from packaging.runtime import get_target
 
 def _present_top_level_entries(runtime_root: Path) -> list[str]:
@@ -71,7 +70,7 @@ def _iter_reviewed_scan_entries(reviewed_scan_payload: Optional[dict]) -> list[d
 
 def _collect_runtime_text(runtime_root: Path) -> str:
     chunks: list[str] = []
-    for path in iter_workspace_files(runtime_root, skip_system=False):
+    for path in iter_workspace_files(runtime_root):
         if is_archive_artifact(path.name):
             continue
         text, _encoding = read_text(path)
@@ -90,17 +89,11 @@ def _validate_structure_check(runtime_root: Path) -> dict:
     ]
     forbidden_dirs = [name for name in top_level_entries if name in BUYOUT_FORBIDDEN_DIRS]
     forbidden_paths: list[str] = []
-    scan_only_residual: list[str] = []
-    internal_manifest_residual: list[str] = []
     dependency_files: list[str] = []
-    for path in iter_workspace_files(runtime_root, skip_system=False):
+    for path in iter_workspace_files(runtime_root):
         relpath = fs_relpath(path, runtime_root)
         if path.name in BUYOUT_FORBIDDEN_FILES:
             forbidden_paths.append(relpath)
-        if relpath == "_scan_only" or relpath.startswith("_scan_only/"):
-            scan_only_residual.append(relpath)
-        if relpath == STAGE_MANIFEST_NAME:
-            internal_manifest_residual.append(relpath)
         if path.is_file() and path.name in {"requirements.txt", "package.json", "pyproject.toml"}:
             dependency_files.append(relpath)
 
@@ -110,8 +103,6 @@ def _validate_structure_check(runtime_root: Path) -> dict:
         and not missing_skill_md
         and not forbidden_dirs
         and not forbidden_paths
-        and not scan_only_residual
-        and not internal_manifest_residual
     )
     return {
         "ok": ok,
@@ -122,10 +113,6 @@ def _validate_structure_check(runtime_root: Path) -> dict:
         "top_level_entries": top_level_entries,
         "forbidden_dirs": forbidden_dirs,
         "forbidden_paths": forbidden_paths,
-        "no_scan_only_residual": not scan_only_residual,
-        "scan_only_residual": scan_only_residual,
-        "no_internal_manifest_residual": not internal_manifest_residual,
-        "internal_manifest_residual": internal_manifest_residual,
         "dependency_files": dependency_files,
     }
 

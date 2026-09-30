@@ -17,21 +17,26 @@ class StageTreeSource:
     display_prefix: str
     source_key: str
     source_value: str
-    skip_skill_runtime_outputs: bool = False
-    excluded_relpath_prefixes: tuple[str, ...] = field(default_factory=tuple)
-    scan_only: bool = False
     required: bool = True
 
 
 @dataclass(frozen=True)
 class StageFileSource:
     source_file: Path
-    relative_target_path: Path
     source_key: str
     source_value: str
+    relative_target_path: Optional[Path] = None
     scan_only: bool = False
     required: bool = True
-    requires_user_confirmation: bool = False
+
+    def __post_init__(self) -> None:
+        if self.scan_only:
+            if self.relative_target_path is not None:
+                raise ValueError("scan-only file sources must not have a target path")
+            if not self.source_key.strip():
+                raise ValueError("scan-only file sources require a logical source_key")
+        elif self.relative_target_path is None:
+            raise ValueError("staged file sources require relative_target_path")
 
 
 @dataclass(frozen=True)
@@ -87,7 +92,6 @@ class EnvProfileTarget:
 
 class HomeBackedProfileTarget(EnvProfileTarget):
     _HOME_PREFIX = ""
-    _STAGE_PLAN_PREFIXES: tuple[str, ...] = ()
 
     def __init__(self, profile: Optional[dict] = None):
         super().__init__(profile)
@@ -110,11 +114,10 @@ class HomeBackedProfileTarget(EnvProfileTarget):
 
     def build_stage_plan(self, runtime_dir: str) -> StagePlan:
         plan = super().build_stage_plan(runtime_dir)
-        prefixes = self._STAGE_PLAN_PREFIXES or (self._HOME_PREFIX,)
         return rebase_stage_plan_sources(
             plan,
             source_root=self.runtime_home,
-            target_prefixes=prefixes,
+            target_prefix=self._HOME_PREFIX,
         )
 
 
@@ -126,14 +129,13 @@ def format_source_value(raw: str, workspace_path: Optional[str] = None) -> str:
     return raw
 
 
-def _target_suffix(relpath: str, prefixes: tuple[str, ...]) -> Optional[str]:
+def _target_suffix(relpath: str, prefix: str) -> Optional[str]:
     normalized_relpath = PurePosixPath(relpath).as_posix().strip("/")
-    for raw_prefix in prefixes:
-        prefix = PurePosixPath(raw_prefix).as_posix().strip("/")
-        if normalized_relpath == prefix:
-            return ""
-        if normalized_relpath.startswith(f"{prefix}/"):
-            return normalized_relpath[len(prefix) + 1 :]
+    prefix = PurePosixPath(prefix).as_posix().strip("/")
+    if normalized_relpath == prefix:
+        return ""
+    if normalized_relpath.startswith(f"{prefix}/"):
+        return normalized_relpath[len(prefix) + 1 :]
     return None
 
 
@@ -141,10 +143,10 @@ def rebase_stage_plan_sources(
     plan: StagePlan,
     *,
     source_root: Path,
-    target_prefixes: tuple[str, ...],
+    target_prefix: str,
 ) -> StagePlan:
     def rebase_tree_source(source: StageTreeSource) -> StageTreeSource:
-        suffix = _target_suffix(source.relative_target_root.as_posix(), target_prefixes)
+        suffix = _target_suffix(source.relative_target_root.as_posix(), target_prefix)
         return (
             replace(source, source_root=source_root / suffix)
             if suffix is not None
@@ -152,7 +154,12 @@ def rebase_stage_plan_sources(
         )
 
     def rebase_file_source(source: StageFileSource) -> StageFileSource:
-        suffix = _target_suffix(source.relative_target_path.as_posix(), target_prefixes)
+        if source.scan_only:
+            logical_path = source.source_key
+        else:
+            assert source.relative_target_path is not None
+            logical_path = source.relative_target_path.as_posix()
+        suffix = _target_suffix(logical_path, target_prefix)
         return (
             replace(source, source_file=source_root / suffix)
             if suffix is not None
@@ -186,8 +193,6 @@ def build_stage_plan(
                 display_prefix=str(root_spec.get("display_prefix", "")),
                 source_key=str(root_spec.get("source_key", "")),
                 source_value=format_source_value(str(root_spec.get("source_value", "copied")), runtime_dir),
-                skip_skill_runtime_outputs=bool(root_spec.get("skip_skill_runtime_outputs", False)),
-                excluded_relpath_prefixes=string_tuple_profile_value(root_spec.get("excluded_relpath_prefixes")),
                 required=False,
             )
         )
@@ -205,8 +210,7 @@ def build_stage_plan(
         file_sources.append(
             StageFileSource(
                 source_file=resolve_path_spec(file_spec, runtime_dir=runtime_dir),
-                relative_target_path=Path("_scan_only").joinpath(*PurePosixPath(normalized_display_path).parts),
-                source_key=str(file_spec.get("display_path", display_path)),
+                source_key=normalized_display_path,
                 source_value="scan_only_reference",
                 scan_only=True,
                 required=False,

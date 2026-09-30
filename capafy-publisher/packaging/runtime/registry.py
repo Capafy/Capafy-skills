@@ -17,7 +17,7 @@ def _codex_target_factory(profile: dict):
     return CodexTarget(profile)
 
 
-def _claude_code_target_factory(profile: dict):
+def _claude_sdk_target_factory(profile: dict):
     EnvProfileTarget = import_module("packaging.runtime.stage_plan").EnvProfileTarget
     return EnvProfileTarget(profile)
 
@@ -37,11 +37,11 @@ def _codex_provider_runtime_factory():
     return CodexRuntime()
 
 
-def _claude_code_provider_runtime_factory():
-    ClaudeCodeRuntime = import_module(
-        "packaging.runtime.plugins.claude_code.url_proxy"
-    ).ClaudeCodeRuntime
-    return ClaudeCodeRuntime()
+def _claude_sdk_provider_runtime_factory():
+    ClaudeSdkRuntime = import_module(
+        "packaging.runtime.plugins.claude_sdk.url_proxy"
+    ).ClaudeSdkRuntime
+    return ClaudeSdkRuntime()
 
 
 def _hermes_provider_runtime_factory():
@@ -70,15 +70,15 @@ _RUNTIME_ADAPTERS = (
         provider_runtime_factory=_codex_provider_runtime_factory,
     ),
     RuntimeAdapter(
-        runtime_id="claude_code",
+        runtime_id="claude-sdk",
         descriptors=(
             TargetDescriptor(
-                target_id="claude_code",
-                profile_env_id="claude_code",
+                target_id="claude-sdk",
+                profile_env_id="claude_sdk",
             ),
         ),
-        target_factory=_claude_code_target_factory,
-        provider_runtime_factory=_claude_code_provider_runtime_factory,
+        target_factory=_claude_sdk_target_factory,
+        provider_runtime_factory=_claude_sdk_provider_runtime_factory,
     ),
     RuntimeAdapter(
         runtime_id="openclaw",

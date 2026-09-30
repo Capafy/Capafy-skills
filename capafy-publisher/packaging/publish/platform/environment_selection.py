@@ -31,15 +31,13 @@ FORBIDDEN_ENVIRONMENT_NAMES = frozenset(
     }
 )
 _RUNTIME_FORBIDDEN_ENVIRONMENT_NAMES = {
-    "claude_code": frozenset({"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY"}),
+    "claude-sdk": frozenset({"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY"}),
     "codex": frozenset({"OPENAI_BASE_URL", "OPENAI_API_KEY"}),
 }
 
 
 def forbidden_environment_names_for_runtime(env_id: str) -> frozenset[str]:
-    normalized_env_id = str(env_id or "").strip().lower().replace("-", "_")
-    if normalized_env_id == "claude":
-        normalized_env_id = "claude_code"
+    normalized_env_id = str(env_id or "").strip().lower().replace("_", "-")
     return frozenset(
         {
             *FORBIDDEN_ENVIRONMENT_NAMES,

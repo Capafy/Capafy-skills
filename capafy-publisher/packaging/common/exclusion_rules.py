@@ -6,9 +6,7 @@ from pathlib import PurePosixPath
 from packaging.common.constants import DEPENDENCY_MANIFEST_FILES
 
 
-SYSTEM_DIRS = {".git", ".github", "__pycache__", "node_modules", ".venv", "venv"}
-
-SYSTEM_SUFFIXES = {".pyc", ".pyo"}
+SYSTEM_DIRS = {".git", ".github", ".pytest_cache", "__pycache__", "node_modules", ".venv", "venv"}
 
 STAGE_EXCLUDED_DIRS = SYSTEM_DIRS | {
     "memory",
@@ -171,7 +169,6 @@ __all__ = [
     "STAGE_EXCLUDED_DIRS",
     "STAGE_EXCLUDED_SUFFIXES",
     "SYSTEM_DIRS",
-    "SYSTEM_SUFFIXES",
     "TEXT_FILE_BASENAMES",
     "TEXT_FILE_SUFFIXES",
     "should_skip_content_scan_for_file",

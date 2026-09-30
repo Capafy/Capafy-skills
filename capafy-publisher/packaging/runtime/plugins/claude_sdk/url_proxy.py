@@ -181,7 +181,7 @@ def resolve_settings_url(
     return ResolvedSetting(value=ANTHROPIC_OFFICIAL_URL, kind="synthesized")
 
 
-class ClaudeCodeRuntime(RuntimeContract):
+class ClaudeSdkRuntime(RuntimeContract):
     def os_fallback_environment_names(self) -> frozenset[str]:
         return frozenset((CLAUDE_BASE_URL_ENV_KEY, *MODEL_ENV_FIELDS))
 
@@ -219,7 +219,7 @@ class ClaudeCodeRuntime(RuntimeContract):
 
 
 __all__ = [
-    "ClaudeCodeRuntime",
+    "ClaudeSdkRuntime",
     "resolve_settings_model",
     "resolve_settings_url",
 ]

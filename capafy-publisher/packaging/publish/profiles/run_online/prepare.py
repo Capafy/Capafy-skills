@@ -253,10 +253,9 @@ def run_run_online_prepare(ctx: Any) -> tuple[dict[str, Any], int]:
             "environment_candidates_path": environment_selection_path,
             "environment_candidate_digest": environment_candidate_digest,
             "source_snapshot_digest": compute_publish_source_snapshot_digest(
-                runtime_dir=manifest.runtime_dir,
-                latest_state=latest_state,
-                manifest=manifest,
+                source_roots=result.source_snapshot_roots,
             ),
+            "source_snapshot_roots": list(result.source_snapshot_roots),
         }
     )
     if environment_variables:

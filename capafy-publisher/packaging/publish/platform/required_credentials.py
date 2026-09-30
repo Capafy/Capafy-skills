@@ -10,7 +10,6 @@ from packaging.publish.reviewed_scan import (
     sanitize_reviewed_scan_payload,
 )
 from packaging.publish.platform.environment_selection import forbidden_environment_names_for_runtime
-from packaging.publish.security.scan.scan_only_paths import is_scan_only_source_path
 
 
 def _strip_tracking_source(item: dict, *, label: str) -> str:
@@ -97,10 +96,6 @@ def _strip_tracking_generic_entry(entry: dict, *, index: int) -> dict[str, Any]:
     return projected
 
 
-def _is_uploadable_generic_entry(entry: Any) -> bool:
-    return isinstance(entry, dict) and not is_scan_only_source_path(str(entry.get("source", "") or ""))
-
-
 def _qualified_generic_field(entry: dict[str, Any]) -> str:
     field = str(entry.get("field", "") or "").strip()
     source = str(entry.get("source", "") or "").strip()
@@ -127,7 +122,7 @@ def _qualified_generic_field(entry: dict[str, Any]) -> str:
 def _project_unique_generic_entries(generic: list[Any]) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for index, entry in enumerate(generic):
-        if not _is_uploadable_generic_entry(entry):
+        if not isinstance(entry, dict):
             continue
         projected = _strip_tracking_generic_entry(entry, index=index)
         field = str(projected.get("field", "") or "").strip()

@@ -93,24 +93,13 @@ def _merged_file_payload(paths: list[Path], archive_path: str) -> bytes:
 def build_bundle_archive(
     staging_root: Path,
     output_path: Path,
-    *,
-    exclude_paths: Optional[set[str]] = None,
-    exclude_prefixes: tuple[str, ...] = (),
 ) -> dict:
     if output_path.suffix.lower() != ".zip":
         raise ValueError(f"bundle output path must end with .zip: {output_path}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    validate_no_packaged_local_path_violations(
-        staging_root,
-        exclude_paths=exclude_paths,
-        exclude_prefixes=exclude_prefixes,
-    )
+    validate_no_packaged_local_path_violations(staging_root)
 
-    entries = collect_final_zip_entries(
-        staging_root,
-        exclude_paths=exclude_paths,
-        exclude_prefixes=exclude_prefixes,
-    )
+    entries = collect_final_zip_entries(staging_root)
 
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for directory in sorted(entries.archive_directories):

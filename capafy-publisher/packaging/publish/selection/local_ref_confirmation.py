@@ -87,8 +87,12 @@ def _stage_plan_path_variants(source_path: Path, stage_plan: Optional[StagePlan]
         relpath = _path_relative_to(source_path, source_file.parent)
         if relpath is None:
             continue
-        target_parent = PurePosixPath(getattr(file_source, "relative_target_path", Path("")).parent.as_posix())
-        variants.add(normalize_local_ref_path((target_parent / relpath).as_posix()))
+        if file_source.scan_only:
+            logical_path = PurePosixPath(file_source.source_key)
+        else:
+            assert file_source.relative_target_path is not None
+            logical_path = PurePosixPath(file_source.relative_target_path.as_posix())
+        variants.add(normalize_local_ref_path((logical_path.parent / relpath).as_posix()))
 
     for tree_source in getattr(stage_plan, "tree_sources", []):
         source_root = Path(getattr(tree_source, "source_root", Path(""))).expanduser()

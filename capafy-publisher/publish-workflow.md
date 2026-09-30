@@ -85,10 +85,12 @@ python3 packager.py publish-refresh-url --agent-id <agent_id> [--step init|publi
 
 | `--env` | `--runtime-dir` |
 |---|---|
-| `claude_code` | Project root opened when Claude Code was launched |
+| `claude-sdk` | Project root of the current Claude Code session |
 | `codex` | Project root of the current Codex session |
 | `hermes` | Project/workspace root of the current Hermes session |
 | `openclaw` | Current OpenClaw workspace, such as `~/.openclaw/workspace`; not the user home, `~/.openclaw`, or a skill directory |
+
+Claude Code is the local workspace being scanned. Its runtime identifier is `claude-sdk` in `--env`, `env_id`, `target_id`, and `agentRuntime`.
 
 - `--env` and `--runtime-dir` are required on every `publish-init` call. The target runtime need not match the host running the publisher.
 - A `metadata.openclaw` skill requires `--env openclaw`.
@@ -225,7 +227,7 @@ Each item requires:
 - `value`: the exact sensitive literal found in the staged file;
 - `source`: a concrete staging-relative file that will enter the final package.
 
-`field` and `value_type` may be included when useful. Do not use directories, escaped paths, `_scan_only/` references, internal manifests, missing files, or existing archive artifacts as sources. The program validates findings, filters anything outside the package boundary, fills internal metadata, and replaces retained values only in staging.
+`field` and `value_type` may be included when useful. Do not use directories, escaped paths, external scan-only sources, internal manifests, missing files, or existing archive artifacts as sources. The program validates findings, filters anything outside the package boundary, fills internal metadata, and replaces retained values only in staging.
 
 Submit findings with:
 
@@ -241,7 +243,7 @@ If no missed value exists, rerun `publish-submit --action prepare` without `--de
 - Allowed files remain in staging; sensitive literals are replaced with `PLATFORM_MANAGED_*` placeholders without modifying the creator's source files.
 - Keep a runtime-required `.env` or a `.env` inside a selected skill when it belongs in the package, but strip sensitive values by semantics. Exclude authentication state, private keys, and runtime-irrelevant development configuration.
 - Codex, Claude Code, Hermes, and OpenClaw do not package global agent configuration. Local runtime configuration is read only for safe provider metadata needed by the publish flow.
-- Claude Code reserves `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` for `url_proxy`; Codex reserves `OPENAI_BASE_URL` and `OPENAI_API_KEY` for `url_proxy`. These names must never be offered or uploaded as ordinary Run Online environment variables.
+- The `claude-sdk` runtime reserves `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` for `url_proxy`; Codex reserves `OPENAI_BASE_URL` and `OPENAI_API_KEY` for `url_proxy`. These names must never be offered or uploaded as ordinary Run Online environment variables.
 - Run Online environment discovery records names only. Show `environment_variable_hint` names and conflicts to the creator; selected values are included only in the final merged submission, while unselected credential values are completed on the final review page.
 
 ### Secret display boundary
