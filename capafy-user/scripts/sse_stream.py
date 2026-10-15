@@ -9,21 +9,13 @@ import urllib.request
 
 try:
     from . import auth, capafy_http, thin_skill_state
-    from .defaults import DEFAULT_PLATFORM_BASE_URL
+    from .common.defaults import DEFAULT_PLATFORM_BASE_URL
 except ImportError:  # pragma: no cover - CLI fallback
     import auth, capafy_http, thin_skill_state  # type: ignore
-    from defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
+    from common.defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
 
 
 TERMINAL_EVENT_TYPES = {"done", "timeout"}
-
-
-def parse_event_stream(stream) -> tuple[list[dict], Optional[str]]:
-    events = list(iter_event_stream(stream))
-    last_event_id = None
-    if events:
-        last_event_id = str(events[-1].get("event_id")) if events[-1].get("event_id") else None
-    return events, last_event_id
 
 
 def iter_event_stream(stream):
@@ -80,10 +72,6 @@ def build_messages_url(
     if reconnect:
         url = f"{url}/reconnect"
     return url
-
-
-def build_interrupt_url(instance_id: str, *, base_url: str = DEFAULT_PLATFORM_BASE_URL) -> str:
-    return f"{base_url.rstrip('/')}/agent/relay/instances/{instance_id}/interrupt"
 
 
 def _build_headers(token: Optional[str], *, has_json_body: bool) -> dict[str, str]:
@@ -227,7 +215,6 @@ def stream_message(
     content: Optional[str] = None,
     original_question: Optional[str] = None,
     next_step_plan: Optional[str] = None,
-    next_step: Optional[str] = None,
     files: Optional[Union[list[dict], list[str]]] = None,
     reconnect: bool = False,
     base_url: str = "",
@@ -240,9 +227,6 @@ def stream_message(
 
     if not reconnect and content is None:
         raise ValueError("content is required unless reconnect=True")
-    if next_step_plan is None and next_step is not None:
-        next_step_plan = next_step
-
     token_loader = auth_loader or auth.load_token
     token = token_loader() if token_loader else None
 
@@ -262,8 +246,11 @@ def stream_message(
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 if not _is_event_stream_response(response):
+                    content_type = _header_value(getattr(response, "headers", None), "Content-Type").lower()
                     payload = _read_json_response(response)
                     _emit_event(payload)
+                    if "text/html" in content_type:
+                        return 1
                     _record_successful_send(instance_id, reconnect=reconnect_mode)
                     return 0
                 saw_event = False
@@ -281,7 +268,7 @@ def stream_message(
         except urllib.error.HTTPError as exc:
             _emit_event(_read_http_error(exc))
             return 1
-        except (OSError, urllib.error.URLError):
+        except OSError:
             attempts += 1
             reconnect_mode = True
 
@@ -295,7 +282,6 @@ def _main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--content")
     parser.add_argument("--original-question")
     parser.add_argument("--next-step-plan")
-    parser.add_argument("--next-step", dest="next_step_plan")
     parser.add_argument("--files", nargs="*", default=None, help="file URLs to send to Agent; each entry is auto-wrapped to {url, originalFileName}")
     parser.add_argument("--reconnect", action="store_true")
     parser.add_argument("--base-url", default="")

@@ -340,7 +340,7 @@ def unwrap_platform_response(path: str, body: Any, *, allow_raw_dict_without_cod
             return body
         raise ValueError(f"{path} response is missing standard platform code")
     code = body.get("code")
-    if code not in (0, "0", None):
+    if code not in (0, "0"):
         raise ValueError(f"{path} platform returned an error: {body.get('msg') or body}")
     data = body.get("data", {})
     if data is None:

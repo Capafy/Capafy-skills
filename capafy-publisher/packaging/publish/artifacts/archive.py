@@ -7,6 +7,7 @@ import zipfile
 
 from packaging.common.final_zip_files import collect_final_zip_entries
 from packaging.publish.artifacts.package_invariants import validate_no_packaged_local_path_violations
+from packaging.publish.artifacts.relative_path_invariants import validate_packaged_relative_path_references
 
 
 _TEXT_APPEND_SUFFIXES = {".md", ".markdown", ".mdx", ".txt"}
@@ -98,6 +99,7 @@ def build_bundle_archive(
         raise ValueError(f"bundle output path must end with .zip: {output_path}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     validate_no_packaged_local_path_violations(staging_root)
+    validate_packaged_relative_path_references(staging_root)
 
     entries = collect_final_zip_entries(staging_root)
 

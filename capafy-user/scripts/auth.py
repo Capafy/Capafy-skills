@@ -18,10 +18,6 @@ def buyer_skill_dir_path(current_file: Optional[Path] = None) -> Path:
     return base.parents[1]
 
 
-def token_file_path(home_dir: Optional[Path] = None) -> Path:
-    return token_store_path(home_dir)
-
-
 def token_store_path(home_dir: Optional[Path] = None) -> Path:
     base = Path(home_dir) if home_dir is not None else buyer_skill_dir_path()
     return base / TOKEN_STORE_FILENAME
@@ -156,8 +152,9 @@ def _main(argv: Optional[list[str]] = None) -> int:
             clear_token()
             return 0
         if args.command == "check":
-            print("configured" if has_token() else "missing")
-            return 0 if has_token() else 1
+            configured = has_token()
+            print("configured" if configured else "missing")
+            return 0 if configured else 1
         return 1
     except ValueError as exc:
         print(str(exc), file=sys.stderr)

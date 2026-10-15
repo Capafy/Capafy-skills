@@ -8,7 +8,6 @@ from typing import Any, Iterable, Mapping, Optional
 
 
 STATE_FILENAME = "thin_skills_state.json"
-LEGACY_STATE_DIRNAME = ".capafy"
 RETAINED_ORDER_STATUSES = {"active", "expired"}
 
 
@@ -20,11 +19,6 @@ def skill_root_path(current_file: Optional[Path] = None) -> Path:
 def state_file_path(skill_root: Optional[Path] = None) -> Path:
     root = skill_root if skill_root is not None else skill_root_path()
     return root / STATE_FILENAME
-
-
-def legacy_state_file_path(skill_root: Optional[Path] = None) -> Path:
-    root = skill_root if skill_root is not None else skill_root_path()
-    return root / LEGACY_STATE_DIRNAME / STATE_FILENAME
 
 
 def default_thin_skill_dir(agent_id: str, skill_root: Optional[Path] = None) -> str:
@@ -41,10 +35,6 @@ def _empty_state() -> dict[str, Any]:
 
 def load_state(skill_root: Optional[Path] = None) -> dict[str, Any]:
     path = state_file_path(skill_root)
-    if not path.is_file():
-        legacy_path = legacy_state_file_path(skill_root)
-        if legacy_path.is_file():
-            path = legacy_path
     if not path.is_file():
         return _empty_state()
     try:
@@ -79,14 +69,6 @@ def save_state(payload: Mapping[str, Any], skill_root: Optional[Path] = None) ->
     path = state_file_path(skill_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(dict(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    legacy_path = legacy_state_file_path(skill_root)
-    if legacy_path != path and legacy_path.is_file():
-        legacy_path.unlink(missing_ok=True)
-        legacy_dir = legacy_path.parent
-        try:
-            legacy_dir.rmdir()
-        except OSError:
-            pass
     return path
 
 
@@ -318,32 +300,6 @@ def sync_agent_state(
     agents[resolved_agent_id] = agent_state
     save_state(payload, resolved_skill_root)
     return agent_state
-
-
-def update_template_id(
-    agent_id: str,
-    *,
-    thin_skill_template_id: str,
-    skill_root: Optional[Path] = None,
-) -> Optional[dict[str, Any]]:
-    resolved_agent_id = _string(agent_id)
-    if not resolved_agent_id:
-        raise ValueError("agent_id cannot be empty")
-    resolved_template_id = _string(thin_skill_template_id)
-    if not resolved_template_id:
-        raise ValueError("thin_skill_template_id cannot be empty")
-
-    resolved_skill_root = skill_root if skill_root is not None else skill_root_path()
-    payload = load_state(resolved_skill_root)
-    agents = payload["agents"]
-    agent_state = agents.get(resolved_agent_id)
-    if agent_state is None or not isinstance(agent_state, dict):
-        return None
-
-    agent_state["thin_skill_template_id"] = resolved_template_id
-    agents[resolved_agent_id] = agent_state
-    save_state(payload, resolved_skill_root)
-    return dict(agent_state)
 
 
 def mark_instance_used(

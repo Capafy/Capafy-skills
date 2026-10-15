@@ -1,29 +1,37 @@
-# User Skill API Download
+# User Skill API Reference
 
-## A23 `GET /agent/orders/buyer/{orderId}/download`
+Shared authentication, units and endpoint index: [00_overview.md](00_overview.md).
 
-Get download information for a specified order. Both Download Agent orders and Run Online orders use this endpoint. Run Online orders download the Thin Skill.
+## A25 `GET /agent/agent/agents/{agentId}/package`
 
-```http
-GET /agent/orders/buyer/{orderId}/download
-Authorization: Bearer {token}
-```
+Download a Skill package
 
-### Path Parameters
+Obtain the installation package URL for a product's currently published version. Free packages still require login; paid packages also require a valid purchase record.
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| orderId | string | Yes | Order ID; supports `buy-`, `hou-`, `cre-`, `str-` prefixes |
+#### Endpoint details
 
-### Query Parameters
+`GET /agent/agent/agents/{agentId}/package`
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| appVersionId | string | No | Specific historical Skill version ID to download; Download Agent orders only |
+Requires Access Token authentication; only the current user's data is accessible.
 
-Compatibility note: current backend reference sections disagree on this parameter. The version-list section documents `appVersionId`, while the order-download section says the endpoint currently has no query parameters. Confirm backend support before relying on historical-version download in new integrations.
 
-### Download Agent Order Response
+#### Request parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| agentId | path string | Yes | Actual ID of the target download-type Agent |
+
+No body or query parameters.
+
+#### Permission rules
+
+- Agent main status must be online; both main and version types must be download.
+- The card must be the latest published version, have passed review, and have a bound installation package.
+- The version must have a billing plan and the package must have packageUrl.
+- The package is free if any plan's relevant amount is non-null and <=0: oneTimeFee for download, hourlyPrice for hourly, cyclePrice for subscription.
+- Non-free packages require a valid purchase record for that agentId owned by the current user.
+
+#### Successful response
 
 ```json
 {
@@ -31,14 +39,103 @@ Compatibility note: current backend reference sections disagree on this paramete
   "msg": "ok",
   "data": {
     "skillInstall": {
-      "url": "https://s3.amazonaws.com/bucket/xxx?X-Amz-Signature=..."
+      "url": "https://example.com/signed-package-url",
+      "licenseId": null
     },
     "thinSkillTemplate": null
   }
 }
 ```
 
-### Run Online Order Response
+| Field | Type | Description |
+| --- | --- | --- |
+| skillInstall | object | Skill installation information |
+| skillInstall.url | string | Installation package URL; GET directly |
+| skillInstall.licenseId | null | Always null in this product-based download endpoint |
+| thinSkillTemplate | null | Always null in this endpoint |
+
+The endpoint first attempts to sign a storage download URL. If signing fails and the original packageUrl is HTTP/HTTPS, it returns that original URL. Presigned links follow the expires configuration; request another after expiration.
+
+#### Failure cases
+
+| code | Scenario |
+| --- | --- |
+| 400 | Empty Agent ID |
+| 2004 | Agent does not exist |
+| 2010 | Agent unpublished, not download-type, no downloadable version, no billing plan, or no package URL |
+| 4047 | Non-free package not yet purchased |
+| 401 / 1007 | Missing or invalid Access Token |
+
+#### Download delivery
+
+On success, read data.skillInstall.url and download directly. licenseId is null in this product-based endpoint; use the purchased-order download endpoint when an order-associated License is needed. thinSkillTemplate is null; cloud-hosted templates are not provided here.
+
+Free packages require no product order but still need a valid Access Token. Paid packages return 4047 when purchase validation fails. Call again for a fresh URL after expiration.
+
+## A23 `GET /agent/orders/buyer/{orderId}/download`
+
+Get order download information
+
+Deliver downloads according to a purchased order: download products provide Skill installation information, while cloud-hosted products provide Thin Skill template installation information.
+
+#### Endpoint details
+
+`GET /agent/orders/buyer/{orderId}/download`
+
+Requires Access Token authentication; only the current user's data is accessible.
+
+
+#### Request parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| orderId | path string | Yes | Buyer order or subscription bill ID: buy- / hou- / cre- / str- |
+
+No body or query parameters. Installation information is returned according to order type.
+
+#### Response fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| skillInstall | object | Skill installation information; returned only for download orders |
+| thinSkillTemplate | object | Thin Skill template installation information |
+
+##### skillInstall
+
+| Field | Type | Description |
+| --- | --- | --- |
+| url | string | Temporary download URL signed according to configuration; GET directly and call this endpoint again after expiration |
+| licenseId | string | Order-associated License ID; null if not enabled or bound |
+
+##### thinSkillTemplate
+
+| Field | Type | Description |
+| --- | --- | --- |
+| thinSkillTemplateId | string | Template ID |
+| folderName | string | Local installation directory name |
+| objectKey | string | S3 object path |
+| downloadUrl | string | Template download URL |
+| sha256 | string | Package artifact SHA-256 |
+
+#### Successful response
+
+Download order:
+
+```json
+{
+  "code": 0,
+  "msg": "ok",
+  "data": {
+    "skillInstall": {
+      "url": "https://example.com/signed-package-url",
+      "licenseId": "license_123"
+    },
+    "thinSkillTemplate": null
+  }
+}
+```
+
+Hosted order:
 
 ```json
 {
@@ -47,60 +144,72 @@ Compatibility note: current backend reference sections disagree on this paramete
   "data": {
     "skillInstall": null,
     "thinSkillTemplate": {
-      "thinSkillTemplateId": "tst_019d3c7f-58cc-7437-a567-6e02b2c3d479",
-      "folderName": "capafy-agent-agent_123",
-      "objectKey": "thin-skill/templates/tst_xxx/capafy-agent-agent_123.zip",
-      "downloadUrl": "https://example.com/presigned-download-url",
+      "thinSkillTemplateId": "template_123",
+      "folderName": "My_Agent",
+      "objectKey": "thin-skill/templates/template_123/My_Agent.zip",
+      "downloadUrl": "https://example.com/signed-template-url",
       "sha256": "abc123"
     }
   }
 }
 ```
 
-Key points:
+#### Download rules
 
-- Download Agent orders return `skillInstall.url` (presigned; valid for 60 minutes)
-- Run Online orders return `thinSkillTemplate` (includes template ID, folder name, download URL, SHA-256)
-- Only orders with status `paid` / `completed` are allowed to download
-- Re-call this endpoint to get a new link after the link expires
+- The order must belong to the current user. Download orders allow downloads in paid / completed. In refunding, repeat downloads are also allowed if this user previously obtained a download URL successfully for the Agent.
+- Download orders default to the latest published, review-approved version with a bound package. Eligible published packages remain accessible after the Agent is delisted.
+- Hosted hourly orders and Credit / Stripe subscription bills require paid / completed and return the Thin Skill template for the order's version.
+- Successfully generating a download-type URL records download activity and writes firstDownloadAt on the first issuance.
+- The storage service signs the returned links; validity depends on deployment configuration. Save licenseId if present and download using url / downloadUrl.
 
-Response fields:
+#### Failure cases
 
-| Field | Type | Description |
-|---|---|---|
-| data.skillInstall | object/null | Download Agent install information. `null` for Run Online orders. |
-| data.skillInstall.url | string | Temporary presigned package download URL. Use it with HTTP GET before it expires. |
-| data.thinSkillTemplate | object/null | Thin Skill template metadata. Present for Run Online orders. |
-| data.thinSkillTemplate.thinSkillTemplateId | string | Thin Skill template ID. |
-| data.thinSkillTemplate.folderName | string | Suggested local folder name, commonly `capafy-agent-{agentId}`. |
-| data.thinSkillTemplate.objectKey | string | Object storage key for the Thin Skill template archive. |
-| data.thinSkillTemplate.downloadUrl | string | Temporary presigned template download URL. |
-| data.thinSkillTemplate.sha256 | string/null | SHA-256 checksum when available. |
+| code | Scenario |
+| --- | --- |
+| 4003 | Order missing or not owned by the user |
+| 4047 | Order status disallows downloading |
+| 2014 | No downloadable Skill version |
+| 2024 | Package missing or has no packageUrl |
+| 4018 | Free trial, daily-free, and request-pack orders do not support this download operation |
+| 4019 | Unsupported or unrecognized order type |
+| 401 / 1007 | Missing or invalid Access Token |
 
-### Error Codes
+Storage signing or Thin Skill template query failures return the corresponding business errors.
 
-| Scenario | Error Code | Description |
-|----------|------------|-------------|
-| Unsupported orderId type | 4019 | This order type does not support download |
-| orderId not found or does not belong to current buyer | 4003 | Query failed |
-| Order not paid or status not downloadable | 4047 | Only `paid` / `completed` allowed |
-| Specified historical version is invalid | 2014 | Only relevant when backend support for `appVersionId` is enabled |
-| Install package does not exist | 2024 | No install package bound or packageUrl is empty |
+#### Using installation information
+
+Read either skillInstall or thinSkillTemplate according to order type. For downloads, use url and retain a nonempty licenseId for the corresponding installation authorization. For hosted products, download the template through downloadUrl and use folderName as the local directory name; sha256 verifies the downloaded artifact.
+
+This endpoint has no query parameter for selecting a historical version. Downloads default to the latest eligible published package; repeat downloads during refunding follow this chapter's download rules. Save the order ID and installation information, and request a fresh temporary URL after expiration.
 
 ## A24 `GET /agent/skill/{agentId}/versions`
 
-Query the version history of a specified Skill. Returns only officially published versions with an install package, sorted by version number in descending order.
+List Skill version history
 
-```http
-GET /agent/skill/{agentId}/versions
-Authorization: Bearer {token}
-```
+Query version history for Agents owned by the current account. Ordinary buyers cannot read another developer's version history solely through a purchase record; the returned list is not a list of versions downloadable by buyers.
 
-Path parameters:
+#### Endpoint details
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| agentId | string | Yes | Download Agent ID. Run Online Agents are not valid here. |
+`GET /agent/skill/{agentId}/versions`
+
+Requires Access Token authentication; only the current user's data is accessible.
+
+
+#### Request parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| agentId | path string | Yes | Agent ID owned by the current user |
+
+No body, query parameters, or pagination.
+
+#### Actual permissions and query scope
+
+This endpoint validates product ownership using Agent ID and the signed-in user; the current user must own the Agent. A purchase record alone does not allow ordinary buyers to query someone else's Agent versions.
+
+Returns all nondeleted version cards for the Agent in descending versionNo and createdAt order. No additional filtering by type, publication status, review result, or bound package is applied, so the response cannot directly serve as a buyer-downloadable version list.
+
+#### Successful response
 
 ```json
 {
@@ -108,101 +217,44 @@ Path parameters:
   "msg": "ok",
   "data": [
     {
-      "appVersionId": "0195c4f8-0a1b-7d1c-a51a-4d7a2c9e1001",
+      "appVersionId": "version_123",
       "agentId": "agent_123",
       "agentType": "download",
-      "name": "capafy SQL Helper",
-      "desc": "Helps you analyze SQL, generate queries, and explain execution plans",
+      "name": "Demo Skill",
+      "desc": "Productivity tool",
       "versionNo": 3,
-      "versionName": "v1.3.0",
-      "title": "SQL Helper Pro",
-      "shortDescription": "Added explain analysis and index recommendations",
-      "createdAt": 1775801989000,
-      "updatedAt": 1775802989000
+      "versionName": "v1.0.2",
+      "title": "Demo Skill",
+      "shortDescription": "Version notes",
+      "createdAt": 1791763200000,
+      "updatedAt": 1791763200000
     }
   ]
 }
 ```
 
-Key points:
-
-- Only applicable to Download Agents (`agentType=download`); not applicable to Run Online Agents
-- Not paginated; returns all officially published versions at once
-- Use `appVersionId` with A23 only after confirming the backend supports the query parameter
-- Does not return drafts, under-review, or review-failed versions
-- Returns `2014` if `agentId` does not exist or is not a Skill
-
-Response fields:
-
 | Field | Type | Description |
-|---|---|---|
-| data[] | array | Historical published Skill versions, sorted by `versionNo` descending. |
-| data[].appVersionId | string | Historical version ID, corresponding to backend `agent_version_id`. |
-| data[].agentId | string | Agent ID. |
-| data[].agentType | string | Always `download` for this endpoint. |
-| data[].name | string | Agent main-table name. |
-| data[].desc | string/null | Agent main-table description. |
-| data[].versionNo | int | Version number. |
-| data[].versionName | string/null | Version label. |
-| data[].title | string | Version title. |
-| data[].shortDescription | string/null | Version short description. |
-| data[].createdAt | long | Creation time in Unix milliseconds. |
-| data[].updatedAt | long | Last update time in Unix milliseconds. |
+| --- | --- | --- |
+| appVersionId | string | Card agentVersionId, exposed as appVersionId |
+| agentId | string | Agent ID |
+| agentType | string | Product type; the current service does not require download |
+| name | string | Agent name |
+| desc | string | Agent short description |
+| versionNo | int | Version number |
+| versionName | string | Version name |
+| title | string | Version title |
+| shortDescription | string | Version short description |
+| createdAt | long | Creation time as a millisecond timestamp |
+| updatedAt | long | Update time as a millisecond timestamp |
 
-## A25 `GET /agent/agent/agents/{agentId}/package`
+The buyer order download endpoint has no version-selection parameter. appVersionId returned here is not a request parameter for Agent buyer order downloads.
 
-Get the download URL for the currently listed Skill version by agentId. Only supports Download Agents (`agentType=download`); does not support Run Online Agents.
+#### Failure cases
 
-```http
-GET /agent/agent/agents/{agentId}/package
-Authorization: Bearer {token}
-```
+A missing Agent or one not owned by the user returns AGENT_NOT_FOUND(2004); no cards returns data=[]. Missing or invalid Access Tokens return authentication errors.
 
-Path parameters:
+#### Buyer integration limits
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| agentId | string | Yes | Download Agent ID. |
+This endpoint does not query versions of all purchased products. Having only a purchase record without owning the Agent returns 2004. Changing userId cannot request someone else's versions because identity comes from the Access Token.
 
-```json
-{
-  "code": 0,
-  "msg": "ok",
-  "data": {
-    "skillInstall": {
-      "url": "https://example-bucket.s3.amazonaws.com/agent/download-package/demo.tar.gz?X-Amz-Signature=..."
-    },
-    "thinSkillTemplate": null
-  }
-}
-```
-
-Key points:
-
-- Only supports `agentType=download`; returns `2010` for Run Online Agents
-- Free Skills (all billing plan amounts ≤ 0) can be downloaded without a purchase
-- Paid Skills require the current buyer to have an existing purchase record; returns `4047` otherwise
-- The returned URL is a presigned download URL with an expiry; use it promptly
-- Difference from A23: A23 downloads by orderId; this endpoint downloads by agentId and always returns the latest listed version
-
-Response fields:
-
-| Field | Type | Description |
-|---|---|---|
-| data.skillInstall | object | Latest listed Skill install package metadata. |
-| data.skillInstall.url | string | Temporary package download URL, usually presigned. |
-| data.thinSkillTemplate | null | Always `null` for this endpoint because it only supports Download Agents. |
-
-### Error Codes
-
-| Scenario | Error Code | Description |
-|----------|------------|-------------|
-| Agent not found | 2004 | AGENT_NOT_FOUND |
-| Agent not online or not a Skill | 2010 | AGENT_NOT_AVAILABLE |
-| No downloadable package | 2010 | Current version has no install package bound |
-| Paid Skill not purchased | 4047 | ORDER_DOWNLOAD_NOT_ALLOWED |
-
-## Runtime Note
-
-- `scripts/install_package.py --order-id <orderId>` calls A23 to download and install
-- `thin_skill_template_id` is read from `data.thinSkillTemplate.thinSkillTemplateId` in the response JSON
+appVersionId identifies a historical card version but is not a request parameter for Agent order downloads. The list may include unpublished versions; an appVersionId alone does not guarantee download availability.

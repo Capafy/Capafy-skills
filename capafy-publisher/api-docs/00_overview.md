@@ -87,6 +87,7 @@ This is an "axiomatic" rule; it is not repeated below — only "the returned `ur
 
 - CLI entry points are `login-init`, `login-verify`, `login-token`, `publish-init`, `publish-submit`, `publish-status`, `publish-remote-status`, `publish-list`, and `publish-refresh-url`.
 - Login commands never expose tokens, OTPs, raw responses, request bodies, or token-store paths. `login-token` validates through `/agent/account` before persisting the local fallback; `401` requires a fresh login or token.
+- `login-init` returns `challenge_id` and `expires_in_sec`. Measure validity from the successful send time and use the returned value rather than a fixed lifetime. A verification attempt consumes the challenge; after failed or expired verification, request a new challenge and email code before retrying.
 - `publish-init` requires `--env` and `--runtime-dir`; an explicit single skill source additionally uses `--skill-dir`. Submit top-level `title`, `description`, and `skills` through `--selections-file`; updating an Agent also carries top-level `agent_id`.
 - Optional `lang` applies only to a new listing and accepts `en`, `es`, `fr`, `de`, `it`, `ja`, `zh`, `zh-TW`, `ar`, `nl`, `ko`, or `pt` case-insensitively.
 - `publish-submit` exposes only `prepare` and `continue_upload`. `prepare` performs or rebuilds local staging and security preparation; `continue_upload` verifies source/staging/reviewed-credential digests, validates, packages, uploads, and calls `POST /agent/agents/{agentId}/uploadPackageCredentials` exactly once. It uses a dispositions file for Download sensitive-value choices and an environment-selection file only for Run Online. `--deep-scan` cannot be combined with either findings-file or environment-selection-file input.
@@ -95,6 +96,8 @@ This is an "axiomatic" rule; it is not repeated below — only "the returned `ur
   ```bash
   python3 -m capafy_platform.http_cli GET "/agent/sales/trend?startDate=2026-04-20&endDate=2026-04-27"
   ```
+
+- Use `--json-stdin` instead of `--json` when shell argument quoting would alter a JSON body (for example, Windows PowerShell). They are mutually exclusive; empty or invalid stdin is rejected before sending a request. For platform responses containing `code`, the HTTP CLI exits nonzero for a business error even when HTTP status is 200; it still prints the response for diagnosis. Generic external responses are not interpreted using the platform business-code convention.
 
 - `publish-status` is local-only. `publish-remote-status` reads the latest platform version. An expired confirmation URL is refreshed through `GET /agent/agents/{agentId}/editLink`.
 - The confirmed skill selection is read from `workflowInfo.selection_groups`; the raw top-level `selectionGroups` is not authoritative.
@@ -130,7 +133,7 @@ This table is the **single source of truth** for all error codes. Interfaces ret
 Handling details:
 
 - A successful response accepts either `{ "code": 0, "data": { ... } }` or directly returns `{ "email": "...", ... }`.
-- `data: null` may be treated as an empty account object, but HTTP 401, HTTP 4xx/5xx, non-JSON, non-object, and `code != 0` are all failures.
+- `data: null` may be treated as an empty account object, but HTTP 401, HTTP 4xx/5xx, non-JSON, non-object, and `code != 0` (including `code: null`) are all failures. The explicitly supported raw account object without a `code` field remains compatible.
 - Written fields only include local login info needed, e.g., `access_token`, `user_id`, `email`, `name`; the CLI response must not contain `access_token`.
 - `login-init`, `login-verify`, and `login-token` never expose the request body, raw response, OTP, token-store path, or issued/supplied token in their public CLI payloads.
 

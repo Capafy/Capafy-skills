@@ -100,6 +100,29 @@ Claude Code is the local workspace being scanned. Its runtime identifier is `cla
 - Windows and WSL paths must be absolute and accessible to the system running the publisher; paths are not converted automatically.
 - If the current OpenClaw workspace is unknown, ask the creator. Do not substitute the skill directory.
 
+### Single and multiple skill uploads
+
+Select one or more discovered skill roots for a release. A directory containing
+an entry `SKILL.md` remains one selected skill even when the creator has merged
+several component skills under it. Keep its component files and directories;
+do not split it into separate selections or synthesize a merged entry document.
+
+Download stages each selected root as a top-level skill directory. One selection
+produces one top-level directory; multiple selections produce sibling directories.
+Relative `./` and `../` references are preserved. Only explicit relative Markdown
+link destinations outside code examples are checked from the containing document's
+location in the final ZIP. Links to included files/directories and matching globs
+are allowed, including sibling skills selected in the same release. An escape
+beyond the ZIP root or a missing link target is reported separately from
+creator-local absolute paths.
+
+Commands, inline code, fenced/indented code examples, plain-text instructions, and
+configuration paths do not establish a document-relative base. Their paths may
+depend on `cd`, the skill root, runtime-generated files, or another declared working
+directory. Preserve them; do not infer that a command is wrong merely because its
+documentation is nested under `references/`. This check does not validate command
+execution or general runtime dependency completeness.
+
 ### `publish-init` inputs
 
 | Parameter | Use |

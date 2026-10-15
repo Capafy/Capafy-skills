@@ -31,12 +31,12 @@ import zipfile
 from pathlib import Path
 
 try:
-    from . import runtime_context
-    from .defaults import DEFAULT_PLATFORM_BASE_URL
+    from .common import runtime_context
+    from .common.defaults import DEFAULT_PLATFORM_BASE_URL
 except ImportError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import runtime_context  # type: ignore
-    from defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
+    from common import runtime_context  # type: ignore
+    from common.defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
 
 
 VERSION_MANIFEST_PATH = "/public/client-agent-version/user"

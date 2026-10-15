@@ -10,14 +10,14 @@ At most **5 results** per page; each result kept to **3 lines**:
 
 | Line | Content | Length Limit |
 |------|---------|--------------|
-| Line 1 | Title + rating + sales volume (free Agents get a 🆓 badge) | Title 50 chars + rating/sales ~15 chars |
-| Line 2 | Short description or tags/category fallback (truncated) | **150 characters**, truncated with "…" |
-| Line 3 | Price + billing mode; if no price in search results, show billing mode only | e.g. "$3/use \| Pay-per-Duration", "Subscription", "One-Time Purchase", or "Free" |
+| Line 1 | Title + rating + sales volume | Title 50 chars + rating/sales ~15 chars |
+| Line 2 | `agentCard.shortDescription`, then tags fallback (truncated) | **150 characters**, truncated with "…" |
+| Line 3 | Price + billing mode; if no price in search results, show billing mode only | e.g. "$3/use \| Pay-per-Duration", "Subscription", "One-Time Purchase", or "Pricing TBD" |
 
 **Example output:**
 
 ```
-🔍 Found 12 matching agents (showing 1-5)
+🔍 Found 5 matching agents on this page
 
  1. TikTok KOL Deep Analysis  ⭐4.8 (342 sales)
     Influencer data specialist: audience profiles, content performance, commercial value assessment, supports batch…
@@ -27,9 +27,9 @@ At most **5 results** per page; each result kept to **3 lines**:
     Covers TikTok/Instagram/YouTube, multi-platform KOL comparison, auto-generates analysis rep…
     $29/month | Subscription
 
- 3. KOL Quick Filter 🆓  ⭐4.2 (89 sales)
+ 3. KOL Quick Filter  ⭐4.2 (89 sales)
     Enter keywords to quickly filter matching KOLs; supports follower count/engagement rate/region filtering…
-    Free
+    Pricing TBD
 
 Enter "use N" to purchase | "next" for more results
 ```
@@ -71,26 +71,26 @@ This is a long-running task — no need to wait. Say "next step" anytime to chec
 The host or user then queries on their next turn:
 
 ```
-GET /agent/relay/instances/{instanceId}/messages
+python3 scripts/message_history.py <instanceId>
 ```
 
 Recommended result display:
 
 ```
-The task is still running. I'll pull the latest message again shortly.
+The available history does not show a completed result yet.
 ```
 
-Then display the final message and files once completed.
+Only describe the task as completed when a `done` event is returned; display its files even when content is null.
 
 ## Installation Result Output (`install_package.py`)
 
 The current script outputs JSON rather than a rich-text card:
 
 ```json
-{"installed_to":"/home/user/.opencode/skills/demo-skill","deps_ok":true,"missing_deps":[],"env_vars_needed":[]}
+{"installed_to":"/home/user/.opencode/skills/demo-skill","installed_skills":[{"installed_to":"/home/user/.opencode/skills/demo-skill","deps_ok":true,"missing_deps":[],"env_vars_needed":[]}],"shared_paths":[],"installed_shared":[],"deps_ok":true,"missing_deps":[],"env_vars_needed":[]}
 ```
 
-> **Note**: Upon receiving this JSON, the LLM should translate it into natural language and inform the user: where it was installed, whether dependencies are ready, any missing dependencies and their install commands, and any environment variables that need to be configured. Do not output the raw JSON directly.
+> **Note**: `installed_skills` and `installed_shared` contain per-item results; the top-level dependency fields aggregate both. Upon receiving this JSON, the LLM should translate it into natural language and inform the user: where every item was installed, whether dependencies are ready, any missing dependencies and their install commands, and any environment variables that need to be configured. Do not output the raw JSON directly.
 
 `env_vars_needed` comes from a heuristic scan of common environment variable references in the package; dependency installation attempts follow `requirements.txt` / `package.json` heuristically but is not equivalent to a full runtime acceptance test.
 

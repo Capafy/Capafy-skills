@@ -54,6 +54,7 @@ Use the JSON fields, not only the exit code, to decide what happens next.
 - Enter publisher login only for creator publishing or creator-account management. Generic Capafy login belongs to `capafy-user`.
 - Email login requires explicit acceptance of both the Terms of Service and Privacy Policy before `login-init`.
 - Email login flow: `login-init` then `login-verify`.
+- Use `login-init`'s `expires_in_sec` from the successful send time; never assume a fixed OTP lifetime. After a failed or expired verification, run `login-init` for a new challenge and email code before retrying `login-verify`.
 - Direct token or account switching: `login-token --access-token <token>`.
 - If the publish request itself contains an explicitly supplied token (for example `token: ...`, `token：...`, `access_token: ...`, or `access token: ...`), including a token next to a Publisher installation request, treat it as a direct developer-Skill token handoff even when it appears alongside an install request. Run `login-token` before `publish-init`; when Publisher was just installed, run it immediately after installation. A successful validation replaces the developer Skill (`capafy-publisher`) root `config.json` token. Never fall back silently to the old local token, use `capafy-user/config.json`, or echo/log the supplied token.
 - Never echo a token, OTP, authorization header, or raw login response.
@@ -118,6 +119,8 @@ Do not expose internal field names as if the creator already knows them. Transla
 - `--env` and `--runtime-dir` are always required.
 - `--runtime-dir` is the current project/workspace root, not the publisher directory and not the skill directory.
 - Use `--skill-dir` only for one explicit skill directory containing `SKILL.md`.
+- Support one selected skill or multiple selected skills in the same release. A creator-merged skill with one entry `SKILL.md` is one selection; preserve its internal component directories and files.
+- Preserve `./` and `../` references; they are not creator-local absolute paths. Packaging validates explicit relative Markdown link destinations against the final ZIP layout. Commands, code examples, and configuration paths may use a runtime working directory; do not resolve them relative to the document or rewrite the creator's source to satisfy this check.
 - Run discovery before submitting selections. Never invent a candidate path.
 - Submit selections with `--selections-file`.
 - `skills[]` must contain at least one real candidate.

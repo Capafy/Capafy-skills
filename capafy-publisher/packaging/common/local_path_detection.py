@@ -23,7 +23,7 @@ LOCAL_HOST_PATTERN = re.compile(
 
 LOCAL_PATH_PATTERN = re.compile(
     r"(?i)(?:^|[\\/])(?:home|users)(?:[\\/]|$)|"
-    r"^[A-Z]:[\\/]|^\\\\[^\\/\r\n]+\\|^\./|^\.\./"
+    r"^[A-Z]:[\\/]|^\\\\[^\\/\r\n]+\\"
 )
 
 _PUBLIC_PATH_PREFIXES = (
@@ -48,7 +48,7 @@ _REMOTE_URL_PATTERN = re.compile(
 _PATH_TOKEN_PATTERN = re.compile(
     r"(?i)("
     r"(?<![A-Za-z0-9._~<>\-`])/[^\s'\"<>:,;`\)\]\}]+"
-    r"|\.{1,2}/[^\s'\"<>:,;`\)\]\}]+"
+    r"|(?<![A-Za-z0-9._~\\/])\.{1,2}[\\/][^\s'\"<>:,;`\)\]\}]+"
     r"|~[\\/][^\s'\"<>:,;`\)\]\}]+"
     r"|(?<![A-Za-z0-9])[A-Z]:[\\/]+(?:[^\r\n'\"<>:,;`\|\s]|\s(?![A-Z]:[\\/]+|\|))+"
     r"|\\\\[^\\/\r\n\s]+\\[^\s'\"<>:,;`\)\]\}]+"
@@ -73,6 +73,15 @@ def is_packaged_runtime_ref(value: str) -> bool:
 
 def _iter_path_tokens(value: str) -> list[str]:
     return [match.group(0).strip().strip("'\"") for match in _PATH_TOKEN_PATTERN.finditer(value)]
+
+
+def _is_relative_path_token(token: str) -> bool:
+    return token.replace("\\", "/").startswith(("./", "../"))
+
+
+def iter_relative_path_refs(value: str) -> list[str]:
+    cleaned = _REMOTE_URL_PATTERN.sub(" ", value)
+    return [token for token in _iter_path_tokens(cleaned) if _is_relative_path_token(token)]
 
 
 _CODE_SYNTAX_FILE_SUFFIXES = {
@@ -132,6 +141,9 @@ def looks_like_local_path(value: str) -> bool:
     if not path_tokens:
         return False
     for token in path_tokens:
+        # Relative references require the final archive layout, not a privacy rule.
+        if _is_relative_path_token(token):
+            continue
         if is_packaged_runtime_ref(token):
             continue
         if token.startswith("~"):
@@ -168,6 +180,8 @@ def redact_local_traces_in_text(
         if _in_url_range(match.start(), match.end()):
             return match.group(0)
         token = match.group(0)
+        if _is_relative_path_token(token):
+            return token
         if is_packaged_runtime_ref(token):
             return token
         if token.startswith("~"):
@@ -193,6 +207,7 @@ __all__ = [
     "LOCAL_PATH_PATTERN",
     "LOCAL_PATH_PLACEHOLDER",
     "is_packaged_runtime_ref",
+    "iter_relative_path_refs",
     "looks_like_local_path",
     "redact_local_traces_in_text",
 ]

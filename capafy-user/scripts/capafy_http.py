@@ -13,21 +13,18 @@ from urllib.parse import urlsplit
 import uuid
 
 try:
-    from . import auth, runtime_context
-    from .defaults import DEFAULT_PLATFORM_BASE_URL
+    from . import auth
+    from .common import runtime_context
+    from .common.defaults import DEFAULT_PLATFORM_BASE_URL
 except ImportError:  # pragma: no cover - CLI fallback
     import auth  # type: ignore
-    import runtime_context  # type: ignore
-    from defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
+    from common import runtime_context  # type: ignore
+    from common.defaults import DEFAULT_PLATFORM_BASE_URL  # type: ignore
 
 
 PLATFORM_BASE_URL_ENV = "CAPAFY_PLATFORM_BASE_URL"
 EXPLICIT_AUTH_HEADER_KEYS = {"authorization", "x-access-token"}
 SKILL_VERSION_STATUS_HEADER = "X-Skill-Version-Status"
-
-
-def _normalize_headers(headers: Optional[dict[str, str]]) -> dict[str, str]:
-    return dict(headers or {})
 
 
 def platform_context_headers() -> dict[str, str]:
@@ -39,9 +36,8 @@ def _maybe_inject_platform_context_headers(
     headers: dict[str, str],
     *,
     platform_base_url: Optional[str] = None,
-    force: bool = False,
 ) -> None:
-    if not force and not _is_platform_request(url, platform_base_url=platform_base_url):
+    if not _is_platform_request(url, platform_base_url=platform_base_url):
         return
     for key, value in runtime_context.platform_context_headers().items():
         headers.setdefault(key, value)
@@ -83,33 +79,27 @@ def _resolve_platform_access_token(
     access_token: Optional[str] = None,
     *,
     auth_loader=None,
-) -> Union[tuple[str, str], tuple[None, None]]:
+) -> Optional[str]:
     explicit_token = str(access_token or "").strip()
     if explicit_token:
-        return explicit_token, "explicit_access_token"
+        return explicit_token
 
     if auth_loader is not None:
         try:
             loaded_token = str(auth_loader() or "").strip()
         except ValueError as exc:
             print(f"[http] token loader failed: {exc}", file=sys.stderr)
-            return None, None
-        if loaded_token:
-            return loaded_token, "custom_auth_loader"
-        return None, None
+            return None
+        return loaded_token or None
 
     try:
         loaded_token = auth.load_token()
     except ValueError as exc:
         print(f"[http] local platform token load failed: {exc}", file=sys.stderr)
-        return None, None
+        return None
     if not loaded_token:
-        return None, None
-    if os.environ.get(auth.PLATFORM_ACCESS_TOKEN_ENV, "").strip():
-        return loaded_token, auth.PLATFORM_ACCESS_TOKEN_ENV
-    if os.environ.get(auth.TOKEN_ENV_VAR, "").strip():
-        return loaded_token, auth.TOKEN_ENV_VAR
-    return loaded_token, "persisted_platform_token"
+        return None
+    return loaded_token
 
 
 def _maybe_inject_platform_auth_header(
@@ -127,7 +117,12 @@ def _maybe_inject_platform_auth_header(
         return
     if not _is_platform_request(url, platform_base_url=platform_base_url):
         return
-    token, _source = _resolve_platform_access_token(access_token, auth_loader=auth_loader)
+    # Public quotes identify optional Web JWTs, never buyer Access Tokens.
+    # Preserve an explicit Web identity header, but do not load local tokens.
+    base_path = urlsplit(_normalize_platform_base_url(platform_base_url)).path.rstrip("/")
+    if urlsplit(url).path.rstrip("/") == base_path + "/public/agents/subscription/prices":
+        return
+    token = _resolve_platform_access_token(access_token, auth_loader=auth_loader)
     if not token:
         return
     headers["Authorization"] = f"Bearer {token}"
@@ -167,9 +162,9 @@ def _header_value(headers, key: str) -> str:
 def _maybe_log_skill_version_status(headers) -> None:
     status = _header_value(headers, SKILL_VERSION_STATUS_HEADER).strip().lower()
     if status == "outdated":
-        print("[http] user skill update available; run `python3 scripts/self_update.py` to upgrade (X-Skill-Version-Status: outdated)", file=sys.stderr)
+        print("[http] user skill update available; run `python3 scripts/self_update_v2.py --ensure-supported` before the next operation (X-Skill-Version-Status: outdated)", file=sys.stderr)
     elif status == "deprecated":
-        print("[http] user skill version is deprecated; upgrade may be required soon", file=sys.stderr)
+        print("[http] user skill version is deprecated; run `python3 scripts/self_update_v2.py --ensure-supported` before the next operation (X-Skill-Version-Status: deprecated)", file=sys.stderr)
 
 
 def _recover_msys_mangled_url(url: str) -> str:
@@ -222,8 +217,7 @@ def request(
             raise ValueError(f"relative URL {url!r} requires a platform base URL")
         url = f"{base}{url}"
 
-    all_headers = {"Accept": "application/json"}
-    all_headers.update(_normalize_headers(headers))
+    all_headers = {"Accept": "application/json", **(headers or {})}
     _maybe_inject_platform_context_headers(
         url,
         all_headers,
@@ -338,16 +332,18 @@ def _main(argv: Optional[list[str]] = None) -> int:
     if args.file_arg:
         file_field, file_path = _parse_file_option(args.file_arg)
 
-    auth_loader = None if args.no_auth else auth.load_token
+    url = _recover_msys_mangled_url(args.url)
+    if url.startswith("/"):
+        url = f"{_normalize_platform_base_url(None)}{url}"
+
     body, status = request(
         args.method,
-        args.url,
+        url,
         json_body=json_body,
         headers=headers,
         out_file=args.out_file,
         file_field=file_field,
         file_path=file_path,
-        auth_loader=auth_loader,
         auto_platform_auth=not (args.no_auth or args.no_auto_platform_token),
         access_token=args.access_token,
     )
@@ -360,7 +356,16 @@ def _main(argv: Optional[list[str]] = None) -> int:
         print(json.dumps(body, ensure_ascii=False, indent=2))
     else:
         print(body)
-    return 0 if status < 400 else 1
+    if status >= 400:
+        return 1
+    if (
+        _is_platform_request(url)
+        and isinstance(body, dict)
+        and "code" in body
+        and body["code"] not in (0, "0")
+    ):
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
