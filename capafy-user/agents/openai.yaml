@@ -1,0 +1,5 @@
+interface:
+  display_name: "Capafy User"
+  short_description: "Discover, purchase, and manage Capafy Agents"
+  icon_small: "./assets/icon.svg"
+  icon_large: "./assets/icon.png"

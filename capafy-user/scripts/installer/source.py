@@ -252,9 +252,15 @@ def _fetch_agent_instances(
 
 
 def _download_archive_from_url(url: str, destination: Path) -> None:
+    # Identify the installed Skill explicitly: the production CDN rejects urllib's
+    # default Python User-Agent. Read the release version instead of hardcoding it;
+    # if metadata is unavailable, retain the product name without inventing a version.
+    # Keep these headers separate from platform headers so buyer tokens stay off the CDN.
+    version = runtime_context.load_app_version()
+    user_agent = f"CapafyUser/{version}" if version else "CapafyUser"
     request = urllib.request.Request(
         url,
-        headers={"Accept": "application/octet-stream"},
+        headers={"Accept": "application/octet-stream", "User-Agent": user_agent},
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=120) as response:

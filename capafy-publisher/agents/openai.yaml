@@ -1,0 +1,5 @@
+interface:
+  display_name: "Capafy Publisher"
+  short_description: "Publish and manage Capafy Agents and Skills"
+  icon_small: "./assets/icon.svg"
+  icon_large: "./assets/icon.png"

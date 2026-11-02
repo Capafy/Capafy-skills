@@ -15,6 +15,40 @@ Read the matching workflow reference when needed; do not preload every reference
 or the entire API manual. Run commands from the installed Skill root; script
 paths are relative to that root.
 
+## ZIP installation completion
+
+After successfully installing this skill (`capafy-user`) from a ZIP, show this standalone line before continuing with login or buyer workflows:
+
+```text
+✅ Capafy user skill installed successfully! Version <version>
+```
+
+Replace `<version>` with `version` from the installed skill's `api-docs/index.json`. For version `0.4.9`, the exact message is:
+
+```text
+✅ Capafy user skill installed successfully! Version 0.4.9
+```
+
+Show the message only after installation succeeds. If installation fails or the installed version cannot be read, report the failure instead of claiming success or guessing a version. This message applies to installing `capafy-user` itself, not purchased Agent packages or Thin Skills.
+
+Immediately below the success line, display the installed skill's `assets/icon.png` on its own line, before any login or buyer workflow instructions. In hosts that render local Markdown images, use `![Capafy](<absolute-path-to-installed-skill/assets/icon.png>)` outside a code block, with blank lines around it. Replace the placeholder with the actual absolute path inside the installed `capafy-user` directory; do not use the source repository or the original attachment path. Keep angle brackets around the path so spaces are supported.
+
+If the host cannot render local images, use its supported image-display mechanism when available. If the image is missing or cannot be displayed, retain the installation success text and briefly state that the icon could not be displayed; this does not turn a successful installation into a failure. Do not claim that an image was displayed when rendering is unverified.
+
+## Upgrade completion
+
+After successfully upgrading this skill (`capafy-user`), either through self-update or by replacing an older installation with a ZIP, show this standalone line before resuming buyer workflows:
+
+```text
+✅ Capafy user skill upgraded successfully! Version <version>
+```
+
+Read `<version>` from the upgraded skill's `api-docs/index.json`. For a ZIP upgrade, use this message instead of the installation message. This message does not apply to purchased Agent packages or Thin Skills.
+
+For self-update, show success only when the updater reports `updated` with no pending files, or when pending-file finalization promotes files and leaves none pending. For `updated_with_pending`, `restart_required`, or remaining pending files, follow the restart and finalization steps in the entry update gate below before showing success. A version number alone does not prove all files were replaced. After showing success, still reread this entry and relevant references and rerun the gate before resuming.
+
+An available update or an already-current installation is not a completed upgrade. Report update failures or an unreadable installed version instead of showing success.
+
 ## Routing
 
 - For conversations with an installed matching Thin Skill (`capafy-agent-*`),
