@@ -112,8 +112,8 @@ Both modes use the same publishing flow. You pick the mode during review, right 
 In your agent client's chat, send:
 
 ```
-install https://capafy.ai/install-publisher-skill.md
-install https://capafy.ai/install-user-skill.md
+install https://api.capafy.ai/install-publisher-skill.md
+install https://api.capafy.ai/install-user-skill.md
 ```
 
 Install the Publisher Skill to publish, the User Skill to use others' Skills, or both.
